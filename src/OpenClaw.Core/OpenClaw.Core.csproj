@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OpenClaw</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\OpenClaw\Helpers\AtomicFileWriter.cs" Link="Helpers\AtomicFileWriter.cs" />
+    <Compile Include="..\OpenClaw\Helpers\LogFileUtilities.cs" Link="Helpers\LogFileUtilities.cs" />
+    <Compile Include="..\OpenClaw\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
+    <Compile Include="..\OpenClaw\Models\EnvironmentConfig.cs" Link="Models\EnvironmentConfig.cs" />
+    <Compile Include="..\OpenClaw\Models\RecoveryModels.cs" Link="Models\RecoveryModels.cs" />
+    <Compile Include="..\OpenClaw\Models\RecoveryPolicyOptions.cs" Link="Models\RecoveryPolicyOptions.cs" />
+    <Compile Include="..\OpenClaw\Services\AppTelemetry.cs" Link="Services\AppTelemetry.cs" />
+    <Compile Include="..\OpenClaw\Services\ConfigurationService.cs" Link="Services\ConfigurationService.cs" />
+    <Compile Include="..\OpenClaw\Services\ControlUiLatencyService.cs" Link="Services\ControlUiLatencyService.cs" />
+    <Compile Include="..\OpenClaw\Services\IAppLogger.cs" Link="Services\IAppLogger.cs" />
+    <Compile Include="..\OpenClaw\Services\LatencyHistory.cs" Link="Services\LatencyHistory.cs" />
+    <Compile Include="..\OpenClaw\Services\LoggingService.cs" Link="Services\LoggingService.cs" />
+    <Compile Include="..\OpenClaw\Services\SessionProbeModels.cs" Link="Services\SessionProbeModels.cs" />
+    <Compile Include="..\OpenClaw\Services\ShellSessionCoordinator*.cs"
+             Exclude="..\OpenClaw\Services\ShellSessionCoordinator.Adapters.cs"
+             Link="Services\%(Filename)%(Extension)" />
+    <Compile Include="..\OpenClaw\Services\SingleInstanceCoordinator.cs" Link="Services\SingleInstanceCoordinator.cs" />
+    <Compile Include="..\OpenClaw\Services\TrayClosePolicy.cs" Link="Services\TrayClosePolicy.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RootNamespace>OpenClaw</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <ApplicationIcon>Assets\WindowIcon.ico</ApplicationIcon>
+    <Version>3.1.1</Version>
+    <AssemblyVersion>3.1.1.0</AssemblyVersion>
+    <FileVersion>3.1.1.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260416003" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenClaw.Core\OpenClaw.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Helpers\AtomicFileWriter.cs" />
+    <Compile Remove="Helpers\LogFileUtilities.cs" />
+    <Compile Remove="Models\AppSettings.cs" />
+    <Compile Remove="Models\EnvironmentConfig.cs" />
+    <Compile Remove="Models\RecoveryModels.cs" />
+    <Compile Remove="Models\RecoveryPolicyOptions.cs" />
+    <Compile Remove="Services\AppTelemetry.cs" />
+    <Compile Remove="Services\ConfigurationService.cs" />
+    <Compile Remove="Services\ControlUiLatencyService.cs" />
+    <Compile Remove="Services\IAppLogger.cs" />
+    <Compile Remove="Services\LatencyHistory.cs" />
+    <Compile Remove="Services\LoggingService.cs" />
+    <Compile Remove="Services\SessionProbeModels.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Attach.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Dependencies.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.EventHandlers.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Events.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Helpers.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Host.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Recovery.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.RecoveryInspection.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.RecoveryLifecycle.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.RecoveryStateTransitions.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.State.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.StateEffects.cs" />
+    <Compile Remove="Services\ShellSessionCoordinator.Telemetry.cs" />
+    <Compile Remove="Services\SingleInstanceCoordinator.cs" />
+    <Compile Remove="Services\TrayClosePolicy.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1621 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenClaw Manager Operations Console</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101112;
+      --bg-raised: #17191c;
+      --surface: #1d2024;
+      --surface-2: #24282d;
+      --surface-3: #2a2f35;
+      --line: rgba(255, 255, 255, 0.12);
+      --line-strong: rgba(255, 255, 255, 0.2);
+      --text: #f5f1e8;
+      --muted: #bbb5aa;
+      --soft: #8d897f;
+      --green: #36d17e;
+      --cyan: #47bfe7;
+      --amber: #f0b24e;
+      --rose: #f46f8e;
+      --ink: #101112;
+      --shadow: rgba(0, 0, 0, 0.38);
+      --radius: 8px;
+      --topbar: 64px;
+      font-family:
+        "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        system-ui,
+        sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        linear-gradient(180deg, #101112 0%, #141518 44%, #101112 100%);
+      color: var(--text);
+      overflow-x: hidden;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 4px;
+    }
+
+    .page-shell {
+      position: relative;
+      isolation: isolate;
+    }
+
+    .topbar {
+      position: fixed;
+      z-index: 30;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--topbar);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(1rem, 3vw, 2.4rem);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(16, 17, 18, 0.86);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.7rem;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      background: var(--surface-2);
+      position: relative;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      width: 7px;
+      height: 17px;
+      top: 8px;
+      border: 2px solid var(--green);
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+      transform: rotate(-18deg);
+    }
+
+    .brand-mark::after {
+      border-color: var(--cyan);
+      transform: rotate(18deg);
+    }
+
+    .brand-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 800;
+      font-size: 0.96rem;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: clamp(0.8rem, 2vw, 1.2rem);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .nav a {
+      padding: 0.2rem 0;
+      border-bottom: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .nav a:hover {
+      color: var(--text);
+      border-color: var(--cyan);
+    }
+
+    main {
+      min-height: 100vh;
+    }
+
+    .hero {
+      min-height: min(860px, 100svh);
+      position: relative;
+      display: grid;
+      align-items: center;
+      padding: calc(var(--topbar) + 2.2rem) clamp(1rem, 4vw, 4rem) 2.2rem;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(16, 17, 18, 0.98) 0%, rgba(16, 17, 18, 0.88) 45%, rgba(16, 17, 18, 0.54) 100%),
+        linear-gradient(180deg, #101112 0%, #15171a 100%);
+    }
+
+    #topologyCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: #101112;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 12rem;
+      z-index: -1;
+      background: linear-gradient(180deg, rgba(16, 17, 18, 0), #141518);
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      width: min(1220px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 0.78fr) minmax(430px, 1fr);
+      gap: clamp(1.8rem, 4vw, 4rem);
+      align-items: center;
+    }
+
+    .hero-copy {
+      max-width: 580px;
+      animation: enterUp 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .eyebrow {
+      display: inline-grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 0.55rem;
+      margin-bottom: 1rem;
+      color: var(--green);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(54, 209, 126, 0.75);
+      animation: statusPulse 1800ms ease-in-out infinite;
+    }
+
+    h2,
+    h3,
+    p {
+      overflow-wrap: anywhere;
+    }
+
+    .hero-title {
+      margin: 0;
+      width: fit-content;
+      max-width: 100%;
+      display: inline-grid;
+      gap: 0.22rem;
+      justify-items: start;
+      color: var(--text);
+      font-size: 5.5rem;
+      line-height: 0.86;
+      font-weight: 900;
+      letter-spacing: 0;
+      overflow-wrap: normal;
+      word-break: keep-all;
+    }
+
+    .hero-title span {
+      display: block;
+      position: relative;
+      white-space: nowrap;
+    }
+
+    .hero-title-main {
+      color: var(--text);
+      text-shadow:
+        -1px 0 0 rgba(54, 209, 126, 0.22),
+        1px 0 0 rgba(71, 191, 231, 0.26),
+        0 0 22px rgba(71, 191, 231, 0.12),
+        0 18px 46px rgba(0, 0, 0, 0.4);
+    }
+
+    .hero-title-main::before,
+    .hero-title-main::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .hero-title-main::before {
+      left: 0.04em;
+      right: 0.08em;
+      top: 0.52em;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(71, 191, 231, 0.7), transparent);
+      opacity: 0.42;
+    }
+
+    .hero-title-main::after {
+      left: 0.03em;
+      right: 0.02em;
+      bottom: -0.06em;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(54, 209, 126, 0.9), rgba(71, 191, 231, 0.72), transparent);
+      box-shadow: 0 0 18px rgba(71, 191, 231, 0.28);
+      opacity: 0.8;
+    }
+
+    .hero-title-tag {
+      justify-self: end;
+      margin-top: 0.36rem;
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid rgba(71, 191, 231, 0.34);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(90deg, rgba(54, 209, 126, 0.09), rgba(71, 191, 231, 0.06)),
+        rgba(16, 17, 18, 0.64);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 0 24px rgba(71, 191, 231, 0.12);
+      color: #d8f8ff;
+      padding: 0 0.7rem;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.92rem;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .hero-title-tag::before {
+      content: "";
+      width: 0.42rem;
+      height: 0.42rem;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 14px rgba(54, 209, 126, 0.72);
+    }
+
+    .hero-lede {
+      margin: 1.25rem 0 0;
+      max-width: 610px;
+      color: var(--muted);
+      font-size: clamp(1.02rem, 1.8vw, 1.22rem);
+      line-height: 1.78;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.65rem;
+    }
+
+    .button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      padding: 0 0.95rem;
+      font-weight: 800;
+      font-size: 0.92rem;
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+      white-space: nowrap;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      border-color: rgba(71, 191, 231, 0.58);
+      background: rgba(71, 191, 231, 0.12);
+    }
+
+    .button.primary {
+      background: var(--text);
+      color: var(--ink);
+      border-color: var(--text);
+    }
+
+    .button.primary:hover {
+      background: #ffffff;
+    }
+
+    .runtime-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 1.65rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--line);
+    }
+
+    .runtime-strip span {
+      min-height: 58px;
+      display: grid;
+      align-content: center;
+      gap: 0.22rem;
+      padding: 0.7rem;
+      background: rgba(29, 32, 36, 0.86);
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.25;
+    }
+
+    .runtime-strip strong {
+      color: var(--text);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.82rem;
+    }
+
+    .console-frame {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: var(--radius);
+      background: rgba(23, 25, 28, 0.88);
+      box-shadow: 0 28px 80px var(--shadow);
+      overflow: hidden;
+      animation: enterPanel 760ms 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .console-titlebar {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0 0.9rem;
+      background: rgba(255, 255, 255, 0.055);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 0.42rem;
+      flex: 0 0 auto;
+    }
+
+    .window-controls span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--soft);
+    }
+
+    .window-controls span:nth-child(1) {
+      background: var(--rose);
+    }
+
+    .window-controls span:nth-child(2) {
+      background: var(--amber);
+    }
+
+    .window-controls span:nth-child(3) {
+      background: var(--green);
+    }
+
+    .console-title {
+      min-width: 0;
+      color: var(--muted);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.78rem;
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .console-body {
+      padding: clamp(0.9rem, 2vw, 1.1rem);
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .status-board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .status-cell {
+      min-height: 112px;
+      background: rgba(255, 255, 255, 0.045);
+      padding: 0.86rem;
+      display: grid;
+      align-content: space-between;
+      gap: 0.85rem;
+    }
+
+    .status-cell small {
+      color: var(--soft);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .status-cell strong {
+      color: var(--text);
+      font-size: clamp(1.15rem, 2vw, 1.55rem);
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .status-cell span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .status-cell[data-tone="green"] {
+      color: var(--green);
+      border-top: 2px solid var(--green);
+    }
+
+    .status-cell[data-tone="cyan"] {
+      color: var(--cyan);
+      border-top: 2px solid var(--cyan);
+    }
+
+    .status-cell[data-tone="amber"] {
+      color: var(--amber);
+      border-top: 2px solid var(--amber);
+    }
+
+    .status-cell[data-tone="rose"] {
+      color: var(--rose);
+      border-top: 2px solid var(--rose);
+    }
+
+    .terminal-grid {
+      display: grid;
+      grid-template-columns: 0.78fr 1fr;
+      gap: 0.9rem;
+    }
+
+    .origin-panel,
+    .trace-panel {
+      min-height: 245px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+        rgba(255, 255, 255, 0.035);
+      padding: 0.9rem;
+    }
+
+    .panel-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      margin-bottom: 0.8rem;
+      color: var(--soft);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border: 1px solid rgba(54, 209, 126, 0.34);
+      border-radius: 999px;
+      padding: 0 0.55rem;
+      color: var(--green);
+      background: rgba(54, 209, 126, 0.08);
+      font-size: 0.66rem;
+      white-space: nowrap;
+    }
+
+    .origin-list {
+      display: grid;
+      gap: 0.58rem;
+    }
+
+    .origin-row {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 0.7rem;
+      align-items: baseline;
+      min-height: 35px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+      padding-bottom: 0.55rem;
+    }
+
+    .origin-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .origin-row dt {
+      color: var(--soft);
+      margin: 0;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .origin-row dd {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.88rem;
+      line-height: 1.35;
+    }
+
+    .trace-lines {
+      display: grid;
+      gap: 0.58rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .trace-lines li {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 0.6rem;
+      align-items: center;
+      min-height: 34px;
+      color: var(--muted);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.76rem;
+    }
+
+    .trace-lines i {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--green);
+      font-style: normal;
+      font-size: 0.68rem;
+      font-weight: 900;
+    }
+
+    .trace-lines b {
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .trace-lines em {
+      color: var(--soft);
+      font-style: normal;
+      font-size: 0.68rem;
+    }
+
+    .peek-strip {
+      position: absolute;
+      left: clamp(1rem, 4vw, 4rem);
+      right: clamp(1rem, 4vw, 4rem);
+      bottom: 1rem;
+      width: min(1220px, calc(100% - clamp(2rem, 8vw, 8rem)));
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .peek-strip a {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 0.9rem;
+      background: rgba(23, 25, 28, 0.82);
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 800;
+    }
+
+    .peek-strip a:hover {
+      color: var(--text);
+      background: rgba(71, 191, 231, 0.1);
+    }
+
+    .section {
+      padding: clamp(4rem, 8vw, 6.5rem) clamp(1rem, 4vw, 4rem);
+    }
+
+    .section-inner {
+      width: min(1220px, 100%);
+      margin: 0 auto;
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(300px, 0.62fr);
+      gap: clamp(1.5rem, 4vw, 3rem);
+      align-items: end;
+      margin-bottom: 2rem;
+    }
+
+    .section-kicker {
+      margin: 0 0 0.75rem;
+      color: var(--cyan);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.76rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      max-width: 850px;
+      font-size: clamp(2rem, 4.8vw, 4rem);
+      line-height: 1.04;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .section-lede {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--line);
+    }
+
+    .matrix-item {
+      min-height: 260px;
+      display: grid;
+      align-content: space-between;
+      gap: 2rem;
+      padding: 1.05rem;
+      background: rgba(29, 32, 36, 0.9);
+      position: relative;
+    }
+
+    .matrix-item::after {
+      content: "";
+      position: absolute;
+      left: 1.05rem;
+      right: 1.05rem;
+      bottom: 1.05rem;
+      height: 2px;
+      background: currentColor;
+      opacity: 0.35;
+      transform: scaleX(0.22);
+      transform-origin: left;
+      transition: transform 420ms ease;
+    }
+
+    .matrix-item:hover::after {
+      transform: scaleX(1);
+    }
+
+    .matrix-item:nth-child(1) {
+      color: var(--green);
+    }
+
+    .matrix-item:nth-child(2) {
+      color: var(--cyan);
+    }
+
+    .matrix-item:nth-child(3) {
+      color: var(--amber);
+    }
+
+    .matrix-item:nth-child(4) {
+      color: var(--rose);
+    }
+
+    .code-label {
+      color: currentColor;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.76rem;
+      font-weight: 800;
+    }
+
+    .matrix-item h3,
+    .state-step h3 {
+      margin: 0 0 0.7rem;
+      color: var(--text);
+      font-size: 1.14rem;
+      line-height: 1.2;
+    }
+
+    .matrix-item p,
+    .state-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.62;
+    }
+
+    .state-section {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
+        #151719;
+      border-block: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .state-machine {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.75rem;
+      align-items: stretch;
+    }
+
+    .state-step {
+      min-height: 190px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.045);
+      padding: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .state-step::before {
+      content: attr(data-index);
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 1rem;
+      border-radius: 50%;
+      background: var(--text);
+      color: var(--ink);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.76rem;
+      font-weight: 900;
+    }
+
+    .state-step::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--cyan);
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: stateSweep 6s linear infinite;
+      animation-delay: calc(var(--delay) * 1s);
+    }
+
+    .data-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.76fr) minmax(360px, 1fr);
+      gap: clamp(1.5rem, 4vw, 3rem);
+      align-items: start;
+    }
+
+    .data-note {
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 1rem;
+    }
+
+    .data-stack {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .data-row {
+      display: grid;
+      grid-template-columns: 132px 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      min-height: 76px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.045);
+      padding: 0.95rem;
+    }
+
+    .data-row strong {
+      color: var(--text);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.82rem;
+    }
+
+    .data-row span {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .data-row em {
+      color: var(--soft);
+      font-style: normal;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+
+    .closing {
+      min-height: 58vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: clamp(4rem, 8vw, 6rem) clamp(1rem, 4vw, 4rem);
+      background: #101112;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .closing h2 {
+      margin: 0 auto;
+      max-width: 800px;
+    }
+
+    .closing p {
+      max-width: 680px;
+      margin: 1rem auto 0;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 1rem;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 680ms ease, transform 680ms ease;
+    }
+
+    .reveal.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @keyframes enterUp {
+      from {
+        opacity: 0;
+        transform: translateY(28px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes enterPanel {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes statusPulse {
+      0%, 100% {
+        opacity: 0.58;
+        transform: scale(0.88);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.12);
+      }
+    }
+
+    @keyframes stateSweep {
+      0%, 12% {
+        transform: scaleX(0);
+      }
+      20%, 36% {
+        transform: scaleX(1);
+      }
+      46%, 100% {
+        transform: scaleX(0);
+      }
+    }
+
+    @media (max-width: 1120px) {
+      .hero {
+        min-height: auto;
+        padding-bottom: 5.2rem;
+      }
+
+      .hero-grid,
+      .section-heading,
+      .data-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-copy {
+        max-width: 760px;
+      }
+
+      .hero-title {
+        font-size: 4.6rem;
+      }
+
+      .status-board,
+      .matrix {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .state-machine {
+        grid-template-columns: 1fr;
+      }
+
+      .state-step {
+        min-height: 142px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      :root {
+        --topbar: 58px;
+      }
+
+      .nav {
+        display: none;
+      }
+
+      .hero {
+        padding-top: calc(var(--topbar) + 1.4rem);
+        padding-bottom: 1.2rem;
+      }
+
+      .hero::after,
+      .peek-strip {
+        display: none;
+      }
+
+      .hero-grid {
+        gap: 1.25rem;
+      }
+
+      .hero-title {
+        font-size: 3.25rem;
+      }
+
+      .hero-title-tag {
+        justify-self: start;
+        min-height: 31px;
+        font-size: 0.78rem;
+      }
+
+      .hero-actions,
+      .runtime-strip,
+      .status-board,
+      .terminal-grid,
+      .matrix,
+      .data-row {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions {
+        display: grid;
+      }
+
+      .button {
+        width: 100%;
+        white-space: normal;
+        text-align: center;
+      }
+
+      .runtime-strip {
+        display: grid;
+      }
+
+      .console-titlebar {
+        align-items: start;
+        flex-direction: column;
+        padding: 0.72rem 0.9rem;
+      }
+
+      .origin-row {
+        grid-template-columns: 1fr;
+        gap: 0.2rem;
+      }
+
+      .trace-lines li {
+        grid-template-columns: 24px 1fr;
+      }
+
+      .trace-lines em {
+        grid-column: 2;
+      }
+
+      .matrix-item {
+        min-height: 205px;
+      }
+
+      .data-row em {
+        white-space: normal;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .hero-title {
+        font-size: 2.7rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="OpenClaw Manager">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-title">OpenClaw Manager</span>
+      </a>
+      <nav class="nav" aria-label="页面导航">
+        <a href="#features">能力矩阵</a>
+        <a href="#recovery">恢复状态机</a>
+        <a href="#storage">本地数据</a>
+        <a href="https://github.com/Jutaosay/openclaw_for_windows" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-label="OpenClaw Manager Operations Console">
+        <canvas id="topologyCanvas" aria-hidden="true"></canvas>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">Operations Console / WinUI 3 Shell</div>
+            <h1 class="hero-title" aria-label="OpenClaw Manager">
+              <span class="hero-title-main">OpenClaw</span>
+              <span class="hero-title-tag">Manager</span>
+            </h1>
+            <p class="hero-lede">
+              面向远程 Gateway 的 Windows 原生入口。它不替换 Control UI，而是把 WebView2 会话、网络恢复、环境隔离和本地诊断收束成一个可观察的桌面控制台。
+            </p>
+            <div class="hero-actions" aria-label="快速操作">
+              <a class="button primary" href="#features">查看运行能力</a>
+              <a class="button" href="#recovery">理解恢复链路</a>
+              <a class="button" href="https://github.com/Jutaosay/openclaw_for_windows" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>
+            </div>
+            <div class="runtime-strip" aria-label="运行边界">
+              <span><strong>remote-first</strong>Gateway 与模型运行在远端</span>
+              <span><strong>session-scoped</strong>每个环境独立 WebView2 profile</span>
+              <span><strong>local-observable</strong>设置、日志和诊断留在本机</span>
+            </div>
+          </div>
+
+          <aside class="console-frame" aria-label="运行态控制台示意">
+            <div class="console-titlebar">
+              <div class="window-controls" aria-hidden="true"><span></span><span></span><span></span></div>
+              <div class="console-title">OpenClaw.Manager / Operations Console</div>
+            </div>
+            <div class="console-body">
+              <div class="status-board" aria-label="运行状态">
+                <div class="status-cell" data-tone="green">
+                  <small>Environment</small>
+                  <strong>default</strong>
+                  <span>Control UI origin 已绑定到当前桌面窗口。</span>
+                </div>
+                <div class="status-cell" data-tone="cyan">
+                  <small>Connection</small>
+                  <strong>42 ms</strong>
+                  <span>Heartbeat 通过 HTTPS endpoint 持续探测。</span>
+                </div>
+                <div class="status-cell" data-tone="amber">
+                  <small>Recovery</small>
+                  <strong>soft-first</strong>
+                  <span>先重连和轻同步，再进入 reload 路径。</span>
+                </div>
+                <div class="status-cell" data-tone="rose">
+                  <small>Logs</small>
+                  <strong>daily</strong>
+                  <span>结构化事件按日期落到 LocalAppData。</span>
+                </div>
+              </div>
+
+              <div class="terminal-grid">
+                <div class="origin-panel">
+                  <div class="panel-label">
+                    <span>active origin</span>
+                    <span class="badge">connected</span>
+                  </div>
+                  <dl class="origin-list">
+                    <div class="origin-row">
+                      <dt>shell</dt>
+                      <dd>WinUI 3 native window</dd>
+                    </div>
+                    <div class="origin-row">
+                      <dt>hosted UI</dt>
+                      <dd>WebView2 isolated profile</dd>
+                    </div>
+                    <div class="origin-row">
+                      <dt>network</dt>
+                      <dd>Cloudflare Tunnel / reverse proxy</dd>
+                    </div>
+                    <div class="origin-row">
+                      <dt>storage</dt>
+                      <dd>%LOCALAPPDATA%\OpenClaw\</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div class="trace-panel">
+                  <div class="panel-label">
+                    <span>recent recovery trace</span>
+                    <span class="badge">stable</span>
+                  </div>
+                  <ul class="trace-lines">
+                    <li><i>1</i><b>bridge.ready</b><em>Control UI session visible</em></li>
+                    <li><i>2</i><b>heartbeat.ok</b><em>latest RTT inside budget</em></li>
+                    <li><i>3</i><b>sync.lightweight</b><em>no hard reload required</em></li>
+                    <li><i>4</i><b>profile.locked</b><em>cookies scoped per environment</em></li>
+                    <li><i>5</i><b>log.flush</b><em>diagnostic event persisted</em></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="peek-strip" aria-label="页面内容预览">
+          <a href="#features"><span>能力矩阵</span><span aria-hidden="true">01</span></a>
+          <a href="#recovery"><span>恢复状态机</span><span aria-hidden="true">02</span></a>
+          <a href="#storage"><span>本地数据边界</span><span aria-hidden="true">03</span></a>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <div class="section-inner reveal">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">capability matrix</p>
+              <h2>保留远端 Web 体验，把桌面端可靠性补齐。</h2>
+            </div>
+            <p class="section-lede">
+              OpenClaw Manager 是薄壳，不在本机托管 Gateway，也不重写前端。它负责窗口、会话、恢复、诊断和本地状态，让远程控制台具备桌面应用该有的稳定边界。
+            </p>
+          </div>
+
+          <div class="matrix" aria-label="能力矩阵">
+            <article class="matrix-item">
+              <div class="code-label">webview.profile()</div>
+              <div>
+                <h3>环境隔离</h3>
+                <p>每个 Gateway 环境使用独立 WebView2 profile，切换远端实例时不混用 cookie、缓存和登录态。</p>
+              </div>
+            </article>
+            <article class="matrix-item">
+              <div class="code-label">heartbeat.observe()</div>
+              <div>
+                <h3>连接感知</h3>
+                <p>状态条显示加载、鉴权、工作态和延迟，让远端 WebSocket 与代理抖动更可见。</p>
+              </div>
+            </article>
+            <article class="matrix-item">
+              <div class="code-label">recover.softFirst()</div>
+              <div>
+                <h3>轻量恢复</h3>
+                <p>优先页面内 reconnect 与 lightweight sync，只有软恢复失败时才刷新或重建 WebView。</p>
+              </div>
+            </article>
+            <article class="matrix-item">
+              <div class="code-label">diagnostics.run()</div>
+              <div>
+                <h3>诊断闭环</h3>
+                <p>WebView2 runtime、HTTP 可达性、Control UI session 状态和日志入口集中到一个地方。</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="recovery" class="section state-section">
+        <div class="section-inner reveal">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">recovery state machine</p>
+              <h2>恢复状态机先判断，再决定是否打断用户。</h2>
+            </div>
+            <p class="section-lede">
+              面向 Cloudflare Tunnel、反向代理和远端 Gateway 的现实网络，恢复策略是一条分级链路，而不是遇到抖动就简单刷新页面。
+            </p>
+          </div>
+
+          <div class="state-machine" aria-label="恢复状态机">
+            <article class="state-step" style="--delay: 0" data-index="01">
+              <h3>观察</h3>
+              <p>Control UI bridge、heartbeat 和 navigation event 持续提供状态信号。</p>
+            </article>
+            <article class="state-step" style="--delay: 0.55" data-index="02">
+              <h3>判定</h3>
+              <p>区分登录失效、origin 拒绝、Gateway reconnect 和普通网络失败。</p>
+            </article>
+            <article class="state-step" style="--delay: 1.1" data-index="03">
+              <h3>软同步</h3>
+              <p>session 仍可用时优先 fetch recent messages 或 lightweight sync。</p>
+            </article>
+            <article class="state-step" style="--delay: 1.65" data-index="04">
+              <h3>重连</h3>
+              <p>向页面发送 reconnect intent，并等待 hosted UI 自己恢复。</p>
+            </article>
+            <article class="state-step" style="--delay: 2.2" data-index="05">
+              <h3>刷新</h3>
+              <p>只有软恢复失败时才进入 reload 或 WebView 重建路径。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="storage" class="section">
+        <div class="section-inner data-layout reveal">
+          <div>
+            <p class="section-kicker">local data boundary</p>
+            <h2>本地数据边界清楚，远端计算仍留在 Gateway。</h2>
+            <p class="data-note">
+              运行时数据留在用户本机的 LocalAppData；远端计算、模型和 Gateway runtime 仍由远端 OpenClaw 部署负责。桌面壳只保存使用体验所需的状态和诊断线索。
+            </p>
+          </div>
+
+          <div class="data-stack" aria-label="本地数据边界">
+            <div class="data-row">
+              <strong>settings</strong>
+              <span>保存环境列表、主题、语言、窗口状态和恢复策略。</span>
+              <em>local json</em>
+            </div>
+            <div class="data-row">
+              <strong>logs</strong>
+              <span>按日期写入结构化日志，便于回看连接、恢复和诊断事件。</span>
+              <em>daily files</em>
+            </div>
+            <div class="data-row">
+              <strong>WebView2Data</strong>
+              <span>每个环境一份浏览器 profile，管理 cookie、缓存和本地会话。</span>
+              <em>per env</em>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="closing">
+        <div class="reveal">
+          <p class="section-kicker">native entry point</p>
+          <h2>远端 OpenClaw 的 Windows 原生控制台入口。</h2>
+          <p>
+            打开就是控制台，切换就是新环境，异常时有诊断，断线时有恢复。OpenClaw Manager 提供的是一个安静但可观察的桌面入口。
+          </p>
+          <div class="hero-actions" style="justify-content: center;">
+            <a class="button primary" href="https://github.com/Jutaosay/openclaw_for_windows" target="_blank" rel="noopener noreferrer">查看 GitHub 项目</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("topologyCanvas");
+      const context = canvas.getContext("2d");
+      const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const colors = {
+        grid: "rgba(255,255,255,0.04)",
+        line: "rgba(255,255,255,0.18)",
+        panel: "rgba(23,25,28,0.68)",
+        text: "rgba(245,241,232,0.82)",
+        green: "rgba(54,209,126,0.9)",
+        cyan: "rgba(71,191,231,0.9)",
+        amber: "rgba(240,178,78,0.88)",
+        rose: "rgba(244,111,142,0.86)"
+      };
+
+      const nodes = [
+        { label: "WinUI Shell", x: 0.58, y: 0.3, tone: colors.green },
+        { label: "WebView2", x: 0.74, y: 0.42, tone: colors.cyan },
+        { label: "Tunnel", x: 0.66, y: 0.62, tone: colors.amber },
+        { label: "Gateway", x: 0.84, y: 0.72, tone: colors.rose }
+      ];
+
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+      let rafId = 0;
+      let resizeId = 0;
+      let running = false;
+      let particles = [];
+
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+        width = Math.max(1, Math.floor(rect.width));
+        height = Math.max(1, Math.floor(rect.height));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        particles = Array.from({ length: Math.min(54, Math.max(20, Math.floor(width / 34))) }, (_, index) => ({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: 0.8 + Math.random() * 1.8,
+          speed: 0.12 + Math.random() * 0.28,
+          phase: Math.random() * Math.PI * 2,
+          tone: index % 4
+        }));
+        draw(0);
+      }
+
+      function scheduleResize() {
+        if (resizeId) {
+          window.clearTimeout(resizeId);
+        }
+        resizeId = window.setTimeout(resizeCanvas, 120);
+      }
+
+      function drawGrid() {
+        const spacing = width < 720 ? 46 : 64;
+        context.strokeStyle = colors.grid;
+        context.lineWidth = 1;
+        context.beginPath();
+        for (let x = 0; x <= width; x += spacing) {
+          context.moveTo(x, 0);
+          context.lineTo(x, height);
+        }
+        for (let y = 0; y <= height; y += spacing) {
+          context.moveTo(0, y);
+          context.lineTo(width, y);
+        }
+        context.stroke();
+      }
+
+      function roundedRect(x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        context.beginPath();
+        context.moveTo(x + radius, y);
+        context.arcTo(x + w, y, x + w, y + h, radius);
+        context.arcTo(x + w, y + h, x, y + h, radius);
+        context.arcTo(x, y + h, x, y, radius);
+        context.arcTo(x, y, x + w, y, radius);
+        context.closePath();
+      }
+
+      function cubic(a, b, c, d, t) {
+        const mt = 1 - t;
+        return mt * mt * mt * a + 3 * mt * mt * t * b + 3 * mt * t * t * c + t * t * t * d;
+      }
+
+      function drawParticles(time) {
+        const palette = [colors.green, colors.cyan, colors.amber, colors.rose];
+        for (const particle of particles) {
+          particle.x += particle.speed;
+          particle.y += Math.sin(time * 0.001 + particle.phase) * 0.055;
+          if (particle.x > width + 12) {
+            particle.x = -12;
+          }
+          context.fillStyle = palette[particle.tone].replace("0.9", "0.2").replace("0.88", "0.18").replace("0.86", "0.18");
+          context.beginPath();
+          context.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
+          context.fill();
+        }
+      }
+
+      function drawLinks(time) {
+        context.save();
+        context.lineWidth = 1.4;
+        for (let i = 0; i < nodes.length - 1; i++) {
+          const a = nodes[i];
+          const b = nodes[i + 1];
+          const ax = a.x * width;
+          const ay = a.y * height;
+          const bx = b.x * width;
+          const by = b.y * height;
+
+          context.strokeStyle = colors.line;
+          context.beginPath();
+          context.moveTo(ax, ay);
+          context.bezierCurveTo(ax + 58, ay + 30, bx - 74, by - 36, bx, by);
+          context.stroke();
+
+          const t = (time * 0.0002 + i * 0.25) % 1;
+          const px = cubic(ax, ax + 58, bx - 74, bx, t);
+          const py = cubic(ay, ay + 30, by - 36, by, t);
+          context.fillStyle = i === 1 ? colors.amber : colors.cyan;
+          context.beginPath();
+          context.arc(px, py, 3.8, 0, Math.PI * 2);
+          context.fill();
+        }
+        context.restore();
+      }
+
+      function drawNode(node, time, index) {
+        const x = node.x * width;
+        const y = node.y * height;
+        const pulse = Math.sin(time * 0.0014 + index) * 0.5 + 0.5;
+        const w = Math.min(150, Math.max(112, width * 0.12));
+        const h = 44;
+
+        context.save();
+        context.shadowBlur = 14 + pulse * 8;
+        context.shadowColor = node.tone;
+        context.fillStyle = colors.panel;
+        context.strokeStyle = node.tone;
+        context.lineWidth = 1.2;
+        roundedRect(x - w / 2, y - h / 2, w, h, 8);
+        context.fill();
+        context.stroke();
+        context.shadowBlur = 0;
+        context.fillStyle = colors.text;
+        context.font = "700 12px Segoe UI, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(node.label, x, y);
+        context.restore();
+      }
+
+      function drawDiagnostics(time) {
+        const w = Math.min(380, Math.max(230, width * 0.27));
+        const h = 150;
+        const x = Math.max(18, width * 0.58);
+        const y = Math.max(88, height * 0.12);
+        const lines = [
+          ["heartbeat.ok", colors.green, 0.82],
+          ["origin.allowed", colors.cyan, 0.68],
+          ["sync.light", colors.amber, 0.56]
+        ];
+
+        context.save();
+        context.fillStyle = "rgba(23,25,28,0.55)";
+        context.strokeStyle = "rgba(255,255,255,0.12)";
+        roundedRect(x, y, w, h, 8);
+        context.fill();
+        context.stroke();
+        context.font = "700 11px Cascadia Code, Consolas, monospace";
+        lines.forEach((line, index) => {
+          const pulse = Math.sin(time * 0.002 + index) * 0.14 + 0.86;
+          context.globalAlpha = pulse;
+          context.fillStyle = line[1];
+          context.fillText(line[0], x + 16, y + 34 + index * 36);
+          context.globalAlpha = 1;
+          context.fillStyle = "rgba(255,255,255,0.14)";
+          roundedRect(x + 16, y + 45 + index * 36, (w - 34) * line[2], 4, 2);
+          context.fill();
+        });
+        context.restore();
+      }
+
+      function draw(time) {
+        context.clearRect(0, 0, width, height);
+        drawGrid();
+        drawParticles(time);
+        drawLinks(time);
+        nodes.forEach((node, index) => drawNode(node, time, index));
+        drawDiagnostics(time);
+      }
+
+      function frame(time) {
+        draw(time);
+        if (running && !motionQuery.matches) {
+          rafId = window.requestAnimationFrame(frame);
+        }
+      }
+
+      function start() {
+        if (running || motionQuery.matches || document.hidden) {
+          draw(0);
+          return;
+        }
+        running = true;
+        rafId = window.requestAnimationFrame(frame);
+      }
+
+      function stop() {
+        running = false;
+        if (rafId) {
+          window.cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      }
+
+      window.addEventListener("resize", scheduleResize, { passive: true });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          stop();
+        } else {
+          start();
+        }
+      });
+      motionQuery.addEventListener("change", () => {
+        stop();
+        draw(0);
+        start();
+      });
+
+      resizeCanvas();
+      start();
+
+      const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in-view");
+            observer.unobserve(entry.target);
+          }
+        }
+      }, { threshold: 0.16 });
+
+      document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
+
+      window.addEventListener("beforeunload", () => {
+        stop();
+        if (resizeId) {
+          window.clearTimeout(resizeId);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
