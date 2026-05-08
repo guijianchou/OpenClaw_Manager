@@ -26,11 +26,13 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tray close policy hides to tray until exit is requested", Tests.TrayClosePolicyHidesToTrayUntilExitRequested),
     ("Tray close policy respects close-to-tray setting", Tests.TrayClosePolicyRespectsCloseToTraySetting),
     ("Settings load defaults tray options on", Tests.SettingsLoadDefaultsTrayOptionsOn),
+    ("Settings load rejects minimized window sentinel bounds", Tests.SettingsLoadRejectsMinimizedWindowSentinelBounds),
+    ("Main window skips persisting minimized or hidden bounds", Tests.MainWindowSkipsPersistingMinimizedOrHiddenBounds),
     ("Settings default disables multiple instances", Tests.SettingsDefaultDisablesMultipleInstances),
     ("Settings Advanced exposes multiple instances option", Tests.SettingsAdvancedExposesMultipleInstancesOption),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places Advanced at the bottom", Tests.SettingsNavigationPlacesAdvancedAtBottom),
-    ("Version metadata is 3.1.1", Tests.VersionMetadataIs311),
+    ("Version metadata is 3.1.2", Tests.VersionMetadataIs312),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -524,6 +526,56 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
+    public static Task SettingsLoadRejectsMinimizedWindowSentinelBounds()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var settingsPath = Path.Combine(directory, "settings.json");
+            File.WriteAllText(settingsPath, """
+            {
+              "windowWidth": 160,
+              "windowHeight": 28,
+              "windowLeft": -32000,
+              "windowTop": -32000
+            }
+            """);
+
+            var configuration = new ConfigurationService(directory, new TestLogger());
+            configuration.Load();
+
+            Assert.Equal(1280d, configuration.Settings.WindowWidth, "Minimized sentinel width should reset to the default window width.");
+            Assert.Equal(800d, configuration.Settings.WindowHeight, "Minimized sentinel height should reset to the default window height.");
+            Assert.Equal(-1d, configuration.Settings.WindowLeft, "Minimized sentinel left should reset to the unset window position.");
+            Assert.Equal(-1d, configuration.Settings.WindowTop, "Minimized sentinel top should reset to the unset window position.");
+            return Task.CompletedTask;
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    public static Task MainWindowSkipsPersistingMinimizedOrHiddenBounds()
+    {
+        var lifecyclePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.Lifecycle.cs");
+        var source = File.ReadAllText(lifecyclePath);
+        var saveIndex = source.IndexOf("private void SaveWindowBounds()", StringComparison.Ordinal);
+        var closeIndex = source.IndexOf("private void OnWindowClosed", StringComparison.Ordinal);
+
+        Assert.True(saveIndex >= 0, "SaveWindowBounds should exist.");
+        Assert.True(closeIndex > saveIndex, "SaveWindowBounds should appear before OnWindowClosed.");
+
+        var saveMethod = source[saveIndex..closeIndex];
+        Assert.Contains("_isWindowHidden", saveMethod, "Hidden-to-tray windows should not overwrite the last visible bounds.");
+        Assert.Contains("WindowFrameHelper.IsWindowMinimized(this)", saveMethod, "Minimized windows should not overwrite the last visible bounds.");
+        return Task.CompletedTask;
+    }
+
     public static Task SettingsDefaultDisablesMultipleInstances()
     {
         var sourcePath = Path.Combine(
@@ -634,7 +686,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs311()
+    public static Task VersionMetadataIs312()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -665,13 +717,13 @@ internal static class Tests
         var about = File.ReadAllText(aboutPath);
         var readme = File.ReadAllText(readmePath);
 
-        Assert.Contains("<Version>3.1.1</Version>", project, "Project package version should be 3.1.1.");
-        Assert.Contains("<AssemblyVersion>3.1.1.0</AssemblyVersion>", project, "Assembly version should be 3.1.1.0 for About dialog display.");
-        Assert.Contains("<FileVersion>3.1.1.0</FileVersion>", project, "File version should be 3.1.1.0.");
-        Assert.Contains("Version=\"3.1.1.0\"", packageManifest, "Package manifest version should be 3.1.1.0.");
-        Assert.Contains("version=\"3.1.1.0\"", appManifest, "Application manifest assembly identity should be 3.1.1.0.");
+        Assert.Contains("<Version>3.1.2</Version>", project, "Project package version should be 3.1.2.");
+        Assert.Contains("<AssemblyVersion>3.1.2.0</AssemblyVersion>", project, "Assembly version should be 3.1.2.0 for About dialog display.");
+        Assert.Contains("<FileVersion>3.1.2.0</FileVersion>", project, "File version should be 3.1.2.0.");
+        Assert.Contains("Version=\"3.1.2.0\"", packageManifest, "Package manifest version should be 3.1.2.0.");
+        Assert.Contains("version=\"3.1.2.0\"", appManifest, "Application manifest assembly identity should be 3.1.2.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
-        Assert.Contains("### v3.1.1 (2026-05-02)", readme, "README should include the v3.1.1 changelog entry.");
+        Assert.Contains("### v3.1.2 (2026-05-08)", readme, "README should include the v3.1.2 changelog entry.");
         return Task.CompletedTask;
     }
 

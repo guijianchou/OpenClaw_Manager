@@ -57,27 +57,35 @@ Claw_winui3/
 |-- OpenClaw.sln
 |-- DEVELOPMENT_NOTES.md
 |-- README.md
-`-- src/OpenClaw/
-    |-- OpenClaw.csproj
-    |-- Package.appxmanifest
-    |-- app.manifest
-    |-- App.xaml
-    |-- App.xaml.cs
-    |-- MainWindow.xaml
-    |-- MainWindow.xaml.cs
-    |-- Assets/
-    |-- Abstractions/
-    |-- Helpers/
-    |-- Models/
-    |-- Services/
-    |-- Strings/
-    |-- ViewModels/
-    `-- Views/
+|-- src/
+|   |-- OpenClaw/
+|   |   |-- OpenClaw.csproj
+|   |   |-- Package.appxmanifest
+|   |   |-- app.manifest
+|   |   |-- App.xaml
+|   |   |-- App.xaml.cs
+|   |   |-- MainWindow.xaml
+|   |   |-- MainWindow.xaml.cs
+|   |   |-- Assets/
+|   |   |-- Abstractions/
+|   |   |-- Helpers/
+|   |   |-- Models/
+|   |   |-- Services/
+|   |   |-- Strings/
+|   |   |-- ViewModels/
+|   |   `-- Views/
+|   `-- OpenClaw.Core/
+|       `-- OpenClaw.Core.csproj
+`-- tests/OpenClaw.Tests/
+    |-- OpenClaw.Tests.csproj
+    `-- Program.cs
 ```
 
 ### Key folders
 
 - `Services/`: configuration, logging, diagnostics, WebView2 lifecycle, recovery helpers
+- `OpenClaw.Core/`: pure .NET shared code linked from the WinUI app for regression coverage
+- `tests/OpenClaw.Tests/`: lightweight regression harness for recovery, settings, tray, metadata, and persistence behavior
 - `ViewModels/`: shell state, commands, settings editing
 - `Views/`: settings, about, and log viewer dialogs
 - `Strings/`: localized UI resources
@@ -229,6 +237,14 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 ---
 
 ## Recent Changes
+
+### v3.1.2 (2026-05-08)
+
+- Fixed main-window restoration after GPU/display topology changes such as switching to dedicated-GPU direct mode.
+- Sanitized persisted minimized-window sentinel bounds like `160x28` at `-32000,-32000` so startup falls back to a visible default window.
+- Stopped saving window bounds while the main window is hidden to tray or minimized, preventing invisible-window state from being persisted again.
+- Recentered previously saved bounds onto the current display when the saved rectangle no longer intersects any available work area.
+- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.1.2`.
 
 ### v3.1.1 (2026-05-02)
 

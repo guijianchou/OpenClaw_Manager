@@ -11,6 +11,7 @@
   <ItemGroup>
     <Compile Include="..\OpenClaw\Helpers\AtomicFileWriter.cs" Link="Helpers\AtomicFileWriter.cs" />
     <Compile Include="..\OpenClaw\Helpers\LogFileUtilities.cs" Link="Helpers\LogFileUtilities.cs" />
+    <Compile Include="..\OpenClaw\Helpers\WindowBoundsUtilities.cs" Link="Helpers\WindowBoundsUtilities.cs" />
     <Compile Include="..\OpenClaw\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
     <Compile Include="..\OpenClaw\Models\EnvironmentConfig.cs" Link="Models\EnvironmentConfig.cs" />
     <Compile Include="..\OpenClaw\Models\RecoveryModels.cs" Link="Models\RecoveryModels.cs" />
