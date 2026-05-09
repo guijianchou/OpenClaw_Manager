@@ -65,6 +65,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("AppSettings defaults AlwaysOnTop to false", Tests.AppSettingsDefaultsAlwaysOnTopToFalse),
     ("AppSettings defaults CompactMode to false", Tests.AppSettingsDefaultsCompactModeToFalse),
     ("AppSettings defaults NotifyOnTaskComplete to true", Tests.AppSettingsDefaultsNotifyOnTaskCompleteToTrue),
+    ("Compact mode bounds bypass minimum persistable size", Tests.CompactModeBoundsBypassMinimumPersistableSize),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1373,6 +1374,25 @@ internal static class Tests
     {
         var settings = new AppSettings();
         Assert.True(settings.NotifyOnTaskComplete, "NotifyOnTaskComplete should default to true.");
+        return Task.CompletedTask;
+    }
+
+    public static Task CompactModeBoundsBypassMinimumPersistableSize()
+    {
+        var boundsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "WindowBoundsUtilities.cs");
+        var boundsSource = File.ReadAllText(boundsPath);
+
+        Assert.Contains("MinimumPersistedWindowWidth = 640", boundsSource, "Normal bounds persistence should keep a desktop-sized minimum width.");
+        Assert.Contains("MinimumPersistedWindowHeight = 480", boundsSource, "Normal bounds persistence should keep a desktop-sized minimum height.");
+
+        var settings = new AppSettings();
+        Assert.Equal(-1d, settings.CompactWindowLeft, "CompactWindowLeft should default to -1 (unset).");
+        Assert.Equal(-1d, settings.CompactWindowTop, "CompactWindowTop should default to -1 (unset).");
         return Task.CompletedTask;
     }
 
