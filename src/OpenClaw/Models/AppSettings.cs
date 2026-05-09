@@ -76,6 +76,36 @@ public class AppSettings
     public bool EnableGlobalHotkey { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets whether the main window stays on top of other windows.
+    /// </summary>
+    public bool AlwaysOnTop { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether compact mode is active (reduced window showing only status).
+    /// </summary>
+    public bool CompactMode { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the compact mode window left position.
+    /// </summary>
+    public double CompactWindowLeft { get; set; } = -1;
+
+    /// <summary>
+    /// Gets or sets the compact mode window top position.
+    /// </summary>
+    public double CompactWindowTop { get; set; } = -1;
+
+    /// <summary>
+    /// Gets or sets whether to show a toast notification when a long task completes (LIVE -> IDLE).
+    /// </summary>
+    public bool NotifyOnTaskComplete { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the debounce duration in seconds before firing a task-complete notification.
+    /// </summary>
+    public int NotifyDebounceSeconds { get; set; } = 2;
+
+    /// <summary>
     /// Gets or sets the heartbeat probe interval in seconds. 0 = disabled.
     /// Default is 30s, which works well with Cloudflare Tunnel / reverse proxy idle timeouts (60-100s).
     /// </summary>

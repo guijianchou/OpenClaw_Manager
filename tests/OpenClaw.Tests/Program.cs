@@ -62,6 +62,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("CloudflareRay returns null for missing or malformed header", Tests.CloudflareRayReturnsNullForMissingOrMalformed),
     ("Latency tooltip includes PoP when available", Tests.LatencyTooltipIncludesPopWhenAvailable),
     ("SingleInstance stop awaits listener task completion", Tests.SingleInstanceStopAwaitsListenerTaskCompletion),
+    ("AppSettings defaults AlwaysOnTop to false", Tests.AppSettingsDefaultsAlwaysOnTopToFalse),
+    ("AppSettings defaults CompactMode to false", Tests.AppSettingsDefaultsCompactModeToFalse),
+    ("AppSettings defaults NotifyOnTaskComplete to true", Tests.AppSettingsDefaultsNotifyOnTaskCompleteToTrue),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1350,6 +1353,27 @@ internal static class Tests
             // If not primary (unlikely in test), just dispose
             coordinator.Dispose();
         }
+    }
+
+    public static Task AppSettingsDefaultsAlwaysOnTopToFalse()
+    {
+        var settings = new AppSettings();
+        Assert.False(settings.AlwaysOnTop, "AlwaysOnTop should default to false.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AppSettingsDefaultsCompactModeToFalse()
+    {
+        var settings = new AppSettings();
+        Assert.False(settings.CompactMode, "CompactMode should default to false.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AppSettingsDefaultsNotifyOnTaskCompleteToTrue()
+    {
+        var settings = new AppSettings();
+        Assert.True(settings.NotifyOnTaskComplete, "NotifyOnTaskComplete should default to true.");
+        return Task.CompletedTask;
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()

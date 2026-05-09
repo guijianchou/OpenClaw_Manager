@@ -257,6 +257,13 @@
                         Grid.Column="3"
                         Orientation="Horizontal"
                         Spacing="4">
+                <Button x:Name="PinButton"
+                        Click="OnPinClick"
+                        ToolTipService.ToolTip="Always on Top"
+                        Style="{StaticResource SubtleButtonStyle}">
+                    <FontIcon Glyph="&#xE718;" FontSize="14" />
+                </Button>
+
                 <Button x:Name="ReloadButton"
                         Command="{x:Bind ViewModel.ReloadCommand}"
                         ToolTipService.ToolTip="{x:Bind helpers:StringResources.Reload}"

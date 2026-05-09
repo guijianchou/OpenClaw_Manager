@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
         _webViewRecreationTimer = CreateWebViewRecreationTimer();
         InitializeTrayIcon();
         InitializeGlobalHotkey();
+        InitializeAlwaysOnTop();
         AttachWindowEventHandlers();
         AttachRootEventHandlers();
         UpdateThemeSelector(App.Configuration.Settings.AppTheme);

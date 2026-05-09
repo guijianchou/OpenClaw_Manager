@@ -13,6 +13,11 @@ public sealed partial class MainWindow
         ShowSettingsWindow();
     }
 
+    private void OnPinClick(object sender, RoutedEventArgs e)
+    {
+        ToggleAlwaysOnTop();
+    }
+
     private void OnOpenSettingsRequested()
     {
         ShowSettingsWindow();
