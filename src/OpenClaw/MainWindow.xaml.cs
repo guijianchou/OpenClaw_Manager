@@ -22,7 +22,6 @@ public sealed partial class MainWindow : Window
         InitializeTrayIcon();
         InitializeGlobalHotkey();
         InitializeAlwaysOnTop();
-        InitializeNotifications();
         AttachWindowEventHandlers();
         AttachRootEventHandlers();
         UpdateThemeSelector(App.Configuration.Settings.AppTheme);

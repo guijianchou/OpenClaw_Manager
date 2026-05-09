@@ -95,12 +95,6 @@ public partial class MainViewModel
         WorkStatusText = workStatusText;
         WorkStatusBrush = workStatusBrush;
         SetRunIndicatorMode(runIndicatorMode);
-
-        // Feed the task complete notifier
-        if (App.Configuration.Settings.NotifyOnTaskComplete)
-        {
-            _taskCompleteNotifier.OnWorkStatusChanged(workStatusText);
-        }
     }
 
     private void ApplySnapshotErrorState(ControlUiProbeSnapshot snapshot)
@@ -119,20 +113,5 @@ public partial class MainViewModel
     {
         RefreshResourceScheduling();
     }
-
-    private void OnTaskCompleted()
-    {
-        RunOnUiThread(() =>
-        {
-            App.Logger.Info("task.completed", new { model = ModelSummaryText });
-            TaskCompletedNotification?.Invoke(ModelSummaryText);
-        });
-    }
-
-    /// <summary>
-    /// Raised when a long task completes (LIVE -> IDLE confirmed after debounce).
-    /// The string parameter is the current model name for display in the notification.
-    /// </summary>
-    public event Action<string>? TaskCompletedNotification;
 
 }

@@ -131,7 +131,6 @@ public sealed partial class MainWindow
         _runIndicatorTimer.Tick -= OnRunIndicatorTick;
         _webViewRecreationTimer.Stop();
         _webViewRecreationTimer.Tick -= OnWebViewRecreationTimerTick;
-        DisposeNotifications();
         DisposeGlobalHotkey();
         DisposeTrayIcon();
         ViewModel.OpenSettingsRequested -= OnOpenSettingsRequested;

@@ -63,7 +63,6 @@
     <Compile Remove="Services\HotkeyBinding.cs" />
     <Compile Remove="Services\DiagnosticBundleService.cs" />
     <Compile Remove="Services\CloudflareRayParser.cs" />
-    <Compile Remove="Services\TaskCompleteNotifier.cs" />
     <Compile Remove="Services\WebViewCircuitBreaker.cs" />
   </ItemGroup>
 
