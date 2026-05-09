@@ -13,6 +13,10 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     public MainViewModel()
     {
+        var debounceMs = App.Configuration.Settings.NotifyDebounceSeconds * 1000;
+        _taskCompleteNotifier = new Services.TaskCompleteNotifier(debounceMs);
+        _taskCompleteNotifier.TaskCompleted += OnTaskCompleted;
+
         InitializeCommands();
         SubscribeToServiceEvents();
         InitializeCoordinator();

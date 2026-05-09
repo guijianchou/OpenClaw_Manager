@@ -57,6 +57,16 @@ public partial class MainViewModel
         IsDiagnosticVisible = false;
     }
 
+    /// <summary>
+    /// Shows an error indicating the WebView recreation circuit breaker has tripped.
+    /// </summary>
+    public void ShowCircuitBreakerError()
+    {
+        ErrorMessage = "WebView2 recreation failed repeatedly. Click Reload to retry.";
+        IsErrorVisible = true;
+        ShowRetryButton = true;
+    }
+
     private async Task OnRunDiagnosticsAsync()
     {
         App.Logger.Info("Running diagnostics...");

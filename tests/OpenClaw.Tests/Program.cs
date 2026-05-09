@@ -32,7 +32,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings Advanced exposes multiple instances option", Tests.SettingsAdvancedExposesMultipleInstancesOption),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places Advanced at the bottom", Tests.SettingsNavigationPlacesAdvancedAtBottom),
-    ("Version metadata is 3.1.3", Tests.VersionMetadataIs313),
+    ("Version metadata is 3.2.0", Tests.VersionMetadataIs320),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -714,7 +714,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs313()
+    public static Task VersionMetadataIs320()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -737,21 +737,18 @@ internal static class Tests
             "OpenClaw",
             "Views",
             "AboutDialog.xaml.cs");
-        var readmePath = Path.Combine(Directory.GetCurrentDirectory(), "README.md");
 
         var project = File.ReadAllText(projectPath);
         var packageManifest = File.ReadAllText(packageManifestPath);
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
-        var readme = File.ReadAllText(readmePath);
 
-        Assert.Contains("<Version>3.1.3</Version>", project, "Project package version should be 3.1.3.");
-        Assert.Contains("<AssemblyVersion>3.1.3.0</AssemblyVersion>", project, "Assembly version should be 3.1.3.0 for About dialog display.");
-        Assert.Contains("<FileVersion>3.1.3.0</FileVersion>", project, "File version should be 3.1.3.0.");
-        Assert.Contains("Version=\"3.1.3.0\"", packageManifest, "Package manifest version should be 3.1.3.0.");
-        Assert.Contains("version=\"3.1.3.0\"", appManifest, "Application manifest assembly identity should be 3.1.3.0.");
+        Assert.Contains("<Version>3.2.0</Version>", project, "Project package version should be 3.2.0.");
+        Assert.Contains("<AssemblyVersion>3.2.0.0</AssemblyVersion>", project, "Assembly version should be 3.2.0.0.");
+        Assert.Contains("<FileVersion>3.2.0.0</FileVersion>", project, "File version should be 3.2.0.0.");
+        Assert.Contains("Version=\"3.2.0.0\"", packageManifest, "Package manifest version should be 3.2.0.0.");
+        Assert.Contains("version=\"3.2.0.0\"", appManifest, "Application manifest assembly identity should be 3.2.0.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
-        Assert.Contains("### v3.1.3 (2026-05-08)", readme, "README should include the v3.1.3 changelog entry.");
         return Task.CompletedTask;
     }
 

@@ -67,6 +67,8 @@ public partial class MainViewModel
     public void Dispose()
     {
         UnsubscribeFromServiceEvents();
+        _taskCompleteNotifier.TaskCompleted -= OnTaskCompleted;
+        _taskCompleteNotifier.Dispose();
 
         if (_coordinator is not null)
         {

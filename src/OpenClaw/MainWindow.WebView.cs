@@ -65,6 +65,14 @@ public sealed partial class MainWindow
     private void ScheduleWebViewRecreation(string reason)
     {
         var normalizedReason = string.IsNullOrWhiteSpace(reason) ? "unspecified" : reason;
+
+        // Reset circuit breaker for user-initiated or settings-triggered recreations
+        if (normalizedReason.Contains("settings", StringComparison.OrdinalIgnoreCase) ||
+            normalizedReason.Contains("initial", StringComparison.OrdinalIgnoreCase))
+        {
+            _webViewCircuitBreaker.Reset();
+        }
+
         if (_pendingWebViewRecreationReason is not null)
         {
             _webViewRecreationMergedCount++;
@@ -100,6 +108,17 @@ public sealed partial class MainWindow
             return;
         }
 
+        if (!_webViewCircuitBreaker.CanAttempt())
+        {
+            RecordInstrumentationEvent("webview.recreation.circuit_breaker_tripped", new
+            {
+                lastReason = _lastWebViewRecreationReason,
+                total = _webViewRecreationCount
+            });
+            ViewModel.ShowCircuitBreakerError();
+            return;
+        }
+
         var pendingReason = _pendingWebViewRecreationReason;
         _pendingWebViewRecreationReason = null;
         if (pendingReason is null)
@@ -121,6 +140,7 @@ public sealed partial class MainWindow
 
         _isRecreatingWebView = true;
         _lastWebViewRecreationReason = pendingReason;
+        _webViewCircuitBreaker.RecordAttempt();
         RecordInstrumentationEvent("webview.recreation.started", new { reason = pendingReason });
 
         try
