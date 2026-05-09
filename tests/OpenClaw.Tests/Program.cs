@@ -69,6 +69,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("TaskCompleteNotifier fires only on LIVE to IDLE transition", Tests.TaskCompleteNotifierFiresOnlyOnLiveToIdleTransition),
     ("TaskCompleteNotifier respects debounce duration", Tests.TaskCompleteNotifierRespectsDebounce),
     ("TaskCompleteNotifier does not fire on WAIT to IDLE", Tests.TaskCompleteNotifierDoesNotFireOnWaitToIdle),
+    ("WebView circuit breaker trips after repeated failures", Tests.WebViewCircuitBreakerTripsAfterRepeatedFailures),
+    ("WebView circuit breaker resets after cooldown", Tests.WebViewCircuitBreakerResetsAfterCooldown),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1449,6 +1451,39 @@ internal static class Tests
         Assert.Equal(0, firedCount, "WAIT -> IDLE should not fire (startup loading).");
 
         notifier.Dispose();
+    }
+
+    public static Task WebViewCircuitBreakerTripsAfterRepeatedFailures()
+    {
+        var breaker = new WebViewCircuitBreaker(maxAttempts: 5, windowSeconds: 60);
+
+        // 5 attempts should be allowed
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.True(breaker.CanAttempt(), $"Attempt {i + 1} should be allowed.");
+            breaker.RecordAttempt();
+        }
+
+        // 6th should be blocked
+        Assert.False(breaker.CanAttempt(), "6th attempt within window should be blocked.");
+        return Task.CompletedTask;
+    }
+
+    public static Task WebViewCircuitBreakerResetsAfterCooldown()
+    {
+        var breaker = new WebViewCircuitBreaker(maxAttempts: 3, windowSeconds: 1);
+
+        for (var i = 0; i < 3; i++)
+        {
+            breaker.RecordAttempt();
+        }
+
+        Assert.False(breaker.CanAttempt(), "Should be tripped after 3 attempts.");
+
+        // Manual reset
+        breaker.Reset();
+        Assert.True(breaker.CanAttempt(), "Should allow attempts after reset.");
+        return Task.CompletedTask;
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()
