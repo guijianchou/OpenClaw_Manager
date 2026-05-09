@@ -66,6 +66,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("AppSettings defaults CompactMode to false", Tests.AppSettingsDefaultsCompactModeToFalse),
     ("AppSettings defaults NotifyOnTaskComplete to true", Tests.AppSettingsDefaultsNotifyOnTaskCompleteToTrue),
     ("Compact mode bounds bypass minimum persistable size", Tests.CompactModeBoundsBypassMinimumPersistableSize),
+    ("TaskCompleteNotifier fires only on LIVE to IDLE transition", Tests.TaskCompleteNotifierFiresOnlyOnLiveToIdleTransition),
+    ("TaskCompleteNotifier respects debounce duration", Tests.TaskCompleteNotifierRespectsDebounce),
+    ("TaskCompleteNotifier does not fire on WAIT to IDLE", Tests.TaskCompleteNotifierDoesNotFireOnWaitToIdle),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1394,6 +1397,58 @@ internal static class Tests
         Assert.Equal(-1d, settings.CompactWindowLeft, "CompactWindowLeft should default to -1 (unset).");
         Assert.Equal(-1d, settings.CompactWindowTop, "CompactWindowTop should default to -1 (unset).");
         return Task.CompletedTask;
+    }
+
+    public static async Task TaskCompleteNotifierFiresOnlyOnLiveToIdleTransition()
+    {
+        var notifier = new TaskCompleteNotifier(debounceMs: 50);
+        var firedCount = 0;
+        notifier.TaskCompleted += () => Interlocked.Increment(ref firedCount);
+
+        // LIVE -> IDLE should fire
+        notifier.OnWorkStatusChanged("LIVE");
+        notifier.OnWorkStatusChanged("IDLE");
+        await Task.Delay(100);
+        Assert.Equal(1, firedCount, "LIVE -> IDLE should fire exactly once.");
+
+        // IDLE -> IDLE should not fire again
+        notifier.OnWorkStatusChanged("IDLE");
+        await Task.Delay(100);
+        Assert.Equal(1, firedCount, "IDLE -> IDLE should not fire.");
+
+        notifier.Dispose();
+    }
+
+    public static async Task TaskCompleteNotifierRespectsDebounce()
+    {
+        var notifier = new TaskCompleteNotifier(debounceMs: 200);
+        var firedCount = 0;
+        notifier.TaskCompleted += () => Interlocked.Increment(ref firedCount);
+
+        // LIVE -> IDLE, but quickly back to LIVE before debounce expires
+        notifier.OnWorkStatusChanged("LIVE");
+        notifier.OnWorkStatusChanged("IDLE");
+        await Task.Delay(50);
+        notifier.OnWorkStatusChanged("LIVE"); // Cancel the pending notification
+        await Task.Delay(300);
+        Assert.Equal(0, firedCount, "Quick LIVE->IDLE->LIVE should not fire (debounce cancelled).");
+
+        notifier.Dispose();
+    }
+
+    public static async Task TaskCompleteNotifierDoesNotFireOnWaitToIdle()
+    {
+        var notifier = new TaskCompleteNotifier(debounceMs: 50);
+        var firedCount = 0;
+        notifier.TaskCompleted += () => Interlocked.Increment(ref firedCount);
+
+        // WAIT -> IDLE should NOT fire (startup scenario)
+        notifier.OnWorkStatusChanged("WAIT");
+        notifier.OnWorkStatusChanged("IDLE");
+        await Task.Delay(100);
+        Assert.Equal(0, firedCount, "WAIT -> IDLE should not fire (startup loading).");
+
+        notifier.Dispose();
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()
