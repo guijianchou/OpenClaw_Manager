@@ -32,7 +32,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings Advanced exposes multiple instances option", Tests.SettingsAdvancedExposesMultipleInstancesOption),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places Advanced at the bottom", Tests.SettingsNavigationPlacesAdvancedAtBottom),
-    ("Version metadata is 3.2.0", Tests.VersionMetadataIs320),
+    ("Version metadata is 3.2.1", Tests.VersionMetadataIs321),
+    ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -714,7 +715,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs320()
+    public static Task VersionMetadataIs321()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -743,12 +744,28 @@ internal static class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.2.0</Version>", project, "Project package version should be 3.2.0.");
-        Assert.Contains("<AssemblyVersion>3.2.0.0</AssemblyVersion>", project, "Assembly version should be 3.2.0.0.");
-        Assert.Contains("<FileVersion>3.2.0.0</FileVersion>", project, "File version should be 3.2.0.0.");
-        Assert.Contains("Version=\"3.2.0.0\"", packageManifest, "Package manifest version should be 3.2.0.0.");
-        Assert.Contains("version=\"3.2.0.0\"", appManifest, "Application manifest assembly identity should be 3.2.0.0.");
+        Assert.Contains("<Version>3.2.1</Version>", project, "Project package version should be 3.2.1.");
+        Assert.Contains("<AssemblyVersion>3.2.1.0</AssemblyVersion>", project, "Assembly version should be 3.2.1.0.");
+        Assert.Contains("<FileVersion>3.2.1.0</FileVersion>", project, "File version should be 3.2.1.0.");
+        Assert.Contains("Version=\"3.2.1.0\"", packageManifest, "Package manifest version should be 3.2.1.0.");
+        Assert.Contains("version=\"3.2.1.0\"", appManifest, "Application manifest assembly identity should be 3.2.1.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AboutDialogRepositoryLinkTargetsOpenClawManagerRepo()
+    {
+        var aboutPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "AboutDialog.xaml");
+
+        var about = File.ReadAllText(aboutPath);
+
+        Assert.Contains("NavigateUri=\"https://github.com/guijianchou/OpenClaw_Manager\"", about, "About dialog repository link should target the OpenClaw Manager repository.");
+        Assert.DoesNotContain("NavigateUri=\"https://github.com/Jutaosay/openclaw_for_windows\"", about, "About dialog should not link to the old repository.");
         return Task.CompletedTask;
     }
 

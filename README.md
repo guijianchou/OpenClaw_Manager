@@ -188,7 +188,6 @@ If the page loads but OpenClaw reports origin rejection, check the exact public 
 | Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
 | Always on Top | Pin button to keep the window above other applications, with native topmost fallback and distinct active/inactive colors |
 | Compact Mode | Reduced window showing only status bar for screen-corner placement |
-| Task Notifications | Windows toast notification when a long task completes (LIVE to IDLE) |
 | Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
 | Theme | Top-bar segmented switcher for System, Light, and Dark |
 | Language | English, Simplified Chinese, System |
@@ -245,6 +244,13 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 ---
 
 ## Recent Changes
+
+### v3.2.1 (2026-05-09)
+
+- Removed the toast notification feature because Windows toast activation is not a good fit for the current unpackaged WebView2 shell.
+- Removed notification settings, notifier lifecycle wiring, and related regression coverage.
+- Kept the v3.2 native features intact: global hotkey, tray commands, diagnostic export, Cloudflare PoP tooltip, always-on-top, compact mode, and WebView2 circuit breaker.
+- Synced app, assembly, file, package manifest, application manifest, About dialog, and regression-test version metadata to `3.2.1`.
 
 ### v3.2.0 (2026-05-09)
 

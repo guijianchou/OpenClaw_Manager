@@ -36,7 +36,7 @@
 
         <HyperlinkButton Content="{x:Bind helpers:StringResources.AboutRepository}"
                          HorizontalAlignment="Center"
-                         NavigateUri="https://github.com/Jutaosay/openclaw_for_windows" />
+                         NavigateUri="https://github.com/guijianchou/OpenClaw_Manager" />
 
         <TextBlock HorizontalAlignment="Center"
                    FontSize="12"

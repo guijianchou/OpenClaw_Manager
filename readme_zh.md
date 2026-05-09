@@ -188,7 +188,6 @@ dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
 | Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
 | Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
 | Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
-| Task Notifications | 长任务完成时（LIVE → IDLE）发送 Windows toast 通知 |
 | Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
 | Theme | 顶部栏 System、Light、Dark 分段切换 |
 | Language | English、Simplified Chinese、System |
@@ -245,6 +244,13 @@ MainWindow
 ---
 
 ## 最近更新
+
+### v3.2.1 (2026-05-09)
+
+- 移除 toast 通知功能；当前应用是 unpackaged WebView2 shell，Windows toast activation 不适合这个分发和启动模型。
+- 移除通知设置、notifier 生命周期接线和相关回归测试。
+- 保留 v3.2 的纯原生能力：全局热键、托盘命令、诊断导出、Cloudflare PoP tooltip、always-on-top、compact mode 和 WebView2 circuit breaker。
+- 同步 app、assembly、file、package manifest、application manifest、About dialog 和回归测试版本元数据到 `3.2.1`。
 
 ### v3.2.0 (2026-05-09)
 
