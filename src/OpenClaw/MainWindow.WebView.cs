@@ -140,13 +140,22 @@ public sealed partial class MainWindow
 
         _isRecreatingWebView = true;
         _lastWebViewRecreationReason = pendingReason;
-        _webViewCircuitBreaker.RecordAttempt();
         RecordInstrumentationEvent("webview.recreation.started", new { reason = pendingReason });
 
         try
         {
             do
             {
+                if (!_webViewCircuitBreaker.CanAttempt())
+                {
+                    RecordInstrumentationEvent("webview.recreation.circuit_breaker_tripped_in_loop", new
+                    {
+                        lastReason = _lastWebViewRecreationReason,
+                        total = _webViewRecreationCount
+                    });
+                    break;
+                }
+
                 var nextWebView = new WebView2
                 {
                     HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -162,6 +171,7 @@ public sealed partial class MainWindow
                 WebViewHost.Children.Add(nextWebView);
 
                 _webViewRecreationCount++;
+                _webViewCircuitBreaker.RecordAttempt();
                 RecordInstrumentationEvent("webview.recreation.initializing", new
                 {
                     reason = _lastWebViewRecreationReason,

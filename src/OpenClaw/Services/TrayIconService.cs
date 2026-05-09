@@ -18,6 +18,7 @@ internal sealed class TrayIconService : IDisposable
     private const int MenuReload = 103;
     private const int MenuViewLogs = 104;
     private const int MenuStatusHeader = 105;
+    private const int MenuCompactMode = 106;
 
     private readonly IAppLogger _logger;
     private readonly TrayMenuStrings _menuStrings;
@@ -56,6 +57,8 @@ internal sealed class TrayIconService : IDisposable
     public event Action? ReloadRequested;
 
     public event Action? ViewLogsRequested;
+
+    public event Action? CompactModeRequested;
 
     public bool IsAvailable => _isIconAdded;
 
@@ -210,6 +213,7 @@ internal sealed class TrayIconService : IDisposable
             AppendMenu(menu, MenuFlags.String, MenuOpenOpenClaw, _menuStrings.OpenLabel);
             AppendMenu(menu, MenuFlags.String, MenuReload, _menuStrings.ReloadLabel);
             AppendMenu(menu, MenuFlags.String, MenuViewLogs, _menuStrings.ViewLogsLabel);
+            AppendMenu(menu, MenuFlags.String, MenuCompactMode, _menuStrings.CompactModeLabel);
             AppendMenu(menu, MenuFlags.Separator, 0, null);
             AppendMenu(menu, MenuFlags.String, MenuSettings, _menuStrings.SettingsLabel);
             AppendMenu(menu, MenuFlags.Separator, 0, null);
@@ -252,6 +256,9 @@ internal sealed class TrayIconService : IDisposable
                 break;
             case MenuViewLogs:
                 ViewLogsRequested?.Invoke();
+                break;
+            case MenuCompactMode:
+                CompactModeRequested?.Invoke();
                 break;
             case MenuSettings:
                 OpenSettingsRequested?.Invoke();

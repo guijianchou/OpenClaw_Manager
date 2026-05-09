@@ -53,7 +53,7 @@ public static partial class DiagnosticBundleService
             $".NET: {Environment.Version}",
             $"App: {GetAppVersion()}",
             $"Architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}",
-            $"Machine: {Environment.MachineName}",
+            $"Machine: {HashMachineName(Environment.MachineName)}",
             $"Processors: {Environment.ProcessorCount}",
         };
 
@@ -154,5 +154,17 @@ public static partial class DiagnosticBundleService
         return version is not null
             ? $"{version.Major}.{version.Minor}.{version.Build}"
             : "unknown";
+    }
+
+    private static string HashMachineName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "unknown";
+        }
+
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(name));
+        return Convert.ToHexString(bytes[..4]).ToLowerInvariant();
     }
 }

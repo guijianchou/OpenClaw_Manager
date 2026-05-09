@@ -1100,12 +1100,14 @@ internal static class Tests
             OpenLabel: "打开 OpenClaw",
             ReloadLabel: "重新加载",
             ViewLogsLabel: "查看日志",
+            CompactModeLabel: "紧凑模式",
             SettingsLabel: "设置",
             ExitLabel: "退出");
 
         Assert.Equal("打开 OpenClaw", strings.OpenLabel, "OpenLabel should be the injected Chinese string.");
         Assert.Equal("重新加载", strings.ReloadLabel, "ReloadLabel should be the injected Chinese string.");
         Assert.Equal("查看日志", strings.ViewLogsLabel, "ViewLogsLabel should be the injected Chinese string.");
+        Assert.Equal("紧凑模式", strings.CompactModeLabel, "CompactModeLabel should be the injected Chinese string.");
         Assert.Equal("设置", strings.SettingsLabel, "SettingsLabel should be the injected Chinese string.");
         Assert.Equal("退出", strings.ExitLabel, "ExitLabel should be the injected Chinese string.");
         return Task.CompletedTask;
@@ -1118,6 +1120,7 @@ internal static class Tests
         Assert.Equal("Open OpenClaw", strings.OpenLabel, "Default OpenLabel should be English.");
         Assert.Equal("Reload", strings.ReloadLabel, "Default ReloadLabel should be English.");
         Assert.Equal("View Logs", strings.ViewLogsLabel, "Default ViewLogsLabel should be English.");
+        Assert.Equal("Compact Mode", strings.CompactModeLabel, "Default CompactModeLabel should be English.");
         Assert.Equal("Settings", strings.SettingsLabel, "Default SettingsLabel should be English.");
         Assert.Equal("Exit", strings.ExitLabel, "Default ExitLabel should be English.");
         return Task.CompletedTask;

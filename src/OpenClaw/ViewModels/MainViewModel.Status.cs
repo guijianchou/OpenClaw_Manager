@@ -122,8 +122,11 @@ public partial class MainViewModel
 
     private void OnTaskCompleted()
     {
-        App.Logger.Info("task.completed", new { model = ModelSummaryText });
-        TaskCompletedNotification?.Invoke(ModelSummaryText);
+        RunOnUiThread(() =>
+        {
+            App.Logger.Info("task.completed", new { model = ModelSummaryText });
+            TaskCompletedNotification?.Invoke(ModelSummaryText);
+        });
     }
 
     /// <summary>

@@ -10,5 +10,6 @@ public partial class MainViewModel
     public System.Windows.Input.ICommand RetryCommand { get; private set; } = null!;
     public System.Windows.Input.ICommand DevToolsCommand { get; private set; } = null!;
     public System.Windows.Input.ICommand RunDiagnosticsCommand { get; private set; } = null!;
+    public System.Windows.Input.ICommand ExportDiagnosticBundleCommand { get; private set; } = null!;
     public System.Windows.Input.ICommand ViewLogsCommand { get; private set; } = null!;
 }

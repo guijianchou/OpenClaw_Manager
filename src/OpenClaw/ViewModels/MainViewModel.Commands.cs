@@ -15,6 +15,7 @@ public partial class MainViewModel
         RetryCommand = new SimpleCommand(OnRetry);
         DevToolsCommand = new SimpleCommand(OnDevTools);
         RunDiagnosticsCommand = new AsyncCommand(OnRunDiagnosticsAsync, OnAsyncCommandFailed);
+        ExportDiagnosticBundleCommand = new AsyncCommand(OnExportDiagnosticBundleAsync, OnAsyncCommandFailed);
         ViewLogsCommand = new SimpleCommand(() => ViewLogsRequested?.Invoke());
     }
 
@@ -86,5 +87,28 @@ public partial class MainViewModel
         IsDiagnosticVisible = true;
 
         App.Logger.Info($"Diagnostics complete. Failures: {report.HasFailures}");
+    }
+
+    private async Task OnExportDiagnosticBundleAsync()
+    {
+        App.Logger.Info("Exporting diagnostic bundle...");
+
+        var settingsJson = System.IO.File.Exists(App.Configuration.SettingsFilePath)
+            ? await System.IO.File.ReadAllTextAsync(App.Configuration.SettingsFilePath)
+            : "{}";
+
+        var diagnosticSummary = DiagnosticSummary;
+        var logsDirectory = App.Configuration.LogsDirectory;
+        var outputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        var outputPath = await DiagnosticBundleService.ExportBundleAsync(
+            settingsJson,
+            logsDirectory,
+            diagnosticSummary,
+            outputDirectory);
+
+        App.Logger.Info($"Diagnostic bundle exported to: {outputPath}");
+        DiagnosticSummary = $"Diagnostic bundle exported to Desktop:\n{System.IO.Path.GetFileName(outputPath)}";
+        IsDiagnosticVisible = true;
     }
 }

@@ -10,6 +10,7 @@ public sealed record TrayMenuStrings(
     string OpenLabel,
     string ReloadLabel,
     string ViewLogsLabel,
+    string CompactModeLabel,
     string SettingsLabel,
     string ExitLabel)
 {
@@ -20,6 +21,7 @@ public sealed record TrayMenuStrings(
         OpenLabel: "Open OpenClaw",
         ReloadLabel: "Reload",
         ViewLogsLabel: "View Logs",
+        CompactModeLabel: "Compact Mode",
         SettingsLabel: "Settings",
         ExitLabel: "Exit");
 }

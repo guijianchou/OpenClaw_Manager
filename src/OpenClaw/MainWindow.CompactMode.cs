@@ -14,6 +14,21 @@ public sealed partial class MainWindow
     private SizeInt32 _normalSize;
     private PointInt32 _normalPosition;
 
+    private void RestoreCompactModeIfSaved()
+    {
+        if (App.Configuration.Settings.CompactMode)
+        {
+            // Defer to after layout so AppWindow.Size is valid
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (!_isCompactMode)
+                {
+                    EnterCompactMode();
+                }
+            });
+        }
+    }
+
     internal void ToggleCompactMode()
     {
         if (_isCompactMode)
@@ -62,7 +77,7 @@ public sealed partial class MainWindow
         // Restore normal bounds
         SetCompactVisibility(Visibility.Visible);
         appWindow.Resize(_normalSize.Width > 0 ? _normalSize : new SizeInt32(1280, 800));
-        if (_normalPosition.X != 0 || _normalPosition.Y != 0)
+        if (_normalSize.Width > 0)
         {
             appWindow.Move(_normalPosition);
         }

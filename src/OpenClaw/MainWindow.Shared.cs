@@ -24,7 +24,7 @@ public sealed partial class MainWindow
     private TrayIconService? _trayIconService;
     private GlobalHotkeyService? _globalHotkeyService;
     private readonly TrayClosePolicy _trayClosePolicy = new();
-    private readonly Services.WebViewCircuitBreaker _webViewCircuitBreaker = new();
+    private readonly WebViewCircuitBreaker _webViewCircuitBreaker = new();
     private int _webViewRecreationCount;
     private int _webViewRecreationMergedCount;
     private string _lastInstrumentationEvent = string.Empty;

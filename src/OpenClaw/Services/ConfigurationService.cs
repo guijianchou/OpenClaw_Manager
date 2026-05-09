@@ -56,6 +56,16 @@ public class ConfigurationService
     /// </summary>
     public AppSettings Settings { get; private set; } = new();
 
+    /// <summary>
+    /// Gets the full path to the settings JSON file.
+    /// </summary>
+    public string SettingsFilePath => _settingsFilePath;
+
+    /// <summary>
+    /// Gets the full path to the logs directory.
+    /// </summary>
+    public string LogsDirectory => Path.Combine(_appDataFolder, "logs");
+
     public int DeferredSaveRequests => Volatile.Read(ref _deferredSaveRequests);
 
     public int DeferredSaveCoalescedRequests => Volatile.Read(ref _deferredSaveCoalescedRequests);

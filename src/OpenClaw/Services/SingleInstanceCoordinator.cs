@@ -117,7 +117,14 @@ public sealed class SingleInstanceCoordinator : IDisposable
 
         if (_ownsMutex)
         {
-            _mutex.ReleaseMutex();
+            try
+            {
+                _mutex.ReleaseMutex();
+            }
+            catch (ApplicationException ex)
+            {
+                _logger.Warning($"Single-instance mutex could not be released by this thread: {ex.Message}");
+            }
         }
 
         _listenCancellation?.Dispose();

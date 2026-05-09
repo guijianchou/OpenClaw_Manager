@@ -14,6 +14,7 @@ public sealed partial class MainWindow
             OpenLabel: StringResources.Get("TrayMenuOpen") is var open && open != "TrayMenuOpen" ? open : "Open OpenClaw",
             ReloadLabel: StringResources.Reload,
             ViewLogsLabel: StringResources.SettingsViewLogs,
+            CompactModeLabel: StringResources.Get("TrayMenuCompactMode") is var compact && compact != "TrayMenuCompactMode" ? compact : "Compact Mode",
             SettingsLabel: StringResources.Settings,
             ExitLabel: StringResources.Get("TrayMenuExit") is var exit && exit != "TrayMenuExit" ? exit : "Exit");
         _trayIconService = new TrayIconService(iconPath, App.Logger, menuStrings);
@@ -28,6 +29,7 @@ public sealed partial class MainWindow
         _trayIconService.OpenSettingsRequested += OnTrayOpenSettingsRequested;
         _trayIconService.ReloadRequested += OnTrayReloadRequested;
         _trayIconService.ViewLogsRequested += OnTrayViewLogsRequested;
+        _trayIconService.CompactModeRequested += OnTrayCompactModeRequested;
         _trayIconService.ExitRequested += OnTrayExitRequested;
         _trayIconService.UpdateStatus(ViewModel.WorkStatusText);
     }
@@ -44,6 +46,7 @@ public sealed partial class MainWindow
         _trayIconService.OpenSettingsRequested -= OnTrayOpenSettingsRequested;
         _trayIconService.ReloadRequested -= OnTrayReloadRequested;
         _trayIconService.ViewLogsRequested -= OnTrayViewLogsRequested;
+        _trayIconService.CompactModeRequested -= OnTrayCompactModeRequested;
         _trayIconService.ExitRequested -= OnTrayExitRequested;
         _trayIconService.Dispose();
         _trayIconService = null;
@@ -137,6 +140,11 @@ public sealed partial class MainWindow
             ShowMainWindowFromTray();
             ViewModel.ViewLogsCommand?.Execute(null);
         });
+    }
+
+    private void OnTrayCompactModeRequested()
+    {
+        DispatcherQueue.TryEnqueue(ToggleCompactMode);
     }
 
     private void OnTrayExitRequested()
