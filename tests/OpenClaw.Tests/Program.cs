@@ -58,6 +58,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("DiagnosticBundle redacts token-like values", Tests.DiagnosticBundleRedactsTokenLikeValues),
     ("DiagnosticBundle includes runtime info", Tests.DiagnosticBundleIncludesRuntimeInfo),
     ("DiagnosticBundle collects recent log files", Tests.DiagnosticBundleCollectsRecentLogFiles),
+    ("CloudflareRay parses PoP from standard cf-ray header", Tests.CloudflareRayParsesPopFromStandardHeader),
+    ("CloudflareRay returns null for missing or malformed header", Tests.CloudflareRayReturnsNullForMissingOrMalformed),
+    ("Latency tooltip includes PoP when available", Tests.LatencyTooltipIncludesPopWhenAvailable),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1289,6 +1292,37 @@ internal static class Tests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    public static Task CloudflareRayParsesPopFromStandardHeader()
+    {
+        // Standard cf-ray format: hex-POP
+        Assert.Equal("LAX", CloudflareRayParser.ParsePoP("8a1b2c3d4e5f6789-LAX"), "Should extract 3-letter PoP code.");
+        Assert.Equal("HKG", CloudflareRayParser.ParsePoP("abcdef1234567890-HKG"), "Should extract HKG.");
+        Assert.Equal("NRT", CloudflareRayParser.ParsePoP("0000000000000000-NRT"), "Should extract NRT.");
+        // Lowercase should also work
+        Assert.Equal("SJC", CloudflareRayParser.ParsePoP("aabbccdd11223344-sjc"), "Should handle lowercase PoP and uppercase it.");
+        return Task.CompletedTask;
+    }
+
+    public static Task CloudflareRayReturnsNullForMissingOrMalformed()
+    {
+        Assert.Null(CloudflareRayParser.ParsePoP(null), "Null input should return null.");
+        Assert.Null(CloudflareRayParser.ParsePoP(""), "Empty input should return null.");
+        Assert.Null(CloudflareRayParser.ParsePoP("8a1b2c3d4e5f6789"), "No dash means no PoP.");
+        Assert.Null(CloudflareRayParser.ParsePoP("8a1b2c3d4e5f6789-"), "Trailing dash with no code should return null.");
+        Assert.Null(CloudflareRayParser.ParsePoP("8a1b2c3d4e5f6789-AB"), "Two-letter code is not a valid PoP.");
+        return Task.CompletedTask;
+    }
+
+    public static Task LatencyTooltipIncludesPopWhenAvailable()
+    {
+        var summary = new LatencyHistorySummary(5, 42, 30, 38, 45, 50);
+        var tooltip = LatencyTooltipFormatter.Format(summary, "LAX");
+
+        Assert.Contains("PoP: LAX", tooltip, "Tooltip should include PoP line when available.");
+        Assert.Contains("Latest: 42 ms", tooltip, "Tooltip should still include latency data.");
+        return Task.CompletedTask;
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()

@@ -190,11 +190,13 @@ public sealed class ControlUiLatencyService : IDisposable
                 cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
-            var proxyHint = response.Headers.TryGetValues("cf-ray", out _) ? " via Cloudflare" : string.Empty;
+            var proxyHint = response.Headers.TryGetValues("cf-ray", out var cfRayValues) ? " via Cloudflare" : string.Empty;
+            var proxyPoP = cfRayValues is not null ? CloudflareRayParser.ParsePoP(cfRayValues.FirstOrDefault()) : null;
             return ControlUiLatencySnapshot.Success(
                 host,
                 stopwatch.ElapsedMilliseconds,
-                $"HTTP {(int)response.StatusCode}{proxyHint}");
+                $"HTTP {(int)response.StatusCode}{proxyHint}",
+                proxyPoP);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -273,12 +275,13 @@ public readonly record struct ControlUiLatencySnapshot(
     ControlUiLatencyState State,
     string Host,
     long? RoundtripTimeMs,
-    string? Detail = null)
+    string? Detail = null,
+    string? ProxyPoP = null)
 {
     public static ControlUiLatencySnapshot Unknown => new(ControlUiLatencyState.Unknown, string.Empty, null);
 
-    public static ControlUiLatencySnapshot Success(string host, long roundtripTimeMs, string? detail = null) =>
-        new(ControlUiLatencyState.Success, host, roundtripTimeMs, detail);
+    public static ControlUiLatencySnapshot Success(string host, long roundtripTimeMs, string? detail = null, string? proxyPoP = null) =>
+        new(ControlUiLatencyState.Success, host, roundtripTimeMs, detail, proxyPoP);
 
     public static ControlUiLatencySnapshot Failure(string host, string? detail = null) =>
         new(ControlUiLatencyState.Failure, host, null, detail);

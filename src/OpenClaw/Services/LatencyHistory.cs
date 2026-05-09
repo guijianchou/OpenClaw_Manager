@@ -68,7 +68,7 @@ public readonly record struct LatencyHistorySummary(
 
 public static class LatencyTooltipFormatter
 {
-    public static string Format(LatencyHistorySummary summary)
+    public static string Format(LatencyHistorySummary summary, string? proxyPoP = null)
     {
         if (summary.SampleCount <= 0 ||
             summary.LatestMs is not long latest ||
@@ -80,13 +80,21 @@ public static class LatencyTooltipFormatter
             return "Latency history: no samples yet";
         }
 
-        return string.Join(
-            '\n',
+        var lines = new List<string>(8)
+        {
             $"Latency history ({summary.SampleCount} samples)",
             $"Latest: {latest} ms",
             $"Min: {min} ms",
             $"Avg: {average} ms",
             $"P95: {p95} ms",
-            $"Max: {max} ms");
+            $"Max: {max} ms",
+        };
+
+        if (!string.IsNullOrWhiteSpace(proxyPoP))
+        {
+            lines.Add($"PoP: {proxyPoP}");
+        }
+
+        return string.Join('\n', lines);
     }
 }

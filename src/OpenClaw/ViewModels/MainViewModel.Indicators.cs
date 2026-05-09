@@ -33,7 +33,13 @@ public partial class MainViewModel
         {
             _latencyHistory.Record(snapshot);
             (LatencySummaryText, LatencySummaryBrush) = FormatLatencySummary(snapshot);
-            LatencyTooltipText = LatencyTooltipFormatter.Format(_latencyHistory.CreateSummary());
+            LatencyTooltipText = LatencyTooltipFormatter.Format(
+                _latencyHistory.CreateSummary(),
+                snapshot.ProxyPoP ?? _lastKnownPoP);
+            if (!string.IsNullOrWhiteSpace(snapshot.ProxyPoP))
+            {
+                _lastKnownPoP = snapshot.ProxyPoP;
+            }
         });
     }
 

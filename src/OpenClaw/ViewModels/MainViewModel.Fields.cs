@@ -54,6 +54,7 @@ public partial class MainViewModel
     private int _runAnimationFrame;
     private HeartbeatProbeStatus? _lastHeartbeatStatus;
     private bool _isHostVisible = true;
+    private string? _lastKnownPoP;
 
     // Recovery state projection
     private RecoveryState _shellConnectionState = RecoveryState.Connecting;

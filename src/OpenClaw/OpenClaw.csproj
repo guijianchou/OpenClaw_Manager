@@ -62,6 +62,7 @@
     <Compile Remove="Services\TrayMenuStrings.cs" />
     <Compile Remove="Services\HotkeyBinding.cs" />
     <Compile Remove="Services\DiagnosticBundleService.cs" />
+    <Compile Remove="Services\CloudflareRayParser.cs" />
   </ItemGroup>
 
   <ItemGroup>
