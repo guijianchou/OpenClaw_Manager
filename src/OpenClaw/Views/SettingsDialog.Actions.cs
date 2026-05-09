@@ -56,6 +56,12 @@ public sealed partial class SettingsDialog
         this.Close();
     }
 
+    private void OnExportDiagnosticBundleClick(object sender, RoutedEventArgs e)
+    {
+        MainViewModel?.ExportDiagnosticBundleCommand.Execute(null);
+        this.Close();
+    }
+
     private void OnResetHotkeyClick(object sender, RoutedEventArgs e)
     {
         ViewModel.ResetGlobalHotkey();

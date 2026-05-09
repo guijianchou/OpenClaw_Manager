@@ -147,6 +147,22 @@
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     FontSize="12"
                                     TextWrapping="Wrap" />
+
+                        <CheckBox Content="Always on Top"
+                                  IsChecked="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
+                                  Margin="0,12,0,0" />
+                        <TextBlock Text="Keep the main window above other applications."
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    FontSize="12"
+                                    TextWrapping="Wrap" />
+
+                        <CheckBox Content="Notify when task completes"
+                                  IsChecked="{x:Bind ViewModel.NotifyOnTaskComplete, Mode=TwoWay}"
+                                  Margin="0,12,0,0" />
+                        <TextBlock Text="Show a Windows notification when a long task finishes (LIVE to IDLE) while the window is hidden."
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    FontSize="12"
+                                    TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- ======= Panel: Environments ======= -->
@@ -323,6 +339,12 @@
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <FontIcon Glyph="&#xEC7A;" FontSize="14" />
                                     <TextBlock Text="{x:Bind helpers:StringResources.SettingsOpenDevTools}" />
+                                </StackPanel>
+                            </Button>
+                            <Button HorizontalAlignment="Stretch" Click="OnExportDiagnosticBundleClick">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE896;" FontSize="14" />
+                                    <TextBlock Text="Export Diagnostic Bundle" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>

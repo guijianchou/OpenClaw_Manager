@@ -32,6 +32,8 @@ public class SettingsViewModel : INotifyPropertyChanged
     private bool _allowMultipleInstances;
     private bool _enableGlobalHotkey;
     private string _globalHotkey = string.Empty;
+    private bool _alwaysOnTop;
+    private bool _notifyOnTaskComplete;
     private string _validationMessage = string.Empty;
 
     public SettingsViewModel()
@@ -54,6 +56,8 @@ public class SettingsViewModel : INotifyPropertyChanged
         _allowMultipleInstances = App.Configuration.Settings.AllowMultipleInstances;
         _enableGlobalHotkey = App.Configuration.Settings.EnableGlobalHotkey;
         _globalHotkey = App.Configuration.Settings.GlobalHotkey;
+        _alwaysOnTop = App.Configuration.Settings.AlwaysOnTop;
+        _notifyOnTaskComplete = App.Configuration.Settings.NotifyOnTaskComplete;
         _validationMessage = StringResources.SettingsValidationDefaultMessage;
     }
 
@@ -136,6 +140,18 @@ public class SettingsViewModel : INotifyPropertyChanged
     {
         get => _globalHotkey;
         set { _globalHotkey = value; OnPropertyChanged(); }
+    }
+
+    public bool AlwaysOnTop
+    {
+        get => _alwaysOnTop;
+        set { _alwaysOnTop = value; OnPropertyChanged(); }
+    }
+
+    public bool NotifyOnTaskComplete
+    {
+        get => _notifyOnTaskComplete;
+        set { _notifyOnTaskComplete = value; OnPropertyChanged(); }
     }
 
     public string ValidationMessage
@@ -282,6 +298,8 @@ public class SettingsViewModel : INotifyPropertyChanged
         App.Configuration.Settings.AllowMultipleInstances = AllowMultipleInstances;
         App.Configuration.Settings.EnableGlobalHotkey = EnableGlobalHotkey;
         App.Configuration.Settings.GlobalHotkey = GlobalHotkey.Trim();
+        App.Configuration.Settings.AlwaysOnTop = AlwaysOnTop;
+        App.Configuration.Settings.NotifyOnTaskComplete = NotifyOnTaskComplete;
         App.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging = EnableDevLog;
 
         SyncRenamedEnvironmentProfiles();
