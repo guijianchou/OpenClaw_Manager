@@ -32,7 +32,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings Advanced exposes multiple instances option", Tests.SettingsAdvancedExposesMultipleInstancesOption),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places Advanced at the bottom", Tests.SettingsNavigationPlacesAdvancedAtBottom),
-    ("Version metadata is 3.1.2", Tests.VersionMetadataIs312),
+    ("Version metadata is 3.1.3", Tests.VersionMetadataIs313),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -44,6 +44,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tray callback reads NOTIFYICON_VERSION_4 event low word", Tests.TrayCallbackReadsNotifyIconVersion4EventLowWord),
     ("Tray context menu exposes minimal commands", Tests.TrayContextMenuExposesMinimalCommands),
     ("Tray context menu uses popup-capable owner window", Tests.TrayContextMenuUsesPopupCapableOwnerWindow),
+    ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
     ("Log retention removes only expired OpenClaw logs", Tests.LogRetentionRemovesOnlyExpiredOpenClawLogs),
@@ -686,7 +687,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs312()
+    public static Task VersionMetadataIs313()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -717,13 +718,13 @@ internal static class Tests
         var about = File.ReadAllText(aboutPath);
         var readme = File.ReadAllText(readmePath);
 
-        Assert.Contains("<Version>3.1.2</Version>", project, "Project package version should be 3.1.2.");
-        Assert.Contains("<AssemblyVersion>3.1.2.0</AssemblyVersion>", project, "Assembly version should be 3.1.2.0 for About dialog display.");
-        Assert.Contains("<FileVersion>3.1.2.0</FileVersion>", project, "File version should be 3.1.2.0.");
-        Assert.Contains("Version=\"3.1.2.0\"", packageManifest, "Package manifest version should be 3.1.2.0.");
-        Assert.Contains("version=\"3.1.2.0\"", appManifest, "Application manifest assembly identity should be 3.1.2.0.");
+        Assert.Contains("<Version>3.1.3</Version>", project, "Project package version should be 3.1.3.");
+        Assert.Contains("<AssemblyVersion>3.1.3.0</AssemblyVersion>", project, "Assembly version should be 3.1.3.0 for About dialog display.");
+        Assert.Contains("<FileVersion>3.1.3.0</FileVersion>", project, "File version should be 3.1.3.0.");
+        Assert.Contains("Version=\"3.1.3.0\"", packageManifest, "Package manifest version should be 3.1.3.0.");
+        Assert.Contains("version=\"3.1.3.0\"", appManifest, "Application manifest assembly identity should be 3.1.3.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
-        Assert.Contains("### v3.1.2 (2026-05-08)", readme, "README should include the v3.1.2 changelog entry.");
+        Assert.Contains("### v3.1.3 (2026-05-08)", readme, "README should include the v3.1.3 changelog entry.");
         return Task.CompletedTask;
     }
 
@@ -968,6 +969,32 @@ internal static class Tests
 
         Assert.DoesNotContain("WindowHandles.MessageOnly", source, "Tray menu owner should not be a message-only window because popup menus need a normal owner.");
         Assert.DoesNotContain("new(-3)", source, "Tray icon service should not use HWND_MESSAGE for the popup menu owner.");
+        return Task.CompletedTask;
+    }
+
+    public static Task WindowHideRestoresMinimizedPlacementFirst()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "WindowFrameHelper.cs");
+        var source = File.ReadAllText(sourcePath);
+        var hideIndex = source.IndexOf("public static void HideWindow(Window window)", StringComparison.Ordinal);
+        var showIndex = source.IndexOf("public static void ShowAndActivateWindow(Window window)", StringComparison.Ordinal);
+
+        Assert.True(hideIndex >= 0, "HideWindow should exist.");
+        Assert.True(showIndex > hideIndex, "ShowAndActivateWindow should follow HideWindow.");
+
+        var hideMethod = source[hideIndex..showIndex];
+        var minimizedCheckIndex = hideMethod.IndexOf("IsIconic(hwnd)", StringComparison.Ordinal);
+        var restoreIndex = hideMethod.IndexOf("ShowWindow(hwnd, ShowWindowRestore)", StringComparison.Ordinal);
+        var hideCallIndex = hideMethod.IndexOf("ShowWindow(hwnd, ShowWindowHide)", StringComparison.Ordinal);
+
+        Assert.True(minimizedCheckIndex >= 0, "HideWindow should check whether the HWND is minimized.");
+        Assert.True(restoreIndex >= 0, "HideWindow should restore minimized placement before hiding.");
+        Assert.True(hideCallIndex > restoreIndex, "HideWindow should hide only after minimized placement is restored.");
         return Task.CompletedTask;
     }
 

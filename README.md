@@ -238,6 +238,13 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 
 ## Recent Changes
 
+### v3.1.3 (2026-05-08)
+
+- Fixed taskbar/system restore after minimizing to tray by restoring the minimized HWND placement before hiding the window.
+- Covered the remaining dedicated-GPU direct mode restore path where Windows could otherwise keep the main window at `160x28` and `-32000,-32000` after taskbar activation.
+- Added regression coverage to ensure tray hiding restores minimized placement before calling `SW_HIDE`.
+- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.1.3`.
+
 ### v3.1.2 (2026-05-08)
 
 - Fixed main-window restoration after GPU/display topology changes such as switching to dedicated-GPU direct mode.

@@ -216,6 +216,11 @@ internal static class WindowFrameHelper
             return;
         }
 
+        if (IsIconic(hwnd))
+        {
+            ShowWindow(hwnd, ShowWindowRestore);
+        }
+
         ShowWindow(hwnd, ShowWindowHide);
     }
 
