@@ -364,6 +364,18 @@
   <data name="AboutCopyright" xml:space="preserve">
     <value>(C) 2026 Lanstack @openclaw. All rights reserved.</value>
   </data>
+  <data name="AboutCheckForUpdates" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
+  <data name="AboutCheckingForUpdates" xml:space="preserve">
+    <value>Checking for updates...</value>
+  </data>
+  <data name="AboutUpdateCheckNoUpdate" xml:space="preserve">
+    <value>You are using the latest version.</value>
+  </data>
+  <data name="AboutUpdateCheckFailed" xml:space="preserve">
+    <value>Could not check for updates. Please try again later.</value>
+  </data>
   <data name="LogsTitle" xml:space="preserve">
     <value>Application Logs</value>
   </data>
@@ -656,5 +668,14 @@
   </data>
   <data name="SettingsValidationGlobalHotkeyInvalid" xml:space="preserve">
     <value>Enter a valid hotkey such as Ctrl+Alt+Space, Shift+F12, or Win+Alt+O.</value>
+  </data>
+  <data name="UpdateAvailableTitle" xml:space="preserve">
+    <value>Update Available</value>
+  </data>
+  <data name="UpdateAvailableMessage" xml:space="preserve">
+    <value>A new version ({0}) is available.</value>
+  </data>
+  <data name="UpdateViewRelease" xml:space="preserve">
+    <value>View Release</value>
   </data>
 </root>

@@ -26,5 +26,6 @@ public sealed partial class MainWindow : Window
         AttachRootEventHandlers();
         UpdateThemeSelector(App.Configuration.Settings.AppTheme);
         RestoreCompactModeIfSaved();
+        InitializeUpdateCheck();
     }
 }

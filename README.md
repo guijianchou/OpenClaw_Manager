@@ -182,13 +182,14 @@ If the page loads but OpenClaw reports origin rejection, check the exact public 
 | Auto-Reconnect | Retries failed navigation automatically |
 | Heartbeat | Periodic Control UI and transport probe with configurable reconnect thresholds |
 | System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Reload, View Logs, Settings, and Exit actions |
-| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window, with Settings UI validation and reset |
+| Global Hotkey | Optional configurable system-wide hotkey (default Ctrl+Shift+F12, disabled by default) to show/hide the window, with Settings UI validation and reset |
 | Instance Control | Optional multiple-instance mode; off by default so app relaunches restore the existing tray-hidden window |
 | Session Isolation | Separate WebView2 profile data per configured environment |
 | Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
 | Always on Top | Pin button to keep the window above other applications, with native topmost fallback and distinct active/inactive colors |
 | Compact Mode | Reduced window showing only status bar for screen-corner placement |
 | Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
+| Update Check | Automatic GitHub Releases check on startup (every 24h) with dismissible notification |
 | Theme | Top-bar segmented switcher for System, Light, and Dark |
 | Language | English, Simplified Chinese, System |
 | Diagnostics | Runtime, network, and session checks |
@@ -245,6 +246,15 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 
 ## Recent Changes
 
+### v3.2.2 (2026-05-09)
+
+- Added GitHub Releases update checker: checks for new versions on startup (every 24h), shows a success InfoBar with a link to the release page, and remembers dismissed versions.
+- Fixed language switching for unpackaged apps: `StringResources` now uses `ResourceManager` with explicit `ResourceContext` language qualification as a fallback when `PrimaryLanguageOverride` does not persist across sessions.
+- Added `AppSettings` fields for update check: `EnableUpdateCheck`, `UpdateCheckIntervalHours`, `LastUpdateCheckUtc`, `DismissedUpdateVersion`.
+- Added `UpdateCheckService` with full error handling (network failure, malformed JSON, pre-release filtering).
+- Added en-us/zh-cn resource strings for update notification UI.
+- Synced app, assembly, file, package manifest, application manifest, About dialog, and regression-test version metadata to `3.2.2`.
+
 ### v3.2.1 (2026-05-09)
 
 - Removed the toast notification feature because Windows toast activation is not a good fit for the current unpackaged WebView2 shell.
@@ -255,7 +265,7 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 ### v3.2.0 (2026-05-09)
 
 - Added localized tray context menu with Reload, View Logs, status header, and full Chinese support.
-- Added configurable global hotkey (default Ctrl+Alt+Space) to show/hide the main window from anywhere, including Settings UI controls, validation, and reset-to-default support.
+- Added configurable global hotkey to show/hide the main window from anywhere, including Settings UI controls, validation, and reset-to-default support.
 - Added diagnostic bundle export: one-click zip of redacted settings, recent logs, runtime info, and diagnostic summary.
 - Added Cloudflare PoP (Point of Presence) display in the latency tooltip by parsing the `cf-ray` response header.
 - Added `StopAsync` to `SingleInstanceCoordinator` for clean listener shutdown without pipe races.

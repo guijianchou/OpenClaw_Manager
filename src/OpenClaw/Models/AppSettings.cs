@@ -65,15 +65,15 @@ public class AppSettings
     public bool AllowMultipleInstances { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets the global hotkey binding string (e.g. "Ctrl+Alt+Space").
+    /// Gets or sets the global hotkey binding string (e.g. "Ctrl+Shift+F12").
     /// Empty or null disables the hotkey.
     /// </summary>
-    public string GlobalHotkey { get; set; } = "Ctrl+Alt+Space";
+    public string GlobalHotkey { get; set; } = "Ctrl+Shift+F12";
 
     /// <summary>
     /// Gets or sets whether the global hotkey is enabled.
     /// </summary>
-    public bool EnableGlobalHotkey { get; set; } = true;
+    public bool EnableGlobalHotkey { get; set; } = false;
 
     /// <summary>
     /// Gets or sets whether the main window stays on top of other windows.
@@ -115,6 +115,26 @@ public class AppSettings
     /// Gets or sets the diagnostics options.
     /// </summary>
     public DiagnosticsOptions Diagnostics { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets whether automatic update checking is enabled.
+    /// </summary>
+    public bool EnableUpdateCheck { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the interval in hours between automatic update checks.
+    /// </summary>
+    public int UpdateCheckIntervalHours { get; set; } = 24;
+
+    /// <summary>
+    /// Gets or sets the last time an update check was performed (UTC ISO 8601).
+    /// </summary>
+    public string? LastUpdateCheckUtc { get; set; }
+
+    /// <summary>
+    /// Gets or sets the version that was dismissed by the user (to avoid repeated prompts).
+    /// </summary>
+    public string? DismissedUpdateVersion { get; set; }
 }
 
 /// <summary>

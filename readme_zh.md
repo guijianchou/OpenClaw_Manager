@@ -182,13 +182,14 @@ dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
 | Auto-Reconnect | 导航失败后自动重试 |
 | Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
 | System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
-| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口，并支持设置界面校验和重置 |
+| Global Hotkey | 可选的全局热键（默认 Ctrl+Shift+F12，默认关闭）随时显示/隐藏窗口，并支持设置界面校验和重置 |
 | Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
 | Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
 | Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
 | Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
 | Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
 | Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
+| Update Check | 启动时自动检查 GitHub Releases 新版本（每 24 小时），有更新时弹出可关闭通知 |
 | Theme | 顶部栏 System、Light、Dark 分段切换 |
 | Language | English、Simplified Chinese、System |
 | Diagnostics | 运行时、网络和会话检查 |
@@ -245,6 +246,15 @@ MainWindow
 
 ## 最近更新
 
+### v3.2.2 (2026-05-09)
+
+- 新增 GitHub Releases 更新检查：启动时每 24 小时检查一次新版本，有更新时弹出 InfoBar 并附带发布页链接，关闭后记住已忽略版本。
+- 修复 unpackaged 应用语言切换不生效的问题：`StringResources` 现在使用 `ResourceManager` 配合显式 `ResourceContext` 语言限定作为 `PrimaryLanguageOverride` 不持久化时的回退方案。
+- 新增 `AppSettings` 字段：`EnableUpdateCheck`、`UpdateCheckIntervalHours`、`LastUpdateCheckUtc`、`DismissedUpdateVersion`。
+- 新增 `UpdateCheckService`，完整处理网络失败、JSON 格式错误和 pre-release 过滤。
+- 新增中英文更新通知 UI 资源字符串。
+- 同步 app、assembly、file、package manifest、application manifest、About dialog 和回归测试版本元数据到 `3.2.2`。
+
 ### v3.2.1 (2026-05-09)
 
 - 移除 toast 通知功能；当前应用是 unpackaged WebView2 shell，Windows toast activation 不适合这个分发和启动模型。
@@ -255,7 +265,7 @@ MainWindow
 ### v3.2.0 (2026-05-09)
 
 - 添加本地化托盘右键菜单，包含 Reload、View Logs、状态标题和完整中文支持。
-- 添加可配置全局热键（默认 Ctrl+Alt+Space）用于随时显示/隐藏主窗口，并在 Settings 中提供输入、校验和恢复默认值。
+- 添加可配置全局热键用于随时显示/隐藏主窗口，并在 Settings 中提供输入、校验和恢复默认值。
 - 添加诊断包导出：一键打包脱敏设置、近期日志、运行时信息和诊断摘要。
 - 在延迟 tooltip 中解析 `cf-ray` 响应头并显示 Cloudflare PoP。
 - 为 `SingleInstanceCoordinator` 添加 `StopAsync`，关闭时等待 listener task，避免 pipe dispose 竞态。

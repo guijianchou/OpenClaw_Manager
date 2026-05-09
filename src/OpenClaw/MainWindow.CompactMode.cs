@@ -93,7 +93,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        // Hide/show InfoBars and WebView host (Rows 2, 3, 4)
+        // Hide/show InfoBars and WebView host (Rows 2, 3, 4, 5)
         if (root.FindName("ConnectionInfoBar") is UIElement connectionInfoBar)
         {
             connectionInfoBar.Visibility = visibility;
@@ -102,6 +102,11 @@ public sealed partial class MainWindow
         if (root.FindName("DiagnosticInfoBar") is UIElement diagnosticInfoBar)
         {
             diagnosticInfoBar.Visibility = visibility;
+        }
+
+        if (root.FindName("UpdateInfoBar") is UIElement updateInfoBar)
+        {
+            updateInfoBar.Visibility = visibility;
         }
 
         if (root.FindName("WebViewHost") is UIElement webViewHost)

@@ -2,6 +2,7 @@ using OpenClaw.Models;
 using OpenClaw.Services;
 using OpenClaw.Helpers;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
 
 var tests = new (string Name, Func<Task> Run)[]
@@ -32,8 +33,10 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings Advanced exposes multiple instances option", Tests.SettingsAdvancedExposesMultipleInstancesOption),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places Advanced at the bottom", Tests.SettingsNavigationPlacesAdvancedAtBottom),
-    ("Version metadata is 3.2.1", Tests.VersionMetadataIs321),
+    ("Version metadata is 3.2.2", Tests.VersionMetadataIs322),
     ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
+    ("About dialog developer link targets Guijianchou", Tests.AboutDialogDeveloperLinkTargetsGuijianchou),
+    ("About dialog exposes manual update check", Tests.AboutDialogExposesManualUpdateCheck),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -53,7 +56,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("HotkeyBinding round-trips through ToString", Tests.HotkeyBindingRoundTripsThroughToString),
     ("HotkeyBinding parse returns null for empty or invalid input", Tests.HotkeyBindingParseReturnsNullForInvalidInput),
     ("HotkeyBinding parse handles single key without modifier", Tests.HotkeyBindingParseSingleKeyWithoutModifier),
-    ("AppSettings defaults hotkey to Ctrl+Alt+Space enabled", Tests.AppSettingsDefaultsHotkeyToCtrlAltSpaceEnabled),
+    ("AppSettings defaults hotkey to Ctrl+Shift+F12 disabled", Tests.AppSettingsDefaultsHotkeyToCtrlShiftF12Disabled),
     ("Settings load without hotkey fields uses defaults", Tests.SettingsLoadWithoutHotkeyFieldsUsesDefaults),
     ("Settings Shell exposes global hotkey controls", Tests.SettingsShellExposesGlobalHotkeyControls),
     ("SettingsViewModel persists and validates global hotkey fields", Tests.SettingsViewModelPersistsAndValidatesGlobalHotkeyFields),
@@ -76,6 +79,15 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
     ("Log retention removes only expired OpenClaw logs", Tests.LogRetentionRemovesOnlyExpiredOpenClawLogs),
+    ("UpdateCheck parses latest release version from GitHub JSON", Tests.UpdateCheckParsesLatestReleaseVersionFromGitHubJson),
+    ("UpdateCheck detects newer version available", Tests.UpdateCheckDetectsNewerVersionAvailable),
+    ("UpdateCheck ignores same or older version", Tests.UpdateCheckIgnoresSameOrOlderVersion),
+    ("UpdateCheck handles network failure gracefully", Tests.UpdateCheckHandlesNetworkFailureGracefully),
+    ("UpdateCheck handles malformed JSON gracefully", Tests.UpdateCheckHandlesMalformedJsonGracefully),
+    ("UpdateCheck skips pre-release tags", Tests.UpdateCheckSkipsPreReleaseTags),
+    ("AppSettings defaults update check enabled", Tests.AppSettingsDefaultsUpdateCheckEnabled),
+    ("Language switch invalidates ResourceLoader", Tests.LanguageSwitchInvalidatesResourceLoader),
+    ("ApplyLanguage persists override for unpackaged app", Tests.ApplyLanguagePersistsOverrideForUnpackagedApp),
 };
 
 var failures = new List<string>();
@@ -715,7 +727,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs321()
+    public static Task VersionMetadataIs322()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -744,11 +756,11 @@ internal static class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.2.1</Version>", project, "Project package version should be 3.2.1.");
-        Assert.Contains("<AssemblyVersion>3.2.1.0</AssemblyVersion>", project, "Assembly version should be 3.2.1.0.");
-        Assert.Contains("<FileVersion>3.2.1.0</FileVersion>", project, "File version should be 3.2.1.0.");
-        Assert.Contains("Version=\"3.2.1.0\"", packageManifest, "Package manifest version should be 3.2.1.0.");
-        Assert.Contains("version=\"3.2.1.0\"", appManifest, "Application manifest assembly identity should be 3.2.1.0.");
+        Assert.Contains("<Version>3.2.2</Version>", project, "Project package version should be 3.2.2.");
+        Assert.Contains("<AssemblyVersion>3.2.2.0</AssemblyVersion>", project, "Assembly version should be 3.2.2.0.");
+        Assert.Contains("<FileVersion>3.2.2.0</FileVersion>", project, "File version should be 3.2.2.0.");
+        Assert.Contains("Version=\"3.2.2.0\"", packageManifest, "Package manifest version should be 3.2.2.0.");
+        Assert.Contains("version=\"3.2.2.0\"", appManifest, "Application manifest assembly identity should be 3.2.2.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
         return Task.CompletedTask;
     }
@@ -766,6 +778,59 @@ internal static class Tests
 
         Assert.Contains("NavigateUri=\"https://github.com/guijianchou/OpenClaw_Manager\"", about, "About dialog repository link should target the OpenClaw Manager repository.");
         Assert.DoesNotContain("NavigateUri=\"https://github.com/Jutaosay/openclaw_for_windows\"", about, "About dialog should not link to the old repository.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AboutDialogDeveloperLinkTargetsGuijianchou()
+    {
+        var aboutPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "AboutDialog.xaml");
+
+        var about = File.ReadAllText(aboutPath);
+
+        Assert.Contains("NavigateUri=\"https://github.com/guijianchou\"", about, "About dialog developer link should target Guijianchou.");
+        Assert.Contains(">@Guijianchou</Hyperlink>", about, "About dialog should display developed by @Guijianchou.");
+        Assert.DoesNotContain("@Jutaosay", about, "About dialog should not display the old developer handle.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AboutDialogExposesManualUpdateCheck()
+    {
+        var aboutXamlPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "AboutDialog.xaml");
+        var aboutCodePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "AboutDialog.xaml.cs");
+        var resourcesPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "StringResources.cs");
+
+        var xaml = File.ReadAllText(aboutXamlPath);
+        var code = File.ReadAllText(aboutCodePath);
+        var resources = File.ReadAllText(resourcesPath);
+
+        Assert.Contains("AboutCheckForUpdates", xaml, "About dialog should expose a manual Check for Updates button.");
+        Assert.Contains("Click=\"OnCheckForUpdatesClick\"", xaml, "Manual update check button should invoke an About dialog handler.");
+        Assert.Contains("ManualUpdateStatusText", xaml, "About dialog should show manual update check status.");
+        Assert.Contains("ManualUpdateReleaseLink", xaml, "About dialog should show a release link when an update is available.");
+        Assert.Contains("UpdateCheckService", code, "About dialog should reuse UpdateCheckService for GitHub Releases checks.");
+        Assert.Contains("https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest", code, "Manual update check should target the OpenClaw Manager releases endpoint.");
+        Assert.Contains("AboutUpdateCheckNoUpdate", resources, "Localized no-update text should be available.");
+        Assert.Contains("AboutUpdateCheckFailed", resources, "Localized failed-check text should be available.");
         return Task.CompletedTask;
     }
 
@@ -1228,11 +1293,11 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task AppSettingsDefaultsHotkeyToCtrlAltSpaceEnabled()
+    public static Task AppSettingsDefaultsHotkeyToCtrlShiftF12Disabled()
     {
         var settings = new AppSettings();
-        Assert.Equal("Ctrl+Alt+Space", settings.GlobalHotkey, "Default hotkey should be Ctrl+Alt+Space.");
-        Assert.True(settings.EnableGlobalHotkey, "Global hotkey should be enabled by default.");
+        Assert.Equal("Ctrl+Shift+F12", settings.GlobalHotkey, "Default hotkey should be Ctrl+Shift+F12.");
+        Assert.False(settings.EnableGlobalHotkey, "Global hotkey should be disabled by default.");
         return Task.CompletedTask;
     }
 
@@ -1248,8 +1313,8 @@ internal static class Tests
             var service = new ConfigurationService(directory, new TestLogger());
             service.Load();
 
-            Assert.Equal("Ctrl+Alt+Space", service.Settings.GlobalHotkey, "Missing hotkey field should default to Ctrl+Alt+Space.");
-            Assert.True(service.Settings.EnableGlobalHotkey, "Missing enable field should default to true.");
+            Assert.Equal("Ctrl+Shift+F12", service.Settings.GlobalHotkey, "Missing hotkey field should default to Ctrl+Shift+F12.");
+            Assert.False(service.Settings.EnableGlobalHotkey, "Missing enable field should default to false.");
             return Task.CompletedTask;
         }
         finally
@@ -1547,6 +1612,159 @@ internal static class Tests
         // Manual reset
         breaker.Reset();
         Assert.True(breaker.CanAttempt(), "Should allow attempts after reset.");
+        return Task.CompletedTask;
+    }
+
+    // --- Update Check Tests ---
+
+    public static async Task UpdateCheckParsesLatestReleaseVersionFromGitHubJson()
+    {
+        var json = """{"tag_name":"v3.3.0","prerelease":false,"html_url":"https://github.com/guijianchou/OpenClaw_Manager/releases/tag/v3.3.0"}""";
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            }));
+        var service = new UpdateCheckService(new HttpClient(handler), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result = await service.CheckForUpdateAsync(new Version(3, 2, 1));
+
+        Assert.NotNull(result, "Should return a result when API responds successfully.");
+        Assert.Equal("3.3.0", result!.LatestVersion.ToString(), "Should parse version from tag_name.");
+        Assert.True(result.IsNewerAvailable, "3.3.0 should be newer than 3.2.1.");
+        Assert.Equal("https://github.com/guijianchou/OpenClaw_Manager/releases/tag/v3.3.0", result.ReleaseUrl, "Should extract html_url.");
+    }
+
+    public static async Task UpdateCheckDetectsNewerVersionAvailable()
+    {
+        var json = """{"tag_name":"v4.0.0","prerelease":false,"html_url":"https://github.com/guijianchou/OpenClaw_Manager/releases/tag/v4.0.0"}""";
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            }));
+        var service = new UpdateCheckService(new HttpClient(handler), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result = await service.CheckForUpdateAsync(new Version(3, 2, 1));
+
+        Assert.NotNull(result, "Should return a result.");
+        Assert.True(result!.IsNewerAvailable, "4.0.0 should be newer than 3.2.1.");
+    }
+
+    public static async Task UpdateCheckIgnoresSameOrOlderVersion()
+    {
+        var json = """{"tag_name":"v3.2.1","prerelease":false,"html_url":"https://github.com/guijianchou/OpenClaw_Manager/releases/tag/v3.2.1"}""";
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            }));
+        var service = new UpdateCheckService(new HttpClient(handler), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result = await service.CheckForUpdateAsync(new Version(3, 2, 1));
+
+        Assert.NotNull(result, "Should return a result even when no update available.");
+        Assert.False(result!.IsNewerAvailable, "Same version should not be flagged as newer.");
+
+        // Also test older
+        var jsonOlder = """{"tag_name":"v3.1.0","prerelease":false,"html_url":"https://github.com/guijianchou/OpenClaw_Manager/releases/tag/v3.1.0"}""";
+        var handler2 = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(jsonOlder)
+            }));
+        var service2 = new UpdateCheckService(new HttpClient(handler2), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result2 = await service2.CheckForUpdateAsync(new Version(3, 2, 1));
+        Assert.False(result2!.IsNewerAvailable, "Older version should not be flagged as newer.");
+    }
+
+    public static async Task UpdateCheckHandlesNetworkFailureGracefully()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+        var service = new UpdateCheckService(new HttpClient(handler), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result = await service.CheckForUpdateAsync(new Version(3, 2, 1));
+
+        Assert.Null(result, "Should return null on HTTP failure.");
+    }
+
+    public static async Task UpdateCheckHandlesMalformedJsonGracefully()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("not json at all")
+            }));
+        var service = new UpdateCheckService(new HttpClient(handler), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result = await service.CheckForUpdateAsync(new Version(3, 2, 1));
+
+        Assert.Null(result, "Should return null on malformed JSON.");
+    }
+
+    public static async Task UpdateCheckSkipsPreReleaseTags()
+    {
+        var json = """{"tag_name":"v4.0.0-beta.1","prerelease":true,"html_url":"https://github.com/guijianchou/OpenClaw_Manager/releases/tag/v4.0.0-beta.1"}""";
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            }));
+        var service = new UpdateCheckService(new HttpClient(handler), "https://api.github.com/repos/guijianchou/OpenClaw_Manager/releases/latest");
+
+        var result = await service.CheckForUpdateAsync(new Version(3, 2, 1));
+
+        Assert.Null(result, "Should return null for pre-release versions.");
+    }
+
+    public static Task AppSettingsDefaultsUpdateCheckEnabled()
+    {
+        var settings = new AppSettings();
+        Assert.True(settings.EnableUpdateCheck, "Update check should be enabled by default.");
+        Assert.Equal(24, settings.UpdateCheckIntervalHours, "Default update check interval should be 24 hours.");
+        return Task.CompletedTask;
+    }
+
+    // --- Language Switch Tests ---
+
+    public static Task LanguageSwitchInvalidatesResourceLoader()
+    {
+        // Verify that StringResources exposes methods to set language and invalidate the cached loader
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "StringResources.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("public static void InvalidateLoader()", source,
+            "StringResources should expose InvalidateLoader() to force recreation after language change.");
+        Assert.Contains("_loader = null", source,
+            "InvalidateLoader should null out the cached ResourceLoader.");
+        Assert.Contains("public static void SetLanguage(string? language)", source,
+            "StringResources should expose SetLanguage() for explicit language override in unpackaged apps.");
+        Assert.Contains("_overrideLanguage", source,
+            "StringResources should store the override language for ResourceManager-based resolution.");
+        Assert.Contains("CreateResourceContext()", source,
+            "StringResources should use ResourceManager with explicit context for unpackaged fallback.");
+        return Task.CompletedTask;
+    }
+
+    public static Task ApplyLanguagePersistsOverrideForUnpackagedApp()
+    {
+        // Verify that ApplyLanguage calls SetLanguage for unpackaged persistence
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "App.xaml.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("StringResources.SetLanguage(language)", source,
+            "ApplyLanguage should call SetLanguage on StringResources for unpackaged app fallback.");
         return Task.CompletedTask;
     }
 

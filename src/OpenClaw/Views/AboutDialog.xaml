@@ -38,11 +38,29 @@
                          HorizontalAlignment="Center"
                          NavigateUri="https://github.com/guijianchou/OpenClaw_Manager" />
 
+        <StackPanel Spacing="6" HorizontalAlignment="Center">
+            <Button x:Name="ManualUpdateCheckButton"
+                    Content="{x:Bind helpers:StringResources.AboutCheckForUpdates}"
+                    Click="OnCheckForUpdatesClick"
+                    HorizontalAlignment="Center" />
+            <TextBlock x:Name="ManualUpdateStatusText"
+                       FontSize="12"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       MaxWidth="320" />
+            <HyperlinkButton x:Name="ManualUpdateReleaseLink"
+                             Content="{x:Bind helpers:StringResources.UpdateViewRelease}"
+                             NavigateUri="https://github.com/guijianchou/OpenClaw_Manager/releases"
+                             Visibility="Collapsed"
+                             HorizontalAlignment="Center" />
+        </StackPanel>
+
         <TextBlock HorizontalAlignment="Center"
                    FontSize="12"
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}">
             <Run Text="{x:Bind helpers:StringResources.AboutDevelopedBy}" />
-            <Hyperlink NavigateUri="https://github.com/Jutaosay">@Jutaosay</Hyperlink>
+            <Hyperlink NavigateUri="https://github.com/guijianchou">@Guijianchou</Hyperlink>
         </TextBlock>
 
         <TextBlock Text="{x:Bind helpers:StringResources.AboutCopyright}"

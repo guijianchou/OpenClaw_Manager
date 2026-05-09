@@ -162,7 +162,7 @@ public class SettingsViewModel : INotifyPropertyChanged
 
     public void ResetGlobalHotkey()
     {
-        EnableGlobalHotkey = true;
+        EnableGlobalHotkey = new AppSettings().EnableGlobalHotkey;
         GlobalHotkey = new AppSettings().GlobalHotkey;
     }
 

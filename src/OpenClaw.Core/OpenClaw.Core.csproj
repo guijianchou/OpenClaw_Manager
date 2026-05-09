@@ -33,6 +33,7 @@
     <Compile Include="..\OpenClaw\Services\DiagnosticBundleService.cs" Link="Services\DiagnosticBundleService.cs" />
     <Compile Include="..\OpenClaw\Services\CloudflareRayParser.cs" Link="Services\CloudflareRayParser.cs" />
     <Compile Include="..\OpenClaw\Services\WebViewCircuitBreaker.cs" Link="Services\WebViewCircuitBreaker.cs" />
+    <Compile Include="..\OpenClaw\Services\UpdateCheckService.cs" Link="Services\UpdateCheckService.cs" />
   </ItemGroup>
 
 </Project>

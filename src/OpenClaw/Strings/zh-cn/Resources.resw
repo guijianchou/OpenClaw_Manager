@@ -364,6 +364,18 @@
   <data name="AboutCopyright" xml:space="preserve">
     <value>(C) 2026 Lanstack @openclaw. 保留所有权利。</value>
   </data>
+  <data name="AboutCheckForUpdates" xml:space="preserve">
+    <value>检查更新</value>
+  </data>
+  <data name="AboutCheckingForUpdates" xml:space="preserve">
+    <value>正在检查更新...</value>
+  </data>
+  <data name="AboutUpdateCheckNoUpdate" xml:space="preserve">
+    <value>当前已是最新版本。</value>
+  </data>
+  <data name="AboutUpdateCheckFailed" xml:space="preserve">
+    <value>无法检查更新，请稍后再试。</value>
+  </data>
   <data name="LogsTitle" xml:space="preserve">
     <value>应用日志</value>
   </data>
@@ -656,5 +668,14 @@
   </data>
   <data name="SettingsValidationGlobalHotkeyInvalid" xml:space="preserve">
     <value>请输入有效热键，例如 Ctrl+Alt+Space、Shift+F12 或 Win+Alt+O。</value>
+  </data>
+  <data name="UpdateAvailableTitle" xml:space="preserve">
+    <value>有新版本可用</value>
+  </data>
+  <data name="UpdateAvailableMessage" xml:space="preserve">
+    <value>新版本 ({0}) 已发布。</value>
+  </data>
+  <data name="UpdateViewRelease" xml:space="preserve">
+    <value>查看发布</value>
   </data>
 </root>

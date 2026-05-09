@@ -288,13 +288,13 @@ MainWindow.xaml 是 394 行的 6 行 Grid 布局：
 
 | 功能 | 用户价值 | 工程风险 | 估算 | 推荐阶段 | 结论 |
 |---|---|---|---:|---|---|
-| 托盘菜单本地化 + Reload/View Logs | 中 | 低 | 0.5d | v3.2 | 立即做 |
-| 全局热键 | 高 | 中低 | 2d | v3.2 | 立即做 |
-| 诊断包导出 | 高 | 低 | 2d | v3.2 | 立即做 |
-| Cloudflare PoP tooltip | 中 | 低 | 0.5d | v3.2 | 立即做 |
-| SingleInstance 可等待关闭 | 中 | 低 | 0.5d | v3.2 | 顺手做 |
-| Always-on-top | 中高 | 低 | 1d | v3.3 | 做 |
-| Compact mode | 高 | 中 | 2d | v3.3 | 做 |
+| ~~托盘菜单本地化 + Reload/View Logs~~ | ~~中~~ | ~~低~~ | ~~0.5d~~ | ~~v3.2~~ | ~~已完成~~ |
+| ~~全局热键~~ | ~~高~~ | ~~中低~~ | ~~2d~~ | ~~v3.2~~ | ~~已完成~~ |
+| ~~诊断包导出~~ | ~~高~~ | ~~低~~ | ~~2d~~ | ~~v3.2~~ | ~~已完成~~ |
+| ~~Cloudflare PoP tooltip~~ | ~~中~~ | ~~低~~ | ~~0.5d~~ | ~~v3.2~~ | ~~已完成~~ |
+| ~~SingleInstance 可等待关闭~~ | ~~中~~ | ~~低~~ | ~~0.5d~~ | ~~v3.2~~ | ~~已完成~~ |
+| ~~Always-on-top~~ | ~~中高~~ | ~~低~~ | ~~1d~~ | ~~v3.3~~ | ~~已完成~~ |
+| ~~Compact mode~~ | ~~高~~ | ~~中~~ | ~~2d~~ | ~~v3.3~~ | ~~已完成~~ |
 | Toast 完成通知 | 高 | 中 | 2d | v3.3 | 做 |
 | Velopack 自动更新 | 高，但依赖分发 | 中高 | 3-5d | v3.4 | 等分发需求明确 |
 | MSIX / Winget | 外部分发高价值 | 高 | 3-5d | v3.4+ | 条件触发 |
@@ -315,12 +315,12 @@ MainWindow.xaml 是 394 行的 6 行 Grid 布局：
 
 | 顺序 | 工作包 | 主要文件 | 测试入口 | 验收 |
 |---:|---|---|---|---|
-| 1 | 托盘菜单本地化和补齐 | `TrayIconService`, `MainWindow.Tray.cs`, `.resw` | tray menu string/command tests | 中文 UI 下菜单为中文，含 Reload / View Logs |
-| 2 | 全局热键 | 新增 `GlobalHotkeyService`, `AppSettings`, `SettingsDialog` | hotkey parsing / conflict fallback tests | 默认 `Ctrl+Alt+Space` 可显示/隐藏窗口 |
-| 3 | 诊断包导出 | 新增 `DiagnosticBundleService`, `DiagnosticService`, `LogFileUtilities` | redaction / zip content tests | 生成 zip，包含日志、脱敏 settings、诊断摘要 |
-| 4 | Cloudflare PoP tooltip | `ControlUiLatencyService`, `LatencyHistory` | cf-ray parsing tests | tooltip 显示 `PoP: XXX` |
-| 5 | 单实例关闭修正 | `SingleInstanceCoordinator` | listener cancel tests | dispose 后 pipe listener 释放 |
-| 6 | 文档同步 | `README.md`, `readme_zh.md`, `recommend.md` | markdown diff check | 功能和设置说明同步 |
+| ~~1~~ | ~~托盘菜单本地化和补齐~~ | ~~`TrayIconService`, `MainWindow.Tray.cs`, `.resw`~~ | ~~tray menu string/command tests~~ | ~~中文 UI 下菜单为中文，含 Reload / View Logs~~ |
+| ~~2~~ | ~~全局热键~~ | ~~`GlobalHotkeyService`, `AppSettings`, `SettingsDialog`~~ | ~~hotkey parsing / conflict fallback tests~~ | ~~默认 `Ctrl+Shift+F12` 可显示/隐藏窗口~~ |
+| ~~3~~ | ~~诊断包导出~~ | ~~`DiagnosticBundleService`, `DiagnosticService`, `LogFileUtilities`~~ | ~~redaction / zip content tests~~ | ~~生成 zip，包含日志、脱敏 settings、诊断摘要~~ |
+| ~~4~~ | ~~Cloudflare PoP tooltip~~ | ~~`ControlUiLatencyService`, `LatencyHistory`~~ | ~~cf-ray parsing tests~~ | ~~tooltip 显示 `PoP: XXX`~~ |
+| ~~5~~ | ~~单实例关闭修正~~ | ~~`SingleInstanceCoordinator`~~ | ~~listener cancel tests~~ | ~~dispose 后 pipe listener 释放~~ |
+| ~~6~~ | ~~文档同步~~ | ~~`README.md`, `readme_zh.md`, `recommend.md`~~ | ~~markdown diff check~~ | ~~功能和设置说明同步~~ |
 
 **v3.2 不建议夹带的内容**：Velopack、compact mode、toast、DI 重构。它们都能做，但会扩大本轮风险。
 
@@ -356,11 +356,11 @@ Compact mode 的窗口尺寸需要注意 `WindowBoundsUtilities` 的约束：当
 
 | 顺序 | 工作包 | 主要文件 | 测试入口 | 验收 |
 |---:|---|---|---|---|
-| 1 | Always-on-top | `MainWindow`, `AppSettings`, `SettingsDialog` | settings persistence tests | 可切换、可持久化 |
-| 2 | Compact mode | `MainWindow.xaml`, `MainWindow.Lifecycle.cs`, `WindowBoundsUtilities` | compact bounds tests | compact bounds 不污染 normal bounds |
+| ~~1~~ | ~~Always-on-top~~ | ~~`MainWindow`, `AppSettings`, `SettingsDialog`~~ | ~~settings persistence tests~~ | ~~可切换、可持久化~~ |
+| ~~2~~ | ~~Compact mode~~ | ~~`MainWindow.xaml`, `MainWindow.Lifecycle.cs`, `WindowBoundsUtilities`~~ | ~~compact bounds tests~~ | ~~compact bounds 不污染 normal bounds~~ |
 | 3 | Toast 完成通知 | 新增 `NotificationService`, `MainViewModel.Status.cs` | LIVE -> IDLE debounce tests | 只有稳定完成才通知 |
 | 4 | Notifications / Window 设置 | `SettingsDialog.xaml`, `SettingsViewModel`, `.resw` | settings save/load tests | 开关清晰，默认值合理 |
-| 5 | WebView recreation circuit breaker | `MainWindow.WebView.cs` | repeated failure tests | 连续失败后显示错误，不无限重建 |
+| ~~5~~ | ~~WebView recreation circuit breaker~~ | ~~`MainWindow.WebView.cs`~~ | ~~repeated failure tests~~ | ~~连续失败后显示错误，不无限重建~~ |
 
 ### v3.4：发布与更新链路
 
@@ -438,9 +438,9 @@ public bool StartMinimized { get; set; } = false;
 
 | 项 | 触发时机 | 做法 |
 |---|---|---|
-| `TrayIconService` 文案注入 | v3.2 托盘菜单 | 增加 `TrayMenuStrings` record |
-| `SingleInstanceCoordinator` 可等待关闭 | v3.2 生命周期修正 | 增加 `DisposeAsync()` 或 `StopAsync()` |
-| `cf-ray` 解析模型 | v3.2 PoP tooltip | `ControlUiLatencySnapshot` 增加 route hint |
+| ~~`TrayIconService` 文案注入~~ | ~~v3.2 托盘菜单~~ | ~~增加 `TrayMenuStrings` record~~ |
+| ~~`SingleInstanceCoordinator` 可等待关闭~~ | ~~v3.2 生命周期修正~~ | ~~增加 `StopAsync()`~~ |
+| ~~`cf-ray` 解析模型~~ | ~~v3.2 PoP tooltip~~ | ~~`CloudflareRayParser` + `ControlUiLatencySnapshot` 增加 route hint~~ |
 | settings migration 测试 | 每次新增 settings 字段 | 覆盖旧 JSON、null section、默认值 |
 
 ### 8.2 中期结构调整

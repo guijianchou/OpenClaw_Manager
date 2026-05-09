@@ -120,6 +120,9 @@ public partial class App : Application
             {
                 Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = language;
             }
+
+            // Set the language on StringResources for explicit resolution (unpackaged fallback).
+            Helpers.StringResources.SetLanguage(language);
         }
         catch (Exception ex)
         {
