@@ -29,6 +29,8 @@ internal static class WindowFrameHelper
     private const int ShowWindowHide = 0;
     private const int ShowWindowShowNormal = 1;
     private const int ShowWindowRestore = 9;
+    private static readonly IntPtr WindowTopMost = new(-1);
+    private static readonly IntPtr WindowNoTopMost = new(-2);
 
     public static bool ApplyWindowTheme(
         Window window,
@@ -236,6 +238,24 @@ internal static class WindowFrameHelper
         ShowWindow(hwnd, IsIconic(hwnd) ? ShowWindowRestore : ShowWindowShowNormal);
         window.Activate();
         SetForegroundWindow(hwnd);
+    }
+
+    public static bool SetTopMost(Window window, bool value)
+    {
+        var hwnd = WindowNative.GetWindowHandle(window);
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        return SetWindowPos(
+            hwnd,
+            value ? WindowTopMost : WindowNoTopMost,
+            0,
+            0,
+            0,
+            0,
+            SetWindowPosNoMove | SetWindowPosNoSize | SetWindowPosNoActivate);
     }
 
     private static bool ApplyThemeVisualState(

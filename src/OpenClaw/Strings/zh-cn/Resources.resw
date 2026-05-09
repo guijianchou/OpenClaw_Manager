@@ -633,4 +633,28 @@
   <data name="TrayMenuExit" xml:space="preserve">
     <value>退出</value>
   </data>
+  <data name="SettingsEnableGlobalHotkey" xml:space="preserve">
+    <value>启用全局热键</value>
+  </data>
+  <data name="SettingsEnableGlobalHotkeyDescription" xml:space="preserve">
+    <value>使用系统级快捷键显示或隐藏 OpenClaw。</value>
+  </data>
+  <data name="SettingsGlobalHotkey" xml:space="preserve">
+    <value>全局热键</value>
+  </data>
+  <data name="SettingsGlobalHotkeyPlaceholder" xml:space="preserve">
+    <value>Ctrl+Alt+Space</value>
+  </data>
+  <data name="SettingsGlobalHotkeyReset" xml:space="preserve">
+    <value>重置</value>
+  </data>
+  <data name="SettingsGlobalHotkeyHint" xml:space="preserve">
+    <value>示例：Ctrl+Alt+Space、Shift+F12、Win+Alt+O。如果快捷键已被其他应用占用，OpenClaw 会继续运行并记录警告。</value>
+  </data>
+  <data name="SettingsValidationGlobalHotkeyRequired" xml:space="preserve">
+    <value>请输入热键，或关闭全局热键选项。</value>
+  </data>
+  <data name="SettingsValidationGlobalHotkeyInvalid" xml:space="preserve">
+    <value>请输入有效热键，例如 Ctrl+Alt+Space、Shift+F12 或 Win+Alt+O。</value>
+  </data>
 </root>

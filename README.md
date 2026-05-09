@@ -182,11 +182,11 @@ If the page loads but OpenClaw reports origin rejection, check the exact public 
 | Auto-Reconnect | Retries failed navigation automatically |
 | Heartbeat | Periodic Control UI and transport probe with configurable reconnect thresholds |
 | System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Reload, View Logs, Settings, and Exit actions |
-| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window |
+| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window, with Settings UI validation and reset |
 | Instance Control | Optional multiple-instance mode; off by default so app relaunches restore the existing tray-hidden window |
 | Session Isolation | Separate WebView2 profile data per configured environment |
 | Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
-| Always on Top | Pin button to keep the window above other applications |
+| Always on Top | Pin button to keep the window above other applications, with native topmost fallback and distinct active/inactive colors |
 | Compact Mode | Reduced window showing only status bar for screen-corner placement |
 | Task Notifications | Windows toast notification when a long task completes (LIVE to IDLE) |
 | Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
@@ -208,7 +208,7 @@ The Settings window is organized into five sections:
 | Environments | Add, edit, remove, and choose default hosted Control UI endpoints |
 | Sessions | Clear WebView2 session data for a specific environment |
 | Developer Tools | Diagnostics, logs, DevTools |
-| Advanced | Minimize-to-tray, close-to-tray, and multiple-instance behavior |
+| Advanced | Global hotkey, minimize-to-tray, close-to-tray, and multiple-instance behavior |
 
 ### Environment URL Rules
 
@@ -249,11 +249,11 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 ### v3.2.0 (2026-05-09)
 
 - Added localized tray context menu with Reload, View Logs, status header, and full Chinese support.
-- Added configurable global hotkey (default Ctrl+Alt+Space) to show/hide the main window from anywhere.
+- Added configurable global hotkey (default Ctrl+Alt+Space) to show/hide the main window from anywhere, including Settings UI controls, validation, and reset-to-default support.
 - Added diagnostic bundle export: one-click zip of redacted settings, recent logs, runtime info, and diagnostic summary.
 - Added Cloudflare PoP (Point of Presence) display in the latency tooltip by parsing the `cf-ray` response header.
 - Added `StopAsync` to `SingleInstanceCoordinator` for clean listener shutdown without pipe races.
-- Added always-on-top pin button in the title bar with persistent setting.
+- Added always-on-top pin button in the title bar with persistent setting, native `HWND_TOPMOST` fallback, and theme-aware active/inactive colors so the Pin state remains visible in light and dark themes.
 - Added compact mode: reduced window (480x120) showing only status bars, with independent position persistence.
 - Added task-complete toast notification when work status transitions from LIVE to IDLE (debounced, only when window is hidden).
 - Added WebView2 recreation circuit breaker: stops runaway recreation after 5 attempts per minute and shows actionable error.

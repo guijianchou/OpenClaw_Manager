@@ -1,6 +1,10 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using OpenClaw.Helpers;
 
 namespace OpenClaw;
 
@@ -32,6 +36,11 @@ public sealed partial class MainWindow
             presenter.IsAlwaysOnTop = value;
         }
 
+        if (!WindowFrameHelper.SetTopMost(this, value))
+        {
+            App.Logger.Warning($"Failed to apply native always-on-top state: {value}");
+        }
+
         UpdatePinButtonVisualState();
     }
 
@@ -42,8 +51,22 @@ public sealed partial class MainWindow
             return;
         }
 
-        PinButton.Content = _isAlwaysOnTop
-            ? new Microsoft.UI.Xaml.Controls.FontIcon { Glyph = "", FontSize = 14 }  // Pinned
-            : new Microsoft.UI.Xaml.Controls.FontIcon { Glyph = "", FontSize = 14 }; // Unpin
+        var foregroundResource = _isAlwaysOnTop
+            ? "AccentTextFillColorPrimaryBrush"
+            : "TextFillColorSecondaryBrush";
+
+        Brush? foreground = null;
+        if (Application.Current.Resources.TryGetValue(foregroundResource, out var foregroundBrush))
+        {
+            foreground = foregroundBrush as Brush;
+        }
+
+        PinButton.Foreground = foreground;
+        PinButton.Content = new FontIcon
+        {
+            Glyph = _isAlwaysOnTop ? "" : "",
+            FontSize = 14,
+            Foreground = foreground
+        };
     }
 }

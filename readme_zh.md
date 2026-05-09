@@ -182,11 +182,11 @@ dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
 | Auto-Reconnect | 导航失败后自动重试 |
 | Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
 | System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
-| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口 |
+| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口，并支持设置界面校验和重置 |
 | Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
 | Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
 | Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
-| Always on Top | 标题栏 Pin 按钮让窗口始终置顶 |
+| Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
 | Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
 | Task Notifications | 长任务完成时（LIVE → IDLE）发送 Windows toast 通知 |
 | Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
@@ -208,7 +208,7 @@ Settings 窗口包含五个部分：
 | Environments | 添加、编辑、删除和选择默认托管 Control UI 端点 |
 | Sessions | 清理指定环境的 WebView2 会话数据 |
 | Developer Tools | 诊断、日志、DevTools |
-| Advanced | 最小化到托盘、关闭到托盘和多实例行为 |
+| Advanced | 全局热键、最小化到托盘、关闭到托盘和多实例行为 |
 
 ### 环境 URL 规则
 
@@ -245,6 +245,20 @@ MainWindow
 ---
 
 ## 最近更新
+
+### v3.2.0 (2026-05-09)
+
+- 添加本地化托盘右键菜单，包含 Reload、View Logs、状态标题和完整中文支持。
+- 添加可配置全局热键（默认 Ctrl+Alt+Space）用于随时显示/隐藏主窗口，并在 Settings 中提供输入、校验和恢复默认值。
+- 添加诊断包导出：一键打包脱敏设置、近期日志、运行时信息和诊断摘要。
+- 在延迟 tooltip 中解析 `cf-ray` 响应头并显示 Cloudflare PoP。
+- 为 `SingleInstanceCoordinator` 添加 `StopAsync`，关闭时等待 listener task，避免 pipe dispose 竞态。
+- 添加标题栏 Always-on-top Pin 按钮，支持持久化设置、原生 `HWND_TOPMOST` fallback，并使用主题感知的启用/未启用颜色，浅色和深色主题下都能区分当前状态。
+- 添加 Compact Mode：缩小为仅显示状态栏的窗口，并独立持久化 compact 位置。
+- 添加任务完成 toast：工作状态从 LIVE 切换到 IDLE 且窗口不可见时发送通知，并带 debounce。
+- 添加 WebView2 recreation circuit breaker：一分钟内超过 5 次重建后停止 runaway recreation，并显示可操作错误。
+- 添加 global hotkey、always-on-top、compact mode 和通知偏好的 `AppSettings` 字段。
+- 同步 app、assembly、file、package manifest、application manifest 和 About dialog 版本元数据到 `3.2.0`。
 
 ### v3.1.3 (2026-05-08)
 

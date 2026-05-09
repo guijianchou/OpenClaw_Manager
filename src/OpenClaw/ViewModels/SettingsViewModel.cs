@@ -30,6 +30,8 @@ public class SettingsViewModel : INotifyPropertyChanged
     private bool _minimizeToTray;
     private bool _closeToTray;
     private bool _allowMultipleInstances;
+    private bool _enableGlobalHotkey;
+    private string _globalHotkey = string.Empty;
     private string _validationMessage = string.Empty;
 
     public SettingsViewModel()
@@ -50,6 +52,8 @@ public class SettingsViewModel : INotifyPropertyChanged
         _minimizeToTray = App.Configuration.Settings.MinimizeToTray;
         _closeToTray = App.Configuration.Settings.CloseToTray;
         _allowMultipleInstances = App.Configuration.Settings.AllowMultipleInstances;
+        _enableGlobalHotkey = App.Configuration.Settings.EnableGlobalHotkey;
+        _globalHotkey = App.Configuration.Settings.GlobalHotkey;
         _validationMessage = StringResources.SettingsValidationDefaultMessage;
     }
 
@@ -122,6 +126,18 @@ public class SettingsViewModel : INotifyPropertyChanged
         set { _allowMultipleInstances = value; OnPropertyChanged(); }
     }
 
+    public bool EnableGlobalHotkey
+    {
+        get => _enableGlobalHotkey;
+        set { _enableGlobalHotkey = value; OnPropertyChanged(); }
+    }
+
+    public string GlobalHotkey
+    {
+        get => _globalHotkey;
+        set { _globalHotkey = value; OnPropertyChanged(); }
+    }
+
     public string ValidationMessage
     {
         get => _validationMessage;
@@ -135,6 +151,12 @@ public class SettingsViewModel : INotifyPropertyChanged
     public bool DidChangeSessionTopology { get; private set; }
 
     public bool DidChangeEnvironmentState { get; private set; }
+
+    public void ResetGlobalHotkey()
+    {
+        EnableGlobalHotkey = true;
+        GlobalHotkey = new AppSettings().GlobalHotkey;
+    }
 
     /// <summary>
     /// Adds a new environment with placeholder values.
@@ -235,6 +257,12 @@ public class SettingsViewModel : INotifyPropertyChanged
             }
         }
 
+        if (!TryValidateHotkey(out var hotkeyErrorMessage))
+        {
+            ValidationMessage = hotkeyErrorMessage;
+            return false;
+        }
+
         App.Configuration.Settings.Environments = [.. Environments];
 
         // Ensure at least one default
@@ -252,6 +280,8 @@ public class SettingsViewModel : INotifyPropertyChanged
         App.Configuration.Settings.MinimizeToTray = MinimizeToTray;
         App.Configuration.Settings.CloseToTray = CloseToTray;
         App.Configuration.Settings.AllowMultipleInstances = AllowMultipleInstances;
+        App.Configuration.Settings.EnableGlobalHotkey = EnableGlobalHotkey;
+        App.Configuration.Settings.GlobalHotkey = GlobalHotkey.Trim();
         App.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging = EnableDevLog;
 
         SyncRenamedEnvironmentProfiles();
@@ -377,6 +407,31 @@ public class SettingsViewModel : INotifyPropertyChanged
             errorMessage = uri.Scheme is "ws" or "wss"
                 ? StringResources.SettingsValidationControlUiUrlWs
                 : StringResources.SettingsValidationControlUiUrlScheme;
+            return false;
+        }
+
+        errorMessage = StringResources.SettingsValidationDefaultMessage;
+        return true;
+    }
+
+    private bool TryValidateHotkey(out string errorMessage)
+    {
+        if (!EnableGlobalHotkey)
+        {
+            errorMessage = StringResources.SettingsValidationDefaultMessage;
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(GlobalHotkey))
+        {
+            errorMessage = StringResources.SettingsValidationGlobalHotkeyRequired;
+            return false;
+        }
+
+        var binding = HotkeyBinding.Parse(GlobalHotkey);
+        if (binding is null || binding.GetVirtualKeyCode() == 0)
+        {
+            errorMessage = StringResources.SettingsValidationGlobalHotkeyInvalid;
             return false;
         }
 

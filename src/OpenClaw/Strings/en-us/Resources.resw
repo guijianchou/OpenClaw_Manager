@@ -633,4 +633,28 @@
   <data name="TrayMenuExit" xml:space="preserve">
     <value>Exit</value>
   </data>
+  <data name="SettingsEnableGlobalHotkey" xml:space="preserve">
+    <value>Enable global hotkey</value>
+  </data>
+  <data name="SettingsEnableGlobalHotkeyDescription" xml:space="preserve">
+    <value>Use a system-wide shortcut to show or hide OpenClaw.</value>
+  </data>
+  <data name="SettingsGlobalHotkey" xml:space="preserve">
+    <value>Global hotkey</value>
+  </data>
+  <data name="SettingsGlobalHotkeyPlaceholder" xml:space="preserve">
+    <value>Ctrl+Alt+Space</value>
+  </data>
+  <data name="SettingsGlobalHotkeyReset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="SettingsGlobalHotkeyHint" xml:space="preserve">
+    <value>Examples: Ctrl+Alt+Space, Shift+F12, Win+Alt+O. If another app already owns the shortcut, OpenClaw will keep running and log a warning.</value>
+  </data>
+  <data name="SettingsValidationGlobalHotkeyRequired" xml:space="preserve">
+    <value>Enter a hotkey or disable the global hotkey option.</value>
+  </data>
+  <data name="SettingsValidationGlobalHotkeyInvalid" xml:space="preserve">
+    <value>Enter a valid hotkey such as Ctrl+Alt+Space, Shift+F12, or Win+Alt+O.</value>
+  </data>
 </root>

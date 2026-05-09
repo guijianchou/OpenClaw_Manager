@@ -101,6 +101,12 @@ public static class StringResources
     public static string SettingsCloseToTrayDescription => Get("SettingsCloseToTrayDescription");
     public static string SettingsAllowMultipleInstances => Get("SettingsAllowMultipleInstances");
     public static string SettingsAllowMultipleInstancesDescription => Get("SettingsAllowMultipleInstancesDescription");
+    public static string SettingsEnableGlobalHotkey => Get("SettingsEnableGlobalHotkey");
+    public static string SettingsEnableGlobalHotkeyDescription => Get("SettingsEnableGlobalHotkeyDescription");
+    public static string SettingsGlobalHotkey => Get("SettingsGlobalHotkey");
+    public static string SettingsGlobalHotkeyPlaceholder => Get("SettingsGlobalHotkeyPlaceholder");
+    public static string SettingsGlobalHotkeyReset => Get("SettingsGlobalHotkeyReset");
+    public static string SettingsGlobalHotkeyHint => Get("SettingsGlobalHotkeyHint");
     public static string SettingsLanguageSystem => Get("SettingsLanguageSystem");
     public static string SettingsLanguageEnglish => Get("SettingsLanguageEnglish");
     public static string SettingsLanguageChineseSimplified => Get("SettingsLanguageChineseSimplified");
@@ -146,6 +152,8 @@ public static class StringResources
     public static string SettingsValidationControlUiUrlAbsolute => Get("SettingsValidationControlUiUrlAbsolute");
     public static string SettingsValidationControlUiUrlWs => Get("SettingsValidationControlUiUrlWs");
     public static string SettingsValidationControlUiUrlScheme => Get("SettingsValidationControlUiUrlScheme");
+    public static string SettingsValidationGlobalHotkeyRequired => Get("SettingsValidationGlobalHotkeyRequired");
+    public static string SettingsValidationGlobalHotkeyInvalid => Get("SettingsValidationGlobalHotkeyInvalid");
     public static string SettingsGeneratedEnvironmentName => Get("SettingsGeneratedEnvironmentName");
 
     // --- About Dialog ---

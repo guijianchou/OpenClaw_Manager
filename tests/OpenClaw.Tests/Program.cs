@@ -54,6 +54,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("HotkeyBinding parse handles single key without modifier", Tests.HotkeyBindingParseSingleKeyWithoutModifier),
     ("AppSettings defaults hotkey to Ctrl+Alt+Space enabled", Tests.AppSettingsDefaultsHotkeyToCtrlAltSpaceEnabled),
     ("Settings load without hotkey fields uses defaults", Tests.SettingsLoadWithoutHotkeyFieldsUsesDefaults),
+    ("Settings Shell exposes global hotkey controls", Tests.SettingsShellExposesGlobalHotkeyControls),
+    ("SettingsViewModel persists and validates global hotkey fields", Tests.SettingsViewModelPersistsAndValidatesGlobalHotkeyFields),
     ("DiagnosticBundle redacts gateway URL host", Tests.DiagnosticBundleRedactsGatewayUrlHost),
     ("DiagnosticBundle redacts token-like values", Tests.DiagnosticBundleRedactsTokenLikeValues),
     ("DiagnosticBundle includes runtime info", Tests.DiagnosticBundleIncludesRuntimeInfo),
@@ -63,6 +65,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Latency tooltip includes PoP when available", Tests.LatencyTooltipIncludesPopWhenAvailable),
     ("SingleInstance stop awaits listener task completion", Tests.SingleInstanceStopAwaitsListenerTaskCompletion),
     ("AppSettings defaults AlwaysOnTop to false", Tests.AppSettingsDefaultsAlwaysOnTopToFalse),
+    ("Always-on-top applies native topmost fallback", Tests.AlwaysOnTopAppliesNativeTopmostFallback),
+    ("Always-on-top pin button uses accent color when active", Tests.AlwaysOnTopPinButtonUsesAccentColorWhenActive),
     ("AppSettings defaults CompactMode to false", Tests.AppSettingsDefaultsCompactModeToFalse),
     ("AppSettings defaults NotifyOnTaskComplete to true", Tests.AppSettingsDefaultsNotifyOnTaskCompleteToTrue),
     ("Compact mode bounds bypass minimum persistable size", Tests.CompactModeBoundsBypassMinimumPersistableSize),
@@ -1241,6 +1245,72 @@ internal static class Tests
         }
     }
 
+    public static Task SettingsShellExposesGlobalHotkeyControls()
+    {
+        var xamlPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "SettingsDialog.xaml");
+        var actionsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "SettingsDialog.Actions.cs");
+        var enResourcesPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Strings",
+            "en-us",
+            "Resources.resw");
+        var zhResourcesPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Strings",
+            "zh-cn",
+            "Resources.resw");
+
+        var xaml = File.ReadAllText(xamlPath);
+        var actions = File.ReadAllText(actionsPath);
+        var enResources = File.ReadAllText(enResourcesPath);
+        var zhResources = File.ReadAllText(zhResourcesPath);
+
+        Assert.Contains("SettingsEnableGlobalHotkey", xaml, "Shell settings should expose a global hotkey enable checkbox.");
+        Assert.Contains("IsChecked=\"{x:Bind ViewModel.EnableGlobalHotkey, Mode=TwoWay}\"", xaml, "Global hotkey checkbox should bind to SettingsViewModel.");
+        Assert.Contains("SettingsGlobalHotkey", xaml, "Shell settings should expose a hotkey input label.");
+        Assert.Contains("Text=\"{x:Bind ViewModel.GlobalHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", xaml, "Global hotkey input should bind to SettingsViewModel.");
+        Assert.Contains("OnResetHotkeyClick", xaml, "Shell settings should include a reset-to-default hotkey button.");
+        Assert.Contains("ResetGlobalHotkey()", actions, "Reset button should reset through SettingsViewModel.");
+        Assert.Contains("<value>Global hotkey</value>", enResources, "English hotkey label should be present.");
+        Assert.Contains("<value>全局热键</value>", zhResources, "Chinese hotkey label should be present.");
+        return Task.CompletedTask;
+    }
+
+    public static Task SettingsViewModelPersistsAndValidatesGlobalHotkeyFields()
+    {
+        var viewModelPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "ViewModels",
+            "SettingsViewModel.cs");
+        var source = File.ReadAllText(viewModelPath);
+
+        Assert.Contains("public bool EnableGlobalHotkey", source, "SettingsViewModel should expose the global hotkey enabled flag.");
+        Assert.Contains("public string GlobalHotkey", source, "SettingsViewModel should expose the global hotkey binding string.");
+        Assert.Contains("Settings.EnableGlobalHotkey = EnableGlobalHotkey", source, "Settings save should persist the hotkey enabled flag.");
+        Assert.Contains("Settings.GlobalHotkey = GlobalHotkey", source, "Settings save should persist the hotkey binding.");
+        Assert.Contains("ResetGlobalHotkey()", source, "SettingsViewModel should expose a reset method for the default hotkey.");
+        Assert.Contains("TryValidateHotkey", source, "Settings save should validate the hotkey before persisting.");
+        Assert.Contains("HotkeyBinding.Parse(GlobalHotkey)", source, "Hotkey validation should use the shared parser.");
+        Assert.Contains("binding.GetVirtualKeyCode() == 0", source, "Hotkey validation should reject keys that cannot be registered.");
+        return Task.CompletedTask;
+    }
+
     public static Task DiagnosticBundleRedactsGatewayUrlHost()
     {
         var input = """{"environments":[{"name":"prod","gatewayUrl":"https://my-secret-host.example.com/control"}]}""";
@@ -1365,6 +1435,46 @@ internal static class Tests
     {
         var settings = new AppSettings();
         Assert.False(settings.AlwaysOnTop, "AlwaysOnTop should default to false.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AlwaysOnTopAppliesNativeTopmostFallback()
+    {
+        var alwaysOnTopPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.AlwaysOnTop.cs");
+        var frameHelperPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "WindowFrameHelper.cs");
+
+        var alwaysOnTop = File.ReadAllText(alwaysOnTopPath);
+        var frameHelper = File.ReadAllText(frameHelperPath);
+
+        Assert.Contains("WindowFrameHelper.SetTopMost(this, value)", alwaysOnTop, "Always-on-top should use a native topmost fallback, not only AppWindow.Presenter.");
+        Assert.Contains("public static bool SetTopMost(Window window, bool value)", frameHelper, "WindowFrameHelper should expose a native SetWindowPos topmost helper.");
+        Assert.Contains("new(-1)", frameHelper, "Native topmost helper should use HWND_TOPMOST.");
+        Assert.Contains("new(-2)", frameHelper, "Native topmost helper should use HWND_NOTOPMOST.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AlwaysOnTopPinButtonUsesAccentColorWhenActive()
+    {
+        var alwaysOnTopPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.AlwaysOnTop.cs");
+
+        var alwaysOnTop = File.ReadAllText(alwaysOnTopPath);
+
+        Assert.Contains("PinButton.Foreground", alwaysOnTop, "Pinned state should be visible through the Pin button foreground.");
+        Assert.Contains("AccentTextFillColorPrimaryBrush", alwaysOnTop, "Pinned state should use a theme-aware accent text brush.");
+        Assert.Contains("TextFillColorSecondaryBrush", alwaysOnTop, "Unpinned state should use a theme-aware secondary text brush so it remains visible on light backgrounds.");
         return Task.CompletedTask;
     }
 

@@ -118,3 +118,19 @@ Those coordinates are Windows minimized-window sentinel values, not a user-visib
 - If saved coordinates no longer intersect any display, center the window on the current display instead of trusting stale topology.
 
 Regression coverage now checks both sides of the fix: settings load sanitizes minimized sentinel bounds, and `SaveWindowBounds()` skips hidden/minimized windows.
+
+## Always-On-Top And Pin State
+
+This note records the v3.2.0 always-on-top follow-up after testing on a machine using dedicated-GPU direct mode.
+
+### Symptoms
+
+The WinUI `OverlappedPresenter.IsAlwaysOnTop` state could appear enabled in app code while the native window did not reliably stay above other applications on that display path. After adding the title-bar Pin affordance, the inactive Pin state also became too faint on light title-bar backgrounds when its foreground fell back to the default subtle button styling.
+
+### Implementation Rules
+
+- Apply always-on-top through both `OverlappedPresenter.IsAlwaysOnTop` and a native `SetWindowPos` fallback using `HWND_TOPMOST` / `HWND_NOTOPMOST`.
+- Keep the Pin button state theme-aware. Use `AccentTextFillColorPrimaryBrush` for the active pinned state and `TextFillColorSecondaryBrush` for the inactive state instead of clearing the foreground to `null`.
+- Update both the `Button.Foreground` and the nested `FontIcon.Foreground`; the icon is the visible state indicator.
+- Persist only the user preference in settings. Reapply the native topmost state from that preference when the main window is initialized.
+- Cover the integration with regression tests that assert the native fallback path and the theme-aware Pin colors are present.

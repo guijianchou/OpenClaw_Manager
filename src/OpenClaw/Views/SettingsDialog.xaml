@@ -126,6 +126,27 @@
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     FontSize="12"
                                     TextWrapping="Wrap" />
+
+                        <CheckBox Content="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkey}"
+                                  IsChecked="{x:Bind ViewModel.EnableGlobalHotkey, Mode=TwoWay}"
+                                  Margin="0,8,0,0" />
+                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkeyDescription}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    FontSize="12"
+                                    TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <TextBox Header="{x:Bind helpers:StringResources.SettingsGlobalHotkey}"
+                                     PlaceholderText="{x:Bind helpers:StringResources.SettingsGlobalHotkeyPlaceholder}"
+                                     Text="{x:Bind ViewModel.GlobalHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     MinWidth="220" />
+                            <Button Content="{x:Bind helpers:StringResources.SettingsGlobalHotkeyReset}"
+                                    Click="OnResetHotkeyClick"
+                                    VerticalAlignment="Bottom" />
+                        </StackPanel>
+                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsGlobalHotkeyHint}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    FontSize="12"
+                                    TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- ======= Panel: Environments ======= -->

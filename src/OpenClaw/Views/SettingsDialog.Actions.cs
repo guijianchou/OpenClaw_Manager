@@ -56,6 +56,11 @@ public sealed partial class SettingsDialog
         this.Close();
     }
 
+    private void OnResetHotkeyClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ResetGlobalHotkey();
+    }
+
     private async void OnClearEnvironmentSessionClick(object sender, RoutedEventArgs e)
     {
         if (MainViewModel is null ||
