@@ -28,6 +28,7 @@
              Link="Services\%(Filename)%(Extension)" />
     <Compile Include="..\OpenClaw\Services\SingleInstanceCoordinator.cs" Link="Services\SingleInstanceCoordinator.cs" />
     <Compile Include="..\OpenClaw\Services\TrayClosePolicy.cs" Link="Services\TrayClosePolicy.cs" />
+    <Compile Include="..\OpenClaw\Services\TrayMenuStrings.cs" Link="Services\TrayMenuStrings.cs" />
   </ItemGroup>
 
 </Project>

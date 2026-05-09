@@ -627,4 +627,10 @@
   <data name="BridgeConnectedSummary" xml:space="preserve">
     <value>Gateway 会话看起来已激活。</value>
   </data>
+  <data name="TrayMenuOpen" xml:space="preserve">
+    <value>打开 OpenClaw</value>
+  </data>
+  <data name="TrayMenuExit" xml:space="preserve">
+    <value>退出</value>
+  </data>
 </root>

@@ -627,4 +627,10 @@
   <data name="BridgeConnectedSummary" xml:space="preserve">
     <value>Gateway session appears active.</value>
   </data>
+  <data name="TrayMenuOpen" xml:space="preserve">
+    <value>Open OpenClaw</value>
+  </data>
+  <data name="TrayMenuExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
 </root>

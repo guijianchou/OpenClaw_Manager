@@ -42,8 +42,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings prewarm is requeued after close", Tests.SettingsPrewarmIsRequeuedAfterClose),
     ("Tray Win32 Unicode entry points declare Unicode marshalling", Tests.TrayWin32UnicodeEntryPointsDeclareUnicodeMarshalling),
     ("Tray callback reads NOTIFYICON_VERSION_4 event low word", Tests.TrayCallbackReadsNotifyIconVersion4EventLowWord),
-    ("Tray context menu exposes minimal commands", Tests.TrayContextMenuExposesMinimalCommands),
+    ("Tray context menu uses localized command labels", Tests.TrayContextMenuUsesLocalizedCommandLabels),
     ("Tray context menu uses popup-capable owner window", Tests.TrayContextMenuUsesPopupCapableOwnerWindow),
+    ("Tray menu strings are injected and accessible", Tests.TrayMenuStringsAreInjectedAndAccessible),
+    ("Tray menu strings default fallback uses English", Tests.TrayMenuStringsDefaultFallbackUsesEnglish),
+    ("Tray menu exposes reload and view logs commands", Tests.TrayMenuExposesReloadAndViewLogsCommands),
+    ("Tray menu status header reflects work status", Tests.TrayMenuStatusHeaderReflectsWorkStatus),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -935,7 +939,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task TrayContextMenuExposesMinimalCommands()
+    public static Task TrayContextMenuUsesLocalizedCommandLabels()
     {
         var sourcePath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -945,14 +949,15 @@ internal static class Tests
             "TrayIconService.cs");
         var source = File.ReadAllText(sourcePath);
 
-        Assert.Contains("\"Open OpenClaw\"", source, "Tray menu should expose an explicit open command.");
-        Assert.Contains("\"Settings\"", source, "Tray menu should expose settings directly.");
-        Assert.Contains("\"Exit\"", source, "Tray menu should expose exit directly.");
+        Assert.Contains("_menuStrings.OpenLabel", source, "Tray menu should use the localized open label.");
+        Assert.Contains("_menuStrings.ReloadLabel", source, "Tray menu should use the localized reload label.");
+        Assert.Contains("_menuStrings.ViewLogsLabel", source, "Tray menu should use the localized view logs label.");
+        Assert.Contains("_menuStrings.SettingsLabel", source, "Tray menu should use the localized settings label.");
+        Assert.Contains("_menuStrings.ExitLabel", source, "Tray menu should use the localized exit label.");
+        Assert.Contains("MenuStatusHeader", source, "Tray menu should include a status header.");
         Assert.DoesNotContain("\"Hide OpenClaw\"", source, "Minimal tray menu should not expose a hide command.");
         Assert.DoesNotContain("\"Show OpenClaw\"", source, "Minimal tray menu should not expose a show command.");
-        Assert.DoesNotContain("\"Reload\"", source, "Minimal tray menu should not expose reload.");
         Assert.DoesNotContain("\"Open Settings\"", source, "Minimal tray menu should use the shorter settings label.");
-        Assert.DoesNotContain("\"View Logs\"", source, "Minimal tray menu should not expose logs.");
         Assert.DoesNotContain("\"Quit\"", source, "Minimal tray menu should use exit terminology.");
         return Task.CompletedTask;
     }
@@ -1067,6 +1072,71 @@ internal static class Tests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    public static Task TrayMenuStringsAreInjectedAndAccessible()
+    {
+        var strings = new TrayMenuStrings(
+            OpenLabel: "打开 OpenClaw",
+            ReloadLabel: "重新加载",
+            ViewLogsLabel: "查看日志",
+            SettingsLabel: "设置",
+            ExitLabel: "退出");
+
+        Assert.Equal("打开 OpenClaw", strings.OpenLabel, "OpenLabel should be the injected Chinese string.");
+        Assert.Equal("重新加载", strings.ReloadLabel, "ReloadLabel should be the injected Chinese string.");
+        Assert.Equal("查看日志", strings.ViewLogsLabel, "ViewLogsLabel should be the injected Chinese string.");
+        Assert.Equal("设置", strings.SettingsLabel, "SettingsLabel should be the injected Chinese string.");
+        Assert.Equal("退出", strings.ExitLabel, "ExitLabel should be the injected Chinese string.");
+        return Task.CompletedTask;
+    }
+
+    public static Task TrayMenuStringsDefaultFallbackUsesEnglish()
+    {
+        var strings = TrayMenuStrings.Default;
+
+        Assert.Equal("Open OpenClaw", strings.OpenLabel, "Default OpenLabel should be English.");
+        Assert.Equal("Reload", strings.ReloadLabel, "Default ReloadLabel should be English.");
+        Assert.Equal("View Logs", strings.ViewLogsLabel, "Default ViewLogsLabel should be English.");
+        Assert.Equal("Settings", strings.SettingsLabel, "Default SettingsLabel should be English.");
+        Assert.Equal("Exit", strings.ExitLabel, "Default ExitLabel should be English.");
+        return Task.CompletedTask;
+    }
+
+    public static Task TrayMenuExposesReloadAndViewLogsCommands()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "TrayIconService.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("public event Action? ReloadRequested", source, "TrayIconService should expose a ReloadRequested event.");
+        Assert.Contains("public event Action? ViewLogsRequested", source, "TrayIconService should expose a ViewLogsRequested event.");
+        Assert.Contains("case MenuReload:", source, "TrayIconService should dispatch the reload menu command.");
+        Assert.Contains("ReloadRequested?.Invoke()", source, "TrayIconService should raise ReloadRequested when reload is selected.");
+        Assert.Contains("case MenuViewLogs:", source, "TrayIconService should dispatch the view logs menu command.");
+        Assert.Contains("ViewLogsRequested?.Invoke()", source, "TrayIconService should raise ViewLogsRequested when view logs is selected.");
+        return Task.CompletedTask;
+    }
+
+    public static Task TrayMenuStatusHeaderReflectsWorkStatus()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "TrayIconService.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("TrayMenuStrings menuStrings", source, "TrayIconService should accept TrayMenuStrings in its constructor.");
+        Assert.Contains("private string _statusText", source, "TrayIconService should track the current status text.");
+        Assert.Contains("public void UpdateStatus(string statusText)", source, "TrayIconService should expose a status update method.");
+        Assert.Contains("$\"Status: {_statusText}\"", source, "TrayIconService should render the current status in the context menu header.");
+        return Task.CompletedTask;
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()

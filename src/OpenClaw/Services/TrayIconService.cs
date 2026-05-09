@@ -15,8 +15,12 @@ internal sealed class TrayIconService : IDisposable
     private const int MenuOpenOpenClaw = 100;
     private const int MenuSettings = 101;
     private const int MenuExit = 102;
+    private const int MenuReload = 103;
+    private const int MenuViewLogs = 104;
+    private const int MenuStatusHeader = 105;
 
     private readonly IAppLogger _logger;
+    private readonly TrayMenuStrings _menuStrings;
     private readonly WindowProcedure _windowProcedure;
     private readonly string _windowClassName = WindowClassPrefix + Guid.NewGuid().ToString("N");
     private IntPtr _messageWindowHandle;
@@ -26,10 +30,17 @@ internal sealed class TrayIconService : IDisposable
     private string _statusText = "WAIT";
 
     public TrayIconService(string iconPath, IAppLogger logger)
+        : this(iconPath, logger, TrayMenuStrings.Default)
+    {
+    }
+
+    public TrayIconService(string iconPath, IAppLogger logger, TrayMenuStrings menuStrings)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(iconPath);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(menuStrings);
         _logger = logger;
+        _menuStrings = menuStrings;
         _windowProcedure = OnWindowMessage;
         Initialize(iconPath);
     }
@@ -41,6 +52,10 @@ internal sealed class TrayIconService : IDisposable
     public event Action? OpenSettingsRequested;
 
     public event Action? ExitRequested;
+
+    public event Action? ReloadRequested;
+
+    public event Action? ViewLogsRequested;
 
     public bool IsAvailable => _isIconAdded;
 
@@ -190,10 +205,15 @@ internal sealed class TrayIconService : IDisposable
 
         try
         {
-            AppendMenu(menu, MenuFlags.String, MenuOpenOpenClaw, "Open OpenClaw");
-            AppendMenu(menu, MenuFlags.String, MenuSettings, "Settings");
+            AppendMenu(menu, MenuFlags.String | MenuFlags.Grayed, MenuStatusHeader, $"Status: {_statusText}");
             AppendMenu(menu, MenuFlags.Separator, 0, null);
-            AppendMenu(menu, MenuFlags.String, MenuExit, "Exit");
+            AppendMenu(menu, MenuFlags.String, MenuOpenOpenClaw, _menuStrings.OpenLabel);
+            AppendMenu(menu, MenuFlags.String, MenuReload, _menuStrings.ReloadLabel);
+            AppendMenu(menu, MenuFlags.String, MenuViewLogs, _menuStrings.ViewLogsLabel);
+            AppendMenu(menu, MenuFlags.Separator, 0, null);
+            AppendMenu(menu, MenuFlags.String, MenuSettings, _menuStrings.SettingsLabel);
+            AppendMenu(menu, MenuFlags.Separator, 0, null);
+            AppendMenu(menu, MenuFlags.String, MenuExit, _menuStrings.ExitLabel);
 
             if (!GetCursorPos(out var point))
             {
@@ -226,6 +246,12 @@ internal sealed class TrayIconService : IDisposable
         {
             case MenuOpenOpenClaw:
                 OpenRequested?.Invoke();
+                break;
+            case MenuReload:
+                ReloadRequested?.Invoke();
+                break;
+            case MenuViewLogs:
+                ViewLogsRequested?.Invoke();
                 break;
             case MenuSettings:
                 OpenSettingsRequested?.Invoke();

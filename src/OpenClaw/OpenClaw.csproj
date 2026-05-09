@@ -59,6 +59,7 @@
     <Compile Remove="Services\ShellSessionCoordinator.Telemetry.cs" />
     <Compile Remove="Services\SingleInstanceCoordinator.cs" />
     <Compile Remove="Services\TrayClosePolicy.cs" />
+    <Compile Remove="Services\TrayMenuStrings.cs" />
   </ItemGroup>
 
   <ItemGroup>
