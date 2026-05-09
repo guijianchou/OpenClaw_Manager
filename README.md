@@ -181,10 +181,15 @@ If the page loads but OpenClaw reports origin rejection, check the exact public 
 | Connection Status | Status bar, error InfoBar, retry support |
 | Auto-Reconnect | Retries failed navigation automatically |
 | Heartbeat | Periodic Control UI and transport probe with configurable reconnect thresholds |
-| System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Settings, and Exit actions |
+| System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Reload, View Logs, Settings, and Exit actions |
+| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window |
 | Instance Control | Optional multiple-instance mode; off by default so app relaunches restore the existing tray-hidden window |
 | Session Isolation | Separate WebView2 profile data per configured environment |
-| Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats |
+| Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
+| Always on Top | Pin button to keep the window above other applications |
+| Compact Mode | Reduced window showing only status bar for screen-corner placement |
+| Task Notifications | Windows toast notification when a long task completes (LIVE to IDLE) |
+| Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
 | Theme | Top-bar segmented switcher for System, Light, and Dark |
 | Language | English, Simplified Chinese, System |
 | Diagnostics | Runtime, network, and session checks |
@@ -240,6 +245,20 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 ---
 
 ## Recent Changes
+
+### v3.2.0 (2026-05-09)
+
+- Added localized tray context menu with Reload, View Logs, status header, and full Chinese support.
+- Added configurable global hotkey (default Ctrl+Alt+Space) to show/hide the main window from anywhere.
+- Added diagnostic bundle export: one-click zip of redacted settings, recent logs, runtime info, and diagnostic summary.
+- Added Cloudflare PoP (Point of Presence) display in the latency tooltip by parsing the `cf-ray` response header.
+- Added `StopAsync` to `SingleInstanceCoordinator` for clean listener shutdown without pipe races.
+- Added always-on-top pin button in the title bar with persistent setting.
+- Added compact mode: reduced window (480x120) showing only status bars, with independent position persistence.
+- Added task-complete toast notification when work status transitions from LIVE to IDLE (debounced, only when window is hidden).
+- Added WebView2 recreation circuit breaker: stops runaway recreation after 5 attempts per minute and shows actionable error.
+- Added `AppSettings` fields for global hotkey, always-on-top, compact mode, and notification preferences.
+- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.2.0`.
 
 ### v3.1.3 (2026-05-08)
 

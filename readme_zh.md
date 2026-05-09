@@ -181,10 +181,15 @@ dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
 | Connection Status | 状态栏、错误 InfoBar 和重试支持 |
 | Auto-Reconnect | 导航失败后自动重试 |
 | Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
-| System Tray | 可配置的最小化/关闭到托盘行为，提供 Open OpenClaw、Settings 和 Exit 操作 |
+| System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
+| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口 |
 | Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
 | Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
-| Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95 和最大往返时间 |
+| Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
+| Always on Top | 标题栏 Pin 按钮让窗口始终置顶 |
+| Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
+| Task Notifications | 长任务完成时（LIVE → IDLE）发送 Windows toast 通知 |
+| Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
 | Theme | 顶部栏 System、Light、Dark 分段切换 |
 | Language | English、Simplified Chinese、System |
 | Diagnostics | 运行时、网络和会话检查 |
