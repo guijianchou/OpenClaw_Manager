@@ -30,6 +30,7 @@
     <Compile Include="..\OpenClaw\Services\TrayClosePolicy.cs" Link="Services\TrayClosePolicy.cs" />
     <Compile Include="..\OpenClaw\Services\TrayMenuStrings.cs" Link="Services\TrayMenuStrings.cs" />
     <Compile Include="..\OpenClaw\Services\HotkeyBinding.cs" Link="Services\HotkeyBinding.cs" />
+    <Compile Include="..\OpenClaw\Services\DiagnosticBundleService.cs" Link="Services\DiagnosticBundleService.cs" />
   </ItemGroup>
 
 </Project>

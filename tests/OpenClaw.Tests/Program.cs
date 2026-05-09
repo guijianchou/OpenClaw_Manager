@@ -54,6 +54,10 @@ var tests = new (string Name, Func<Task> Run)[]
     ("HotkeyBinding parse handles single key without modifier", Tests.HotkeyBindingParseSingleKeyWithoutModifier),
     ("AppSettings defaults hotkey to Ctrl+Alt+Space enabled", Tests.AppSettingsDefaultsHotkeyToCtrlAltSpaceEnabled),
     ("Settings load without hotkey fields uses defaults", Tests.SettingsLoadWithoutHotkeyFieldsUsesDefaults),
+    ("DiagnosticBundle redacts gateway URL host", Tests.DiagnosticBundleRedactsGatewayUrlHost),
+    ("DiagnosticBundle redacts token-like values", Tests.DiagnosticBundleRedactsTokenLikeValues),
+    ("DiagnosticBundle includes runtime info", Tests.DiagnosticBundleIncludesRuntimeInfo),
+    ("DiagnosticBundle collects recent log files", Tests.DiagnosticBundleCollectsRecentLogFiles),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1216,6 +1220,69 @@ internal static class Tests
 
             Assert.Equal("Ctrl+Alt+Space", service.Settings.GlobalHotkey, "Missing hotkey field should default to Ctrl+Alt+Space.");
             Assert.True(service.Settings.EnableGlobalHotkey, "Missing enable field should default to true.");
+            return Task.CompletedTask;
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    public static Task DiagnosticBundleRedactsGatewayUrlHost()
+    {
+        var input = """{"environments":[{"name":"prod","gatewayUrl":"https://my-secret-host.example.com/control"}]}""";
+        var redacted = DiagnosticBundleService.RedactSettingsJson(input);
+
+        Assert.DoesNotContain("my-secret-host.example.com", redacted, "Host should be redacted from settings JSON.");
+        Assert.Contains("<host>", redacted, "Redacted host placeholder should be present.");
+        Assert.DoesNotContain("/control", redacted, "Path should be redacted from settings JSON.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DiagnosticBundleRedactsTokenLikeValues()
+    {
+        var input = """{"environments":[{"name":"dev","gatewayUrl":"https://x.com"}],"someToken":"abc123secret","apiKey":"sk-live-xyz"}""";
+        var redacted = DiagnosticBundleService.RedactSettingsJson(input);
+
+        Assert.DoesNotContain("abc123secret", redacted, "Token value should be redacted.");
+        Assert.DoesNotContain("sk-live-xyz", redacted, "API key value should be redacted.");
+        Assert.Contains("<redacted>", redacted, "Redacted placeholder should be present for token-like fields.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DiagnosticBundleIncludesRuntimeInfo()
+    {
+        var info = DiagnosticBundleService.CollectRuntimeInfo();
+
+        Assert.Contains("OS:", info, "Runtime info should include OS.");
+        Assert.Contains(".NET:", info, "Runtime info should include .NET version.");
+        Assert.Contains("App:", info, "Runtime info should include app version.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DiagnosticBundleCollectsRecentLogFiles()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var logsDir = Path.Combine(directory, "logs");
+            Directory.CreateDirectory(logsDir);
+
+            var today = DateTimeOffset.UtcNow;
+            // Create logs: 2 recent, 1 old (>7 days)
+            var todayLog = Path.Combine(logsDir, $"openclaw-{today:yyyy-MM-dd}.log");
+            var recentLog = Path.Combine(logsDir, $"openclaw-{today.AddDays(-3):yyyy-MM-dd}.log");
+            var oldLog = Path.Combine(logsDir, $"openclaw-{today.AddDays(-10):yyyy-MM-dd}.log");
+            File.WriteAllText(todayLog, "today's log");
+            File.WriteAllText(recentLog, "3 days ago");
+            File.WriteAllText(oldLog, "10 days ago");
+            File.SetLastWriteTimeUtc(todayLog, today.UtcDateTime);
+            File.SetLastWriteTimeUtc(recentLog, today.AddDays(-3).UtcDateTime);
+            File.SetLastWriteTimeUtc(oldLog, today.AddDays(-10).UtcDateTime);
+
+            var files = DiagnosticBundleService.CollectRecentLogFiles(logsDir, TimeSpan.FromDays(7));
+
+            Assert.Equal(2, files.Count, "Should collect only logs within 7 days.");
             return Task.CompletedTask;
         }
         finally

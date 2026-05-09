@@ -61,6 +61,7 @@
     <Compile Remove="Services\TrayClosePolicy.cs" />
     <Compile Remove="Services\TrayMenuStrings.cs" />
     <Compile Remove="Services\HotkeyBinding.cs" />
+    <Compile Remove="Services\DiagnosticBundleService.cs" />
   </ItemGroup>
 
   <ItemGroup>
