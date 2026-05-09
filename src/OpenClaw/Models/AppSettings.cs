@@ -65,6 +65,17 @@ public class AppSettings
     public bool AllowMultipleInstances { get; set; } = false;
 
     /// <summary>
+    /// Gets or sets the global hotkey binding string (e.g. "Ctrl+Alt+Space").
+    /// Empty or null disables the hotkey.
+    /// </summary>
+    public string GlobalHotkey { get; set; } = "Ctrl+Alt+Space";
+
+    /// <summary>
+    /// Gets or sets whether the global hotkey is enabled.
+    /// </summary>
+    public bool EnableGlobalHotkey { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the heartbeat probe interval in seconds. 0 = disabled.
     /// Default is 30s, which works well with Cloudflare Tunnel / reverse proxy idle timeouts (60-100s).
     /// </summary>

@@ -48,6 +48,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tray menu strings default fallback uses English", Tests.TrayMenuStringsDefaultFallbackUsesEnglish),
     ("Tray menu exposes reload and view logs commands", Tests.TrayMenuExposesReloadAndViewLogsCommands),
     ("Tray menu status header reflects work status", Tests.TrayMenuStatusHeaderReflectsWorkStatus),
+    ("HotkeyBinding parses standard modifier+key string", Tests.HotkeyBindingParsesStandardModifierKeyString),
+    ("HotkeyBinding round-trips through ToString", Tests.HotkeyBindingRoundTripsThroughToString),
+    ("HotkeyBinding parse returns null for empty or invalid input", Tests.HotkeyBindingParseReturnsNullForInvalidInput),
+    ("HotkeyBinding parse handles single key without modifier", Tests.HotkeyBindingParseSingleKeyWithoutModifier),
+    ("AppSettings defaults hotkey to Ctrl+Alt+Space enabled", Tests.AppSettingsDefaultsHotkeyToCtrlAltSpaceEnabled),
+    ("Settings load without hotkey fields uses defaults", Tests.SettingsLoadWithoutHotkeyFieldsUsesDefaults),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1137,6 +1143,85 @@ internal static class Tests
         Assert.Contains("public void UpdateStatus(string statusText)", source, "TrayIconService should expose a status update method.");
         Assert.Contains("$\"Status: {_statusText}\"", source, "TrayIconService should render the current status in the context menu header.");
         return Task.CompletedTask;
+    }
+
+    public static Task HotkeyBindingParsesStandardModifierKeyString()
+    {
+        var binding = HotkeyBinding.Parse("Ctrl+Alt+Space");
+        Assert.NotNull(binding, "Parse should succeed for a valid hotkey string.");
+        Assert.True(binding!.Ctrl, "Ctrl modifier should be set.");
+        Assert.True(binding.Alt, "Alt modifier should be set.");
+        Assert.False(binding.Shift, "Shift modifier should not be set.");
+        Assert.False(binding.Win, "Win modifier should not be set.");
+        Assert.Equal("Space", binding.Key, "Key should be 'Space'.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HotkeyBindingRoundTripsThroughToString()
+    {
+        var original = "Ctrl+Shift+F12";
+        var binding = HotkeyBinding.Parse(original);
+        Assert.NotNull(binding, "Parse should succeed.");
+        var serialized = binding!.ToString();
+        var reparsed = HotkeyBinding.Parse(serialized);
+        Assert.NotNull(reparsed, "Re-parse should succeed.");
+        Assert.True(reparsed!.Ctrl, "Ctrl should survive round-trip.");
+        Assert.True(reparsed.Shift, "Shift should survive round-trip.");
+        Assert.False(reparsed.Alt, "Alt should not be set after round-trip.");
+        Assert.Equal("F12", reparsed.Key, "Key should survive round-trip.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HotkeyBindingParseReturnsNullForInvalidInput()
+    {
+        Assert.Null(HotkeyBinding.Parse(null), "Null input should return null.");
+        Assert.Null(HotkeyBinding.Parse(""), "Empty input should return null.");
+        Assert.Null(HotkeyBinding.Parse("   "), "Whitespace input should return null.");
+        Assert.Null(HotkeyBinding.Parse("+"), "Lone plus should return null.");
+        Assert.Null(HotkeyBinding.Parse("Ctrl+"), "Modifier without key should return null.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HotkeyBindingParseSingleKeyWithoutModifier()
+    {
+        var binding = HotkeyBinding.Parse("F5");
+        Assert.NotNull(binding, "Single key without modifier should parse.");
+        Assert.False(binding!.Ctrl, "No Ctrl.");
+        Assert.False(binding.Alt, "No Alt.");
+        Assert.False(binding.Shift, "No Shift.");
+        Assert.False(binding.Win, "No Win.");
+        Assert.Equal("F5", binding.Key, "Key should be F5.");
+        return Task.CompletedTask;
+    }
+
+    public static Task AppSettingsDefaultsHotkeyToCtrlAltSpaceEnabled()
+    {
+        var settings = new AppSettings();
+        Assert.Equal("Ctrl+Alt+Space", settings.GlobalHotkey, "Default hotkey should be Ctrl+Alt+Space.");
+        Assert.True(settings.EnableGlobalHotkey, "Global hotkey should be enabled by default.");
+        return Task.CompletedTask;
+    }
+
+    public static Task SettingsLoadWithoutHotkeyFieldsUsesDefaults()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            // Write a minimal settings.json without hotkey fields
+            var settingsPath = Path.Combine(directory, "settings.json");
+            File.WriteAllText(settingsPath, """{"appTheme":"Dark","environments":[]}""");
+
+            var service = new ConfigurationService(directory, new TestLogger());
+            service.Load();
+
+            Assert.Equal("Ctrl+Alt+Space", service.Settings.GlobalHotkey, "Missing hotkey field should default to Ctrl+Alt+Space.");
+            Assert.True(service.Settings.EnableGlobalHotkey, "Missing enable field should default to true.");
+            return Task.CompletedTask;
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()

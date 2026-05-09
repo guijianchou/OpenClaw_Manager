@@ -60,6 +60,7 @@
     <Compile Remove="Services\SingleInstanceCoordinator.cs" />
     <Compile Remove="Services\TrayClosePolicy.cs" />
     <Compile Remove="Services\TrayMenuStrings.cs" />
+    <Compile Remove="Services\HotkeyBinding.cs" />
   </ItemGroup>
 
   <ItemGroup>

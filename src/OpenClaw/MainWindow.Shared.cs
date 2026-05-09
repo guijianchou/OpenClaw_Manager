@@ -22,6 +22,7 @@ public sealed partial class MainWindow
     private bool _isWindowHidden;
     private SettingsDialog? _settingsWindow;
     private TrayIconService? _trayIconService;
+    private GlobalHotkeyService? _globalHotkeyService;
     private readonly TrayClosePolicy _trayClosePolicy = new();
     private int _webViewRecreationCount;
     private int _webViewRecreationMergedCount;
