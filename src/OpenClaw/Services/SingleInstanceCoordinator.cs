@@ -80,6 +80,31 @@ public sealed class SingleInstanceCoordinator : IDisposable
         _listenTask = Task.Run(() => ListenForActivationRequestsAsync(_listenCancellation.Token));
     }
 
+    /// <summary>
+    /// Cancels the listener and waits for the listen task to complete (up to 2 seconds).
+    /// Call this before Dispose to avoid pipe listener races on rapid restart.
+    /// </summary>
+    public async Task StopAsync()
+    {
+        _listenCancellation?.Cancel();
+
+        if (_listenTask is not null)
+        {
+            try
+            {
+                await _listenTask.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                // Best-effort: listener didn't exit in time, proceed with dispose anyway
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed)

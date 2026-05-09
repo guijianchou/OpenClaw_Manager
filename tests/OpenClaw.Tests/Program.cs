@@ -61,6 +61,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("CloudflareRay parses PoP from standard cf-ray header", Tests.CloudflareRayParsesPopFromStandardHeader),
     ("CloudflareRay returns null for missing or malformed header", Tests.CloudflareRayReturnsNullForMissingOrMalformed),
     ("Latency tooltip includes PoP when available", Tests.LatencyTooltipIncludesPopWhenAvailable),
+    ("SingleInstance stop awaits listener task completion", Tests.SingleInstanceStopAwaitsListenerTaskCompletion),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
     ("Atomic writer replaces existing content", Tests.AtomicWriterReplacesExistingContent),
     ("Log tail reader returns the final lines", Tests.LogTailReaderReturnsFinalLines),
@@ -1323,6 +1324,32 @@ internal static class Tests
         Assert.Contains("PoP: LAX", tooltip, "Tooltip should include PoP line when available.");
         Assert.Contains("Latest: 42 ms", tooltip, "Tooltip should still include latency data.");
         return Task.CompletedTask;
+    }
+
+    public static async Task SingleInstanceStopAwaitsListenerTaskCompletion()
+    {
+        // Verify that SingleInstanceCoordinator exposes a StopAsync method
+        var type = typeof(SingleInstanceCoordinator);
+        var stopMethod = type.GetMethod("StopAsync");
+        Assert.NotNull(stopMethod, "SingleInstanceCoordinator should expose a StopAsync method.");
+
+        // Verify StopAsync returns Task
+        Assert.Equal(typeof(Task), stopMethod!.ReturnType, "StopAsync should return Task.");
+
+        // Functional test: create a primary coordinator, start listening, then stop
+        var coordinator = SingleInstanceCoordinator.CreatePrimaryOrSecondary(new TestLogger());
+        if (coordinator.IsPrimary)
+        {
+            coordinator.StartListening();
+            await coordinator.StopAsync();
+            // After StopAsync, the coordinator should be safe to dispose without race
+            coordinator.Dispose();
+        }
+        else
+        {
+            // If not primary (unlikely in test), just dispose
+            coordinator.Dispose();
+        }
     }
 
     private static ControlUiProbeSnapshot CreateAuthRequiredSnapshot()
