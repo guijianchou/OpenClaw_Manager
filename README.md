@@ -182,14 +182,13 @@ If the page loads but OpenClaw reports origin rejection, check the exact public 
 | Auto-Reconnect | Retries failed navigation automatically |
 | Heartbeat | Periodic Control UI and transport probe with configurable reconnect thresholds |
 | System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Reload, View Logs, Settings, and Exit actions |
-| Global Hotkey | Optional configurable system-wide hotkey (default Ctrl+Shift+F12, disabled by default) to show/hide the window, with Settings UI validation and reset |
+| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window, with Settings UI validation and reset |
 | Instance Control | Optional multiple-instance mode; off by default so app relaunches restore the existing tray-hidden window |
 | Session Isolation | Separate WebView2 profile data per configured environment |
 | Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
 | Always on Top | Pin button to keep the window above other applications, with native topmost fallback and distinct active/inactive colors |
 | Compact Mode | Reduced window showing only status bar for screen-corner placement |
 | Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
-| Update Check | Automatic GitHub Releases check on startup (every 24h) with dismissible notification |
 | Theme | Top-bar segmented switcher for System, Light, and Dark |
 | Language | English, Simplified Chinese, System |
 | Diagnostics | Runtime, network, and session checks |
@@ -244,150 +243,6 @@ Design principle: remote-first thin shell. The actual OpenClaw runtime lives on 
 
 ---
 
-## Recent Changes
+## Changelog
 
-### v3.2.2 (2026-05-09)
-
-- Added GitHub Releases update checker: checks for new versions on startup (every 24h), shows a success InfoBar with a link to the release page, and remembers dismissed versions.
-- Fixed language switching for unpackaged apps: `StringResources` now uses `ResourceManager` with explicit `ResourceContext` language qualification as a fallback when `PrimaryLanguageOverride` does not persist across sessions.
-- Added `AppSettings` fields for update check: `EnableUpdateCheck`, `UpdateCheckIntervalHours`, `LastUpdateCheckUtc`, `DismissedUpdateVersion`.
-- Added `UpdateCheckService` with full error handling (network failure, malformed JSON, pre-release filtering).
-- Added en-us/zh-cn resource strings for update notification UI.
-- Synced app, assembly, file, package manifest, application manifest, About dialog, and regression-test version metadata to `3.2.2`.
-
-### v3.2.1 (2026-05-09)
-
-- Removed the toast notification feature because Windows toast activation is not a good fit for the current unpackaged WebView2 shell.
-- Removed notification settings, notifier lifecycle wiring, and related regression coverage.
-- Kept the v3.2 native features intact: global hotkey, tray commands, diagnostic export, Cloudflare PoP tooltip, always-on-top, compact mode, and WebView2 circuit breaker.
-- Synced app, assembly, file, package manifest, application manifest, About dialog, and regression-test version metadata to `3.2.1`.
-
-### v3.2.0 (2026-05-09)
-
-- Added localized tray context menu with Reload, View Logs, status header, and full Chinese support.
-- Added configurable global hotkey to show/hide the main window from anywhere, including Settings UI controls, validation, and reset-to-default support.
-- Added diagnostic bundle export: one-click zip of redacted settings, recent logs, runtime info, and diagnostic summary.
-- Added Cloudflare PoP (Point of Presence) display in the latency tooltip by parsing the `cf-ray` response header.
-- Added `StopAsync` to `SingleInstanceCoordinator` for clean listener shutdown without pipe races.
-- Added always-on-top pin button in the title bar with persistent setting, native `HWND_TOPMOST` fallback, and theme-aware active/inactive colors so the Pin state remains visible in light and dark themes.
-- Added compact mode: reduced window (480x120) showing only status bars, with independent position persistence.
-- Added task-complete toast notification when work status transitions from LIVE to IDLE (debounced, only when window is hidden).
-- Added WebView2 recreation circuit breaker: stops runaway recreation after 5 attempts per minute and shows actionable error.
-- Added `AppSettings` fields for global hotkey, always-on-top, compact mode, and notification preferences.
-- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.2.0`.
-
-### v3.1.3 (2026-05-08)
-
-- Fixed taskbar/system restore after minimizing to tray by restoring the minimized HWND placement before hiding the window.
-- Covered the remaining dedicated-GPU direct mode restore path where Windows could otherwise keep the main window at `160x28` and `-32000,-32000` after taskbar activation.
-- Added regression coverage to ensure tray hiding restores minimized placement before calling `SW_HIDE`.
-- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.1.3`.
-
-### v3.1.2 (2026-05-08)
-
-- Fixed main-window restoration after GPU/display topology changes such as switching to dedicated-GPU direct mode.
-- Sanitized persisted minimized-window sentinel bounds like `160x28` at `-32000,-32000` so startup falls back to a visible default window.
-- Stopped saving window bounds while the main window is hidden to tray or minimized, preventing invisible-window state from being persisted again.
-- Recentered previously saved bounds onto the current display when the saved rectangle no longer intersects any available work area.
-- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.1.2`.
-
-### v3.1.1 (2026-05-02)
-
-- Renamed the Settings More section to Advanced.
-- Synced app, assembly, file, package manifest, application manifest, and About dialog version metadata to `3.1.1`.
-
-### v3.1.0 (2026-05-02)
-
-- Added a system tray icon with status tooltip, minimize/close-to-tray support, and right-click Open OpenClaw, Settings, and Exit actions.
-- Fixed tray initialization by declaring Unicode marshalling for Win32 `*W` entry points, including window class registration, icon loading, and menu text.
-- Fixed tray right-click handling for the `NOTIFYICON_VERSION_4` callback format by reading the event from `LOWORD(lParam)`.
-- Fixed tray menu popup behavior by using a hidden normal owner window instead of a message-only `HWND_MESSAGE` window.
-- Added More settings for minimize-to-tray, close-to-tray, and optional multiple-instance behavior.
-- Disabled multiple instances by default; secondary launches now restore the existing OpenClaw window when the setting is off.
-- Renamed the Shell settings section to More and moved it to the bottom of the settings navigation.
-- Changed window minimize and close behavior to hide OpenClaw to the tray when enabled and the tray icon is available.
-- Added latency badge hover details for the most recent probe samples, including latest, min, average, p95, and max round-trip time.
-- Synced app, assembly, file, manifest, and About dialog version metadata to `3.1.0`.
-
-### v3.0.6 (2026-05-02)
-
-- Fixed deferred settings saves so updates queued while a previous write is flushing are persisted by a follow-up save.
-- Hardened settings loading against explicit `null` JSON sections for environments, heartbeat, recovery, and diagnostics options.
-- Moved log retention cleanup off the `LoggingService` constructor path and into the background writer task.
-- Switched latency probing to `GET __openclaw/control-ui-config.json` under the configured Control UI base path, with clean cancellation for the initial probe task.
-- Split pure .NET recovery/config/logging code into `OpenClaw.Core` so tests can reference real shared code instead of compiling a growing mix of linked files and stubs.
-- Pinned NuGet package versions, enabled package lock files, and removed the obsolete `RestorePackagesConfig` restore switch.
-- Synced app, assembly, file, manifest, and About dialog version metadata to `3.0.6`.
-
-### v3.0.5 (2026-05-01)
-
-- Hardened settings persistence with atomic writes so interrupted saves no longer risk leaving a truncated `settings.json`.
-- Improved Cloudflare Tunnel behavior by replacing ICMP latency checks with HTTP HEAD RTT probes and honoring the configured hard-refresh cooldown in heartbeat recovery.
-- Reduced local resource buildup by closing replaced WebView2 instances explicitly, tail-reading the log viewer, and applying 14-day log retention.
-- Trimmed UI churn by de-duplicating heartbeat/run indicator property changes and converting the Stop command path to awaitable async execution.
-- Synced app, assembly, file, manifest, and About dialog version metadata to `3.0.5`.
-
-### v3.0.4 (2026-04-29)
-
-- Fixed the main window top-edge artifact by removing the XAML edge cover workaround and explicitly syncing the WinUI title bar, DWM caption, and DWM border colors.
-- Updated theme-change handling so `ActualThemeChanged` uses the full native frame refresh path instead of only repainting managed title-bar content.
-- Synced app, assembly, file, manifest, and About dialog version metadata to `3.0.4`.
-
-### v3.0.3 (2026-04-22)
-
-- Kept the shell lightweight by narrowing Hosted UI DOM scanning to auth/origin/pairing/connectivity signals and avoiding broader page-text sweeps.
-- Tuned the default heartbeat, reconnect, and hard-refresh cadence for the Cloudflare Tunnel remote-gateway path so the shell is less aggressive during transient tunnel jitter.
-- Reduced startup and debug-session noise by removing eager string-resource warm-up, caching `CoreWebView2` handles, and de-duplicating high-frequency WebView lifecycle logs.
-
-### v3.0.2 (2026-04-21)
-
-- Fixed Visual Studio solution configuration mappings so the test project now maps cleanly across `x64`, `x86`, and `ARM64` solution platforms without showing unknown project configuration warnings.
-- Reduced startup and background overhead by deferring non-critical warm-up work, pausing hidden-window activity, and tightening WebView recreation scheduling into a single debounced path.
-- Added lightweight runtime observability for WebView recreation, Control UI inspect reuse/coalescing, deferred settings saves, and heartbeat-triggered recovery so diagnostics now expose the recent optimization paths more clearly.
-
-### v3.0.1 (2026-04-21)
-
-- Continued the refactor by splitting `MainWindow` and `SettingsDialog` startup logic into smaller initialization, action, navigation, and theme files without changing existing behavior.
-- Consolidated duplicated window theme and title-bar refresh logic into shared helpers so the main window and settings window now follow the same theme-application pipeline.
-- Fixed an initialization-order null reference in `ShellSessionCoordinator` by making logger and recovery-option dependencies available before `AttachAsync()` runs.
-- Fixed the window-shell split so the new partial entry files compile cleanly and the main window, settings window, and About version display stay in sync at `3.0.1`.
-
-### v3.0.0 (2026-04-21)
-
-- Refactored shared window theme and native frame refresh logic into reusable helpers to reduce duplicate patch-style fixes across the main window and settings window.
-- Split reusable command, indicator, and app metadata types out of large view model files to make responsibilities clearer and future maintenance safer.
-- Consolidated main window environment selection and UI-thread update flows so behavior stays the same while the code path is easier to reason about.
-
-### v2.1.4 (2026-04-20)
-
-- Added a top-right latency badge for the active Control UI endpoint.
-- Increased latency refresh cadence from 3 seconds to 1 second.
-- Reduced transient blank latency readings by retaining the most recent successful ping value when a probe briefly misses.
-
-### v2.1.3 (2026-04-20)
-
-- Fixed the Settings window so reopening it immediately resyncs the current app theme before the window is shown again.
-- Replaced the title bar refresh resize hack with a non-geometry non-client refresh path based on native frame invalidation, redraw, and DWM flush.
-
-### v2.1.2 (2026-04-19)
-
-- Unified heartbeat settings so runtime behavior now respects the configured enable flag and reconnect thresholds.
-- Added settings normalization so legacy `heartbeatIntervalSeconds` values migrate cleanly into the newer heartbeat settings object.
-- Added explicit disposal for `WebViewService`, `HostedUiBridge`, `ShellSessionCoordinator`, and main-window event subscriptions during shutdown.
-- Improved diagnostics and settings guidance for Cloudflare Tunnel and reverse-proxy deployments, especially around `gateway.controlUi.allowedOrigins`.
-- Clarified that environment URLs must use the public hosted Control UI page origin rather than the raw Gateway WebSocket endpoint.
-
-### v2.0.9 (2026-03-31)
-
-- Refined the recovery architecture so heartbeat, event-gap handling, and background resume all prefer in-page reconnect or soft resync before falling back to a hard reload.
-- Added input-focus-aware recovery guards to reduce unexpected refreshes while typing.
-- Removed the last dead duplicate bridge constant from `WebViewService`, leaving `HostedUiBridge` as the single injected page bridge.
-- Polished the top status strip layout so heartbeat summary and indicators each occupy their own centered lane.
-- Fixed the top heartbeat badge staying gray by preventing duplicate heartbeat restarts from resetting the timer before the first probe completed.
-- Tightened the top status strip spacing so `HB`, `MODEL`, `AUTH`, and `Status` read more evenly without over-compressing the model label.
-
-### v2.0.6 (2026-03-30)
-
-- Consolidated hosted UI snapshot ownership under `WebViewService` and reduced duplicate status pipelines.
-- Hardened WebView recreation and bridge reattachment behavior to avoid stale subscriptions.
-- Localized heartbeat summary text in both English and Chinese.
+See [changelog.md](changelog.md) for the full release history.

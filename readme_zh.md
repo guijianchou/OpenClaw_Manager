@@ -182,14 +182,13 @@ dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
 | Auto-Reconnect | 导航失败后自动重试 |
 | Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
 | System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
-| Global Hotkey | 可选的全局热键（默认 Ctrl+Shift+F12，默认关闭）随时显示/隐藏窗口，并支持设置界面校验和重置 |
+| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口，并支持设置界面校验和重置 |
 | Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
 | Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
 | Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
 | Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
 | Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
 | Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
-| Update Check | 启动时自动检查 GitHub Releases 新版本（每 24 小时），有更新时弹出可关闭通知 |
 | Theme | 顶部栏 System、Light、Dark 分段切换 |
 | Language | English、Simplified Chinese、System |
 | Diagnostics | 运行时、网络和会话检查 |
@@ -244,150 +243,6 @@ MainWindow
 
 ---
 
-## 最近更新
+## 更新日志
 
-### v3.2.2 (2026-05-09)
-
-- 新增 GitHub Releases 更新检查：启动时每 24 小时检查一次新版本，有更新时弹出 InfoBar 并附带发布页链接，关闭后记住已忽略版本。
-- 修复 unpackaged 应用语言切换不生效的问题：`StringResources` 现在使用 `ResourceManager` 配合显式 `ResourceContext` 语言限定作为 `PrimaryLanguageOverride` 不持久化时的回退方案。
-- 新增 `AppSettings` 字段：`EnableUpdateCheck`、`UpdateCheckIntervalHours`、`LastUpdateCheckUtc`、`DismissedUpdateVersion`。
-- 新增 `UpdateCheckService`，完整处理网络失败、JSON 格式错误和 pre-release 过滤。
-- 新增中英文更新通知 UI 资源字符串。
-- 同步 app、assembly、file、package manifest、application manifest、About dialog 和回归测试版本元数据到 `3.2.2`。
-
-### v3.2.1 (2026-05-09)
-
-- 移除 toast 通知功能；当前应用是 unpackaged WebView2 shell，Windows toast activation 不适合这个分发和启动模型。
-- 移除通知设置、notifier 生命周期接线和相关回归测试。
-- 保留 v3.2 的纯原生能力：全局热键、托盘命令、诊断导出、Cloudflare PoP tooltip、always-on-top、compact mode 和 WebView2 circuit breaker。
-- 同步 app、assembly、file、package manifest、application manifest、About dialog 和回归测试版本元数据到 `3.2.1`。
-
-### v3.2.0 (2026-05-09)
-
-- 添加本地化托盘右键菜单，包含 Reload、View Logs、状态标题和完整中文支持。
-- 添加可配置全局热键用于随时显示/隐藏主窗口，并在 Settings 中提供输入、校验和恢复默认值。
-- 添加诊断包导出：一键打包脱敏设置、近期日志、运行时信息和诊断摘要。
-- 在延迟 tooltip 中解析 `cf-ray` 响应头并显示 Cloudflare PoP。
-- 为 `SingleInstanceCoordinator` 添加 `StopAsync`，关闭时等待 listener task，避免 pipe dispose 竞态。
-- 添加标题栏 Always-on-top Pin 按钮，支持持久化设置、原生 `HWND_TOPMOST` fallback，并使用主题感知的启用/未启用颜色，浅色和深色主题下都能区分当前状态。
-- 添加 Compact Mode：缩小为仅显示状态栏的窗口，并独立持久化 compact 位置。
-- 添加任务完成 toast：工作状态从 LIVE 切换到 IDLE 且窗口不可见时发送通知，并带 debounce。
-- 添加 WebView2 recreation circuit breaker：一分钟内超过 5 次重建后停止 runaway recreation，并显示可操作错误。
-- 添加 global hotkey、always-on-top、compact mode 和通知偏好的 `AppSettings` 字段。
-- 同步 app、assembly、file、package manifest、application manifest 和 About dialog 版本元数据到 `3.2.0`。
-
-### v3.1.3 (2026-05-08)
-
-- 修复最小化到托盘后通过任务栏或系统 restore 恢复时的窗口异常，隐藏窗口前会先恢复 minimized HWND placement。
-- 覆盖独显直连模式下剩余的 restore 路径，避免 Windows 在任务栏激活后仍把主窗口保持在 `160x28` 和 `-32000,-32000`。
-- 增加回归测试，确保托盘隐藏逻辑在调用 `SW_HIDE` 前先恢复 minimized placement。
-- 同步 app、assembly、file、package manifest、application manifest 和 About dialog 版本元数据到 `3.1.3`。
-
-### v3.1.2 (2026-05-08)
-
-- 修复 GPU/显示拓扑变化后主窗口恢复问题，例如切换到独显直连模式。
-- 清理持久化的最小化窗口哨兵 bounds，例如 `160x28` 和 `-32000,-32000`，启动时回退到可见默认窗口。
-- 主窗口隐藏到托盘或最小化时停止保存窗口 bounds，避免再次持久化不可见窗口状态。
-- 当已保存窗口矩形不再与任何可用工作区相交时，将窗口重新居中到当前显示器。
-- 同步 app、assembly、file、package manifest、application manifest 和 About dialog 版本元数据到 `3.1.2`。
-
-### v3.1.1 (2026-05-02)
-
-- 将 Settings 的 More 区域重命名为 Advanced。
-- 同步 app、assembly、file、package manifest、application manifest 和 About dialog 版本元数据到 `3.1.1`。
-
-### v3.1.0 (2026-05-02)
-
-- 添加系统托盘图标、状态 tooltip、最小化/关闭到托盘支持，以及右键 Open OpenClaw、Settings、Exit 操作。
-- 通过为 Win32 `*W` 入口声明 Unicode marshalling 修复托盘初始化，包括窗口类注册、图标加载和菜单文本。
-- 通过从 `LOWORD(lParam)` 读取事件修复 `NOTIFYICON_VERSION_4` 回调格式下的托盘右键处理。
-- 通过使用隐藏的普通 owner window 而非 message-only `HWND_MESSAGE` 修复托盘菜单弹出行为。
-- 添加 More 设置，用于最小化到托盘、关闭到托盘和可选多实例行为。
-- 默认禁用多实例；关闭该设置时，二次启动会恢复已有 OpenClaw 窗口。
-- 将 Shell 设置区域重命名为 More 并移动到设置导航底部。
-- 在启用且托盘图标可用时，将窗口最小化和关闭行为改为隐藏到托盘。
-- 为延迟徽标添加悬停详情，展示最近探测样本的 latest、min、average、p95 和 max 往返时间。
-- 同步 app、assembly、file、manifest 和 About dialog 版本元数据到 `3.1.0`。
-
-### v3.0.6 (2026-05-02)
-
-- 修复 deferred settings save，使前一次写入 flush 时排队的更新会由后续 save 持久化。
-- 加固 settings load，处理 environments、heartbeat、recovery 和 diagnostics options 显式为 `null` 的 JSON。
-- 将日志保留清理从 `LoggingService` 构造路径移到后台 writer task。
-- 将延迟探测切换为在配置的 Control UI base path 下请求 `GET __openclaw/control-ui-config.json`，并干净取消初始探测任务。
-- 将纯 .NET recovery/config/logging 代码拆入 `OpenClaw.Core`，让测试可以引用真实共享代码。
-- 固定 NuGet 包版本、启用 package lock files，并移除过时的 `RestorePackagesConfig` restore 开关。
-- 同步 app、assembly、file、manifest 和 About dialog 版本元数据到 `3.0.6`。
-
-### v3.0.5 (2026-05-01)
-
-- 使用原子写入加固 settings persistence，避免中断保存留下截断的 `settings.json`。
-- 用 HTTP HEAD RTT 探测替代 ICMP 延迟检查，并在 heartbeat recovery 中遵守 hard-refresh cooldown，改善 Cloudflare Tunnel 行为。
-- 通过显式关闭被替换的 WebView2 实例、日志查看器 tail-read 和 14 天日志保留，减少本地资源堆积。
-- 通过去重 heartbeat/run indicator 属性变更，并将 Stop 命令路径改为可 await 的异步执行，减少 UI 抖动。
-- 同步 app、assembly、file、manifest 和 About dialog 版本元数据到 `3.0.5`。
-
-### v3.0.4 (2026-04-29)
-
-- 移除 XAML edge cover workaround，并显式同步 WinUI title bar、DWM caption 和 DWM border 颜色，修复主窗口顶部边缘伪影。
-- 更新主题切换处理，使 `ActualThemeChanged` 走完整 native frame refresh 路径，而不是只重绘 managed title-bar content。
-- 同步 app、assembly、file、manifest 和 About dialog 版本元数据到 `3.0.4`。
-
-### v3.0.3 (2026-04-22)
-
-- 将 Hosted UI DOM 扫描收窄到 auth/origin/pairing/connectivity 信号，避免更宽泛的页面文本扫描，保持外壳轻量。
-- 调整默认 heartbeat、reconnect 和 hard-refresh 节奏，使 Cloudflare Tunnel 远程 Gateway 路径在瞬时 tunnel 抖动时不那么激进。
-- 移除 eager string-resource warm-up、缓存 `CoreWebView2` 句柄，并去重高频 WebView 生命周期日志，减少启动和调试噪音。
-
-### v3.0.2 (2026-04-21)
-
-- 修复 Visual Studio 解决方案配置映射，使测试项目在 `x64`、`x86` 和 `ARM64` 平台下不再显示 unknown project configuration 警告。
-- 通过延迟非关键 warm-up、暂停 hidden-window activity，并将 WebView recreation scheduling 收敛为单一 debounce 路径，降低启动和后台开销。
-- 为 WebView recreation、Control UI inspect reuse/coalescing、deferred settings save 和 heartbeat-triggered recovery 增加轻量运行时可观测性。
-
-### v3.0.1 (2026-04-21)
-
-- 继续重构，将 `MainWindow` 和 `SettingsDialog` 启动逻辑拆为更小的 initialization、action、navigation 和 theme 文件，不改变现有行为。
-- 将重复的窗口主题和 title-bar refresh 逻辑合并到共享 helpers，使主窗口和设置窗口使用同一主题应用 pipeline。
-- 通过让 logger 和 recovery-option dependencies 在 `AttachAsync()` 之前可用，修复 `ShellSessionCoordinator` 初始化顺序空引用。
-- 修复 window-shell 拆分后的编译问题，确保主窗口、设置窗口和 About version display 在 `3.0.1` 保持同步。
-
-### v3.0.0 (2026-04-21)
-
-- 将共享窗口主题和 native frame refresh 逻辑重构为可复用 helpers，减少主窗口和设置窗口间重复的 patch-style 修复。
-- 拆出可复用 command、indicator 和 app metadata 类型，让职责更清晰，后续维护更安全。
-- 合并主窗口环境选择和 UI-thread update 流程，在行为不变的前提下让代码路径更易推理。
-
-### v2.1.4 (2026-04-20)
-
-- 为当前 Control UI 端点添加右上角延迟徽标。
-- 将延迟刷新频率从 3 秒提高到 1 秒。
-- 探测短暂失败时保留最近一次成功 ping 值，减少临时空白延迟读数。
-
-### v2.1.3 (2026-04-20)
-
-- 修复 Settings 窗口，使重新打开时会在显示前立即同步当前 app theme。
-- 用基于 native frame invalidation、redraw 和 DWM flush 的非几何 non-client refresh 路径替代 title bar refresh resize hack。
-
-### v2.1.2 (2026-04-19)
-
-- 统一 heartbeat settings，使运行时行为遵守配置的 enable flag 和 reconnect thresholds。
-- 添加 settings normalization，使旧的 `heartbeatIntervalSeconds` 值能干净迁移到新的 heartbeat settings object。
-- 在关闭时显式释放 `WebViewService`、`HostedUiBridge`、`ShellSessionCoordinator` 和主窗口事件订阅。
-- 改进 Cloudflare Tunnel 和反向代理部署的诊断与设置说明，尤其是 `gateway.controlUi.allowedOrigins`。
-- 明确环境 URL 必须使用公共托管 Control UI 页面 origin，而不是原始 Gateway WebSocket endpoint。
-
-### v2.0.9 (2026-03-31)
-
-- 调整 recovery 架构，使 heartbeat、event-gap handling 和 background resume 都优先尝试 in-page reconnect 或 soft resync，再回退到 hard reload。
-- 添加 input-focus-aware recovery guards，减少输入时的意外刷新。
-- 移除 `WebViewService` 中最后一个无用重复 bridge constant，让 `HostedUiBridge` 成为唯一注入页面 bridge。
-- 打磨顶部状态条布局，让 heartbeat summary 和 indicators 各自占据居中的独立 lane。
-- 修复顶部 heartbeat badge 一直为灰色的问题，避免重复 heartbeat restart 在第一次探测完成前重置 timer。
-- 收紧顶部状态条间距，让 `HB`、`MODEL`、`AUTH` 和 `Status` 更均衡，同时不过度压缩 model label。
-
-### v2.0.6 (2026-03-30)
-
-- 将 hosted UI snapshot ownership 合并到 `WebViewService`，减少重复状态 pipeline。
-- 加固 WebView recreation 和 bridge reattachment 行为，避免 stale subscriptions。
-- 本地化英文和中文 heartbeat summary 文本。
+完整发布历史请见 [changelog.md](changelog.md)。
