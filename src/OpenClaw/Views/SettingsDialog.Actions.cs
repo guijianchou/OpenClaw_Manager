@@ -8,16 +8,6 @@ namespace OpenClaw.Views;
 
 public sealed partial class SettingsDialog
 {
-    private void OnApplyClick(object sender, RoutedEventArgs e)
-    {
-        if (!TryApplyEdit())
-        {
-            return;
-        }
-
-        ValidationInfoBar.IsOpen = false;
-    }
-
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
         if (!TrySaveSettings(out var saveResult))
@@ -65,6 +55,16 @@ public sealed partial class SettingsDialog
     private void OnResetHotkeyClick(object sender, RoutedEventArgs e)
     {
         ViewModel.ResetGlobalHotkey();
+    }
+
+    private void OnApplyClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryApplyEdit())
+        {
+            return;
+        }
+
+        ValidationInfoBar.IsOpen = false;
     }
 
     private async void OnClearEnvironmentSessionClick(object sender, RoutedEventArgs e)

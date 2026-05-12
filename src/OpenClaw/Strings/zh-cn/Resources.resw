@@ -154,6 +154,9 @@
   <data name="SetAsDefault" xml:space="preserve">
     <value>设为默认</value>
   </data>
+  <data name="SettingsApply" xml:space="preserve">
+    <value>应用</value>
+  </data>
   <data name="AddEnvironment" xml:space="preserve">
     <value>添加环境</value>
   </data>
@@ -173,7 +176,7 @@
     <value>语言</value>
   </data>
   <data name="SettingsNavShell" xml:space="preserve">
-    <value>高级</value>
+    <value>常规</value>
   </data>
   <data name="SettingsNavEnvironments" xml:space="preserve">
     <value>环境</value>
@@ -188,10 +191,10 @@
     <value>选择你偏好的显示语言。</value>
   </data>
   <data name="SettingsShellTitle" xml:space="preserve">
-    <value>高级</value>
+    <value>常规</value>
   </data>
   <data name="SettingsShellDescription" xml:space="preserve">
-    <value>控制原生窗口在最小化或关闭时的行为。</value>
+    <value>控制应用窗口、托盘和快捷键行为。</value>
   </data>
   <data name="SettingsMinimizeToTray" xml:space="preserve">
     <value>最小化到托盘</value>
@@ -210,6 +213,12 @@
   </data>
   <data name="SettingsAllowMultipleInstancesDescription" xml:space="preserve">
     <value>允许在 Windows 上打开多个 OpenClaw 实例。</value>
+  </data>
+  <data name="SettingsAlwaysOnTop" xml:space="preserve">
+    <value>窗口置顶</value>
+  </data>
+  <data name="SettingsAlwaysOnTopDescription" xml:space="preserve">
+    <value>让主窗口保持在其他应用窗口之上。</value>
   </data>
   <data name="SettingsLanguageSystem" xml:space="preserve">
     <value>系统默认</value>
@@ -252,9 +261,6 @@
   </data>
   <data name="SettingsControlUiUrlHint4" xml:space="preserve">
     <value>如果 OpenClaw 要求设备配对，请在网关主机上执行 `openclaw devices list` 和 `openclaw devices approve --latest`，然后再回到这个桌面客户端重连。</value>
-  </data>
-  <data name="SettingsApply" xml:space="preserve">
-    <value>应用</value>
   </data>
   <data name="SettingsValidationError" xml:space="preserve">
     <value>校验错误</value>
@@ -363,18 +369,6 @@
   </data>
   <data name="AboutCopyright" xml:space="preserve">
     <value>(C) 2026 Lanstack @openclaw. 保留所有权利。</value>
-  </data>
-  <data name="AboutCheckForUpdates" xml:space="preserve">
-    <value>检查更新</value>
-  </data>
-  <data name="AboutCheckingForUpdates" xml:space="preserve">
-    <value>正在检查更新...</value>
-  </data>
-  <data name="AboutUpdateCheckNoUpdate" xml:space="preserve">
-    <value>当前已是最新版本。</value>
-  </data>
-  <data name="AboutUpdateCheckFailed" xml:space="preserve">
-    <value>无法检查更新，请稍后再试。</value>
   </data>
   <data name="LogsTitle" xml:space="preserve">
     <value>应用日志</value>
@@ -668,14 +662,5 @@
   </data>
   <data name="SettingsValidationGlobalHotkeyInvalid" xml:space="preserve">
     <value>请输入有效热键，例如 Ctrl+Alt+Space、Shift+F12 或 Win+Alt+O。</value>
-  </data>
-  <data name="UpdateAvailableTitle" xml:space="preserve">
-    <value>有新版本可用</value>
-  </data>
-  <data name="UpdateAvailableMessage" xml:space="preserve">
-    <value>新版本 ({0}) 已发布。</value>
-  </data>
-  <data name="UpdateViewRelease" xml:space="preserve">
-    <value>查看发布</value>
   </data>
 </root>

@@ -204,10 +204,10 @@ Settings 窗口包含五个部分：
 | 部分 | 内容 |
 |---|---|
 | Language | 显示语言 |
+| General | 窗口、托盘、全局热键、窗口置顶和多实例行为 |
 | Environments | 添加、编辑、删除和选择默认托管 Control UI 端点 |
 | Sessions | 清理指定环境的 WebView2 会话数据 |
 | Developer Tools | 诊断、日志、DevTools |
-| Advanced | 全局热键、最小化到托盘、关闭到托盘和多实例行为 |
 
 ### 环境 URL 规则
 

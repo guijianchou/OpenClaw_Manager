@@ -8,6 +8,14 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v3.3.0 (2026-05-12)
+
+- Refined Settings with PowerToys-style settings rows, compact ToggleSwitch spacing, and localized always-on-top text.
+- Reorganized Settings navigation to Language, General, Environments, Sessions, and Dev Tools.
+- Polished the Environment editor by grouping Set as default and Apply into a single compact action bar.
+- Removed the manual GitHub update-check UI and service from the About dialog.
+- Synced app, assembly, file, package manifest, application manifest, About dialog, README, and regression-test version metadata to `3.3.0`.
+
 ### v3.2.1 (2026-05-09)
 
 - Removed the toast notification feature because Windows toast activation is not a good fit for the current unpackaged WebView2 shell.
@@ -148,6 +156,14 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v3.3.0 (2026-05-12)
+
+- 优化 Settings，采用 PowerToys 风格设置行、紧凑 ToggleSwitch 间距，并补齐窗口置顶文案本地化。
+- 将 Settings 导航整理为 Language、General、Environments、Sessions 和 Dev Tools。
+- 优化 Environment 编辑区域，将 Set as default 和 Apply 收进同一个紧凑动作栏。
+- 从 About 对话框移除手动 GitHub 更新检查 UI 和服务。
+- 同步 app、assembly、file、package manifest、application manifest、About dialog、README 和回归测试版本元数据到 `3.3.0`。
 
 ### v3.2.1 (2026-05-09)
 

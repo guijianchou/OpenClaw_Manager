@@ -3,6 +3,7 @@
     x:Class="OpenClaw.Views.SettingsDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:helpers="using:OpenClaw.Helpers"
     xmlns:models="using:OpenClaw.Models"
@@ -43,6 +44,12 @@
                         <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavLanguage}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
+                    <ListViewItem x:Name="NavShell" Tag="Shell">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE713;" FontSize="14" />
+                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavShell}" FontSize="13" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListViewItem>
                     <ListViewItem x:Name="NavEnvironments" Tag="Environments">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE909;" FontSize="14" />
@@ -59,12 +66,6 @@
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE9D9;" FontSize="14" />
                         <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavDevTools}" FontSize="13" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ListViewItem>
-                    <ListViewItem x:Name="NavShell" Tag="Shell">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE713;" FontSize="14" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavShell}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
                 </ListView>
@@ -103,37 +104,42 @@
                                     FontSize="13"
                                     TextWrapping="Wrap" />
 
-                        <CheckBox Content="{x:Bind helpers:StringResources.SettingsMinimizeToTray}"
-                                  IsChecked="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}"
-                                  Margin="0,4,0,0" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsMinimizeToTrayDescription}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="12"
-                                    TextWrapping="Wrap" />
+                        <StackPanel x:Name="ShellSwitchRows" Spacing="8">
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsMinimizeToTray}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsMinimizeToTrayDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
 
-                        <CheckBox Content="{x:Bind helpers:StringResources.SettingsCloseToTray}"
-                                  IsChecked="{x:Bind ViewModel.CloseToTray, Mode=TwoWay}"
-                                  Margin="0,8,0,0" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsCloseToTrayDescription}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="12"
-                                    TextWrapping="Wrap" />
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsCloseToTray}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsCloseToTrayDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.CloseToTray, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
 
-                        <CheckBox Content="{x:Bind helpers:StringResources.SettingsAllowMultipleInstances}"
-                                  IsChecked="{x:Bind ViewModel.AllowMultipleInstances, Mode=TwoWay}"
-                                  Margin="0,8,0,0" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsAllowMultipleInstancesDescription}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="12"
-                                    TextWrapping="Wrap" />
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsAllowMultipleInstances}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsAllowMultipleInstancesDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.AllowMultipleInstances, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
 
-                        <CheckBox Content="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkey}"
-                                  IsChecked="{x:Bind ViewModel.EnableGlobalHotkey, Mode=TwoWay}"
-                                  Margin="0,8,0,0" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkeyDescription}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="12"
-                                    TextWrapping="Wrap" />
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsAlwaysOnTop}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsAlwaysOnTopDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
+
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkey}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkeyDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.EnableGlobalHotkey, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <TextBox Header="{x:Bind helpers:StringResources.SettingsGlobalHotkey}"
                                      PlaceholderText="{x:Bind helpers:StringResources.SettingsGlobalHotkeyPlaceholder}"
@@ -148,13 +154,6 @@
                                     FontSize="12"
                                     TextWrapping="Wrap" />
 
-                        <CheckBox Content="Always on Top"
-                                  IsChecked="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
-                                  Margin="0,12,0,0" />
-                        <TextBlock Text="Keep the main window above other applications."
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="12"
-                                    TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- ======= Panel: Environments ======= -->
@@ -235,15 +234,46 @@
                                     FontSize="12"
                                     TextWrapping="Wrap" />
 
-                        <StackPanel Orientation="Horizontal" Spacing="16">
-                            <CheckBox x:Name="DefaultCheckBox"
-                                      Content="{x:Bind helpers:StringResources.SetAsDefault}"
-                                      IsChecked="{x:Bind ViewModel.EditIsDefault, Mode=TwoWay}"
-                                      VerticalAlignment="Center" />
-                            <Button Content="{x:Bind helpers:StringResources.SettingsApply}"
-                                     Click="OnApplyClick"
-                                     Style="{StaticResource AccentButtonStyle}" />
-                        </StackPanel>
+                        <Border x:Name="EnvironmentActionsBar"
+                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="12,8"
+                                Margin="0,4,0,0">
+                            <Grid ColumnSpacing="16" MinHeight="36">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid x:Name="DefaultEnvironmentRow"
+                                      ColumnSpacing="10"
+                                      VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="{x:Bind helpers:StringResources.SetAsDefault}"
+                                               FontSize="13"
+                                               VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1"
+                                                  IsOn="{x:Bind ViewModel.EditIsDefault, Mode=TwoWay}"
+                                                  AutomationProperties.Name="{x:Bind helpers:StringResources.SetAsDefault}"
+                                                  VerticalAlignment="Center"
+                                                  OnContent=""
+                                                  OffContent="" />
+                                </Grid>
+
+                                <Button Grid.Column="1"
+                                        Content="{x:Bind helpers:StringResources.SettingsApply}"
+                                        Click="OnApplyClick"
+                                        Style="{StaticResource AccentButtonStyle}"
+                                        MinWidth="88"
+                                        VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
 
                         <InfoBar x:Name="ValidationInfoBar"
                                  IsOpen="False"
@@ -306,13 +336,14 @@
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     FontSize="13" />
 
-                        <CheckBox Content="{x:Bind helpers:StringResources.SettingsEnableDevLog}"
-                                  IsChecked="{x:Bind ViewModel.EnableDevLog, Mode=TwoWay}"
-                                  Margin="0,4,0,0" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsEnableDevLogDescription}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="12"
-                                    TextWrapping="Wrap" />
+                        <StackPanel x:Name="DevToolsSwitchRows" Spacing="8">
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsEnableDevLog}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsEnableDevLogDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.EnableDevLog, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
+                        </StackPanel>
 
                         <StackPanel Spacing="8" Margin="0,8,0,0">
                             <Button HorizontalAlignment="Stretch" Click="OnRunDiagnosticsClick">

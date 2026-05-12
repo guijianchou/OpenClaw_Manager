@@ -18,7 +18,6 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -354,21 +353,7 @@
                  IsClosable="True"
                  Closed="OnDiagnosticInfoBarClosed" />
 
-        <InfoBar x:Name="UpdateInfoBar"
-                 Grid.Row="4"
-                 IsOpen="False"
-                 Severity="Success"
-                 Title="{x:Bind helpers:StringResources.UpdateAvailableTitle}"
-                 IsClosable="True"
-                 Closed="OnUpdateInfoBarClosed">
-            <InfoBar.ActionButton>
-                <HyperlinkButton x:Name="UpdateReleaseLink"
-                                 Content="{x:Bind helpers:StringResources.UpdateViewRelease}"
-                                 NavigateUri="https://github.com/guijianchou/OpenClaw_Manager/releases" />
-            </InfoBar.ActionButton>
-        </InfoBar>
-
-        <Grid Grid.Row="5">
+        <Grid Grid.Row="4">
             <Grid x:Name="WebViewHost" />
 
             <ProgressRing x:Name="LoadingRing"
@@ -381,7 +366,7 @@
         </Grid>
 
         <Grid x:Name="StatusBarSurface"
-              Grid.Row="6"
+              Grid.Row="5"
               Padding="12,6"
               Background="{ThemeResource LayerOnMicaBaseAltFillColorDefaultBrush}"
               BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"

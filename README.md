@@ -204,10 +204,10 @@ The Settings window is organized into five sections:
 | Section | Content |
 |---|---|
 | Language | Display language |
+| General | Window, tray, global hotkey, always-on-top, and multiple-instance behavior |
 | Environments | Add, edit, remove, and choose default hosted Control UI endpoints |
 | Sessions | Clear WebView2 session data for a specific environment |
 | Developer Tools | Diagnostics, logs, DevTools |
-| Advanced | Global hotkey, minimize-to-tray, close-to-tray, and multiple-instance behavior |
 
 ### Environment URL Rules
 

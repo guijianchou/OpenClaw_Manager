@@ -11,63 +11,17 @@ namespace OpenClaw.Helpers;
 public static class StringResources
 {
     private static ResourceLoader? _loader;
-    private static ResourceManager? _resourceManager;
-    private static string? _overrideLanguage;
 
     public static void Initialize()
     {
         _ = TryGetLoader();
     }
 
-    /// <summary>
-    /// Sets the language override used for resource resolution.
-    /// Call this before any resource access to ensure the correct language is loaded.
-    /// </summary>
-    public static void SetLanguage(string? language)
-    {
-        _overrideLanguage = string.IsNullOrEmpty(language) || language == "System"
-            ? null
-            : language;
-        InvalidateLoader();
-    }
-
-    /// <summary>
-    /// Invalidates the cached ResourceLoader so the next access picks up a new language override.
-    /// Must be called after changing <see cref="Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride"/>.
-    /// </summary>
-    public static void InvalidateLoader()
-    {
-        _loader = null;
-        _resourceManager = null;
-    }
-
     private static ResourceLoader? TryGetLoader()
     {
-        if (_loader is not null)
-        {
-            return _loader;
-        }
-
         try
         {
-            if (!string.IsNullOrEmpty(_overrideLanguage))
-            {
-                // For unpackaged apps, PrimaryLanguageOverride may not persist.
-                // Use ResourceManager with explicit language context as fallback.
-                _resourceManager ??= new ResourceManager();
-                var context = _resourceManager.CreateResourceContext();
-                context.QualifierValues["Language"] = _overrideLanguage;
-                var candidate = _resourceManager.MainResourceMap.TryGetValue("Resources/Close", context);
-                if (candidate is not null)
-                {
-                    // Language-qualified resolution works; use a loader for this language.
-                    _loader = new ResourceLoader();
-                    return _loader;
-                }
-            }
-
-            _loader = new ResourceLoader();
-            return _loader;
+            return _loader ??= new ResourceLoader();
         }
         catch
         {
@@ -82,18 +36,6 @@ public static class StringResources
     {
         try
         {
-            // Try language-qualified resolution first for unpackaged apps
-            if (!string.IsNullOrEmpty(_overrideLanguage) && _resourceManager is not null)
-            {
-                var context = _resourceManager.CreateResourceContext();
-                context.QualifierValues["Language"] = _overrideLanguage;
-                var candidate = _resourceManager.MainResourceMap.TryGetValue($"Resources/{key}", context);
-                if (candidate is not null)
-                {
-                    return candidate.ValueAsString;
-                }
-            }
-
             return TryGetLoader()?.GetString(key) ?? key;
         }
         catch
@@ -114,9 +56,6 @@ public static class StringResources
     public static string ThemeSystem => Get("ThemeSystem");
     public static string ThemeLight => Get("ThemeLight");
     public static string ThemeDark => Get("ThemeDark");
-    public static string UpdateAvailableTitle => Get("UpdateAvailableTitle");
-    public static string UpdateAvailableMessage => Get("UpdateAvailableMessage");
-    public static string UpdateViewRelease => Get("UpdateViewRelease");
 
     // --- Top Bar ---
     public static string Reload => Get("Reload");
@@ -162,6 +101,8 @@ public static class StringResources
     public static string SettingsCloseToTrayDescription => Get("SettingsCloseToTrayDescription");
     public static string SettingsAllowMultipleInstances => Get("SettingsAllowMultipleInstances");
     public static string SettingsAllowMultipleInstancesDescription => Get("SettingsAllowMultipleInstancesDescription");
+    public static string SettingsAlwaysOnTop => Get("SettingsAlwaysOnTop");
+    public static string SettingsAlwaysOnTopDescription => Get("SettingsAlwaysOnTopDescription");
     public static string SettingsEnableGlobalHotkey => Get("SettingsEnableGlobalHotkey");
     public static string SettingsEnableGlobalHotkeyDescription => Get("SettingsEnableGlobalHotkeyDescription");
     public static string SettingsGlobalHotkey => Get("SettingsGlobalHotkey");
@@ -223,10 +164,6 @@ public static class StringResources
     public static string AboutRepository => Get("AboutRepository");
     public static string AboutDevelopedBy => Get("AboutDevelopedBy");
     public static string AboutCopyright => Get("AboutCopyright");
-    public static string AboutCheckForUpdates => Get("AboutCheckForUpdates");
-    public static string AboutCheckingForUpdates => Get("AboutCheckingForUpdates");
-    public static string AboutUpdateCheckNoUpdate => Get("AboutUpdateCheckNoUpdate");
-    public static string AboutUpdateCheckFailed => Get("AboutUpdateCheckFailed");
 
     // --- Log Viewer ---
     public static string LogsTitle => Get("LogsTitle");

@@ -154,6 +154,9 @@
   <data name="SetAsDefault" xml:space="preserve">
     <value>Set as default</value>
   </data>
+  <data name="SettingsApply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
   <data name="AddEnvironment" xml:space="preserve">
     <value>Add Environment</value>
   </data>
@@ -173,7 +176,7 @@
     <value>Language</value>
   </data>
   <data name="SettingsNavShell" xml:space="preserve">
-    <value>Advanced</value>
+    <value>General</value>
   </data>
   <data name="SettingsNavEnvironments" xml:space="preserve">
     <value>Environments</value>
@@ -188,10 +191,10 @@
     <value>Choose your preferred display language.</value>
   </data>
   <data name="SettingsShellTitle" xml:space="preserve">
-    <value>Advanced</value>
+    <value>General</value>
   </data>
   <data name="SettingsShellDescription" xml:space="preserve">
-    <value>Control how the native window behaves when you minimize or close it.</value>
+    <value>Control app window, tray, and shortcut behavior.</value>
   </data>
   <data name="SettingsMinimizeToTray" xml:space="preserve">
     <value>Minimize to tray</value>
@@ -210,6 +213,12 @@
   </data>
   <data name="SettingsAllowMultipleInstancesDescription" xml:space="preserve">
     <value>Allow multiple instance of Openclaw for windows</value>
+  </data>
+  <data name="SettingsAlwaysOnTop" xml:space="preserve">
+    <value>Always on top</value>
+  </data>
+  <data name="SettingsAlwaysOnTopDescription" xml:space="preserve">
+    <value>Keep the main window above other applications.</value>
   </data>
   <data name="SettingsLanguageSystem" xml:space="preserve">
     <value>System Default</value>
@@ -252,9 +261,6 @@
   </data>
   <data name="SettingsControlUiUrlHint4" xml:space="preserve">
     <value>If OpenClaw asks for device pairing, approve the pending request on the gateway host with `openclaw devices list` and `openclaw devices approve --latest`, then reconnect this desktop client.</value>
-  </data>
-  <data name="SettingsApply" xml:space="preserve">
-    <value>Apply</value>
   </data>
   <data name="SettingsValidationError" xml:space="preserve">
     <value>Validation Error</value>
@@ -363,18 +369,6 @@
   </data>
   <data name="AboutCopyright" xml:space="preserve">
     <value>(C) 2026 Lanstack @openclaw. All rights reserved.</value>
-  </data>
-  <data name="AboutCheckForUpdates" xml:space="preserve">
-    <value>Check for Updates</value>
-  </data>
-  <data name="AboutCheckingForUpdates" xml:space="preserve">
-    <value>Checking for updates...</value>
-  </data>
-  <data name="AboutUpdateCheckNoUpdate" xml:space="preserve">
-    <value>You are using the latest version.</value>
-  </data>
-  <data name="AboutUpdateCheckFailed" xml:space="preserve">
-    <value>Could not check for updates. Please try again later.</value>
   </data>
   <data name="LogsTitle" xml:space="preserve">
     <value>Application Logs</value>
@@ -668,14 +662,5 @@
   </data>
   <data name="SettingsValidationGlobalHotkeyInvalid" xml:space="preserve">
     <value>Enter a valid hotkey such as Ctrl+Alt+Space, Shift+F12, or Win+Alt+O.</value>
-  </data>
-  <data name="UpdateAvailableTitle" xml:space="preserve">
-    <value>Update Available</value>
-  </data>
-  <data name="UpdateAvailableMessage" xml:space="preserve">
-    <value>A new version ({0}) is available.</value>
-  </data>
-  <data name="UpdateViewRelease" xml:space="preserve">
-    <value>View Release</value>
   </data>
 </root>
