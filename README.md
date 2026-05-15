@@ -38,6 +38,31 @@ It is best suited for users who:
 
 ---
 
+## Features
+
+| Feature | Description |
+|---|---|
+| WebView2 Shell | Hosts the remote OpenClaw UI inside a native window |
+| Environment Switching | Manage multiple hosted Control UI endpoints |
+| Connection Status | Status bar, error InfoBar, retry support |
+| Auto-Reconnect | Retries failed navigation automatically |
+| Heartbeat | Periodic Control UI and transport probe with configurable reconnect thresholds |
+| System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Reload, View Logs, Settings, and Exit actions |
+| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window, with Settings UI validation and reset |
+| Instance Control | Optional multiple-instance mode; off by default so app relaunches restore the existing tray-hidden window |
+| Session Isolation | Separate WebView2 profile data per configured environment |
+| Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
+| Always on Top | Pin button to keep the window above other applications, with native topmost fallback and distinct active/inactive colors |
+| Compact Mode | Reduced window showing only status bar for screen-corner placement |
+| Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
+| Theme | Top-bar segmented switcher for System, Light, and Dark |
+| Language | English, Simplified Chinese, System |
+| Diagnostics | Runtime, network, and session checks |
+| Log Viewer | View today's log and open the log folder |
+| DevTools | Open WebView2 developer tools |
+
+---
+
 ## Tech Stack
 
 | Component | Version |
@@ -48,6 +73,20 @@ It is best suited for users who:
 | MVVM | CommunityToolkit.Mvvm 8.x |
 | UI Language | English + Simplified Chinese |
 | Packaging | Unpackaged, self-contained |
+
+---
+
+## Architecture
+
+```text
+MainWindow
+|- MainViewModel
+|  |- ConfigurationService
+|  `- LoggingService
+`- WebViewService
+```
+
+Design principle: remote-first thin shell. The actual OpenClaw runtime lives on the VPS; this app is a native control surface for the hosted Control UI.
 
 ---
 
@@ -92,19 +131,6 @@ Claw_winui3/
 - `ViewModels/`: shell state, commands, settings editing
 - `Views/`: settings, about, and log viewer dialogs
 - `Strings/`: localized UI resources
-
----
-
-## Runtime Requirements
-
-The compiled application requires:
-
-| Dependency | Download |
-|---|---|
-| .NET 10 Desktop Runtime | [Download](https://dotnet.microsoft.com/download/dotnet/10.0) |
-| WebView2 Runtime | [Download](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
-
-Windows 11 usually already includes WebView2 Runtime. Windows 10 users may need to install it manually.
 
 ---
 
@@ -172,31 +198,6 @@ If the page loads but OpenClaw reports origin rejection, check the exact public 
 
 ---
 
-## Features
-
-| Feature | Description |
-|---|---|
-| WebView2 Shell | Hosts the remote OpenClaw UI inside a native window |
-| Environment Switching | Manage multiple hosted Control UI endpoints |
-| Connection Status | Status bar, error InfoBar, retry support |
-| Auto-Reconnect | Retries failed navigation automatically |
-| Heartbeat | Periodic Control UI and transport probe with configurable reconnect thresholds |
-| System Tray | Configurable minimize/close-to-tray behavior with Open OpenClaw, Reload, View Logs, Settings, and Exit actions |
-| Global Hotkey | Configurable system-wide hotkey (default Ctrl+Alt+Space) to show/hide the window, with Settings UI validation and reset |
-| Instance Control | Optional multiple-instance mode; off by default so app relaunches restore the existing tray-hidden window |
-| Session Isolation | Separate WebView2 profile data per configured environment |
-| Latency Tooltip | Hover the latency badge for recent min/avg/p95/max round-trip stats and Cloudflare PoP |
-| Always on Top | Pin button to keep the window above other applications, with native topmost fallback and distinct active/inactive colors |
-| Compact Mode | Reduced window showing only status bar for screen-corner placement |
-| Diagnostic Export | One-click export of redacted settings, logs, and runtime info as a zip bundle |
-| Theme | Top-bar segmented switcher for System, Light, and Dark |
-| Language | English, Simplified Chinese, System |
-| Diagnostics | Runtime, network, and session checks |
-| Log Viewer | View today's log and open the log folder |
-| DevTools | Open WebView2 developer tools |
-
----
-
 ## Settings
 
 The Settings window is organized into five sections:
@@ -229,17 +230,16 @@ All local data is stored under `%LOCALAPPDATA%\OpenClaw\`.
 
 ---
 
-## Architecture
+## Runtime Requirements
 
-```text
-MainWindow
-|- MainViewModel
-|  |- ConfigurationService
-|  `- LoggingService
-`- WebViewService
-```
+The compiled application requires:
 
-Design principle: remote-first thin shell. The actual OpenClaw runtime lives on the VPS; this app is a native control surface for the hosted Control UI.
+| Dependency | Download |
+|---|---|
+| .NET 10 Desktop Runtime | [Download](https://dotnet.microsoft.com/download/dotnet/10.0) |
+| WebView2 Runtime | [Download](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
+
+Windows 11 usually already includes WebView2 Runtime. Windows 10 users may need to install it manually.
 
 ---
 

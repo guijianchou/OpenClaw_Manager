@@ -38,6 +38,31 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 
 ---
 
+## 功能
+
+| 功能 | 说明 |
+|---|---|
+| WebView2 Shell | 在原生窗口内托管远程 OpenClaw UI |
+| Environment Switching | 管理多个托管 Control UI 端点 |
+| Connection Status | 状态栏、错误 InfoBar 和重试支持 |
+| Auto-Reconnect | 导航失败后自动重试 |
+| Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
+| System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
+| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口，并支持设置界面校验和重置 |
+| Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
+| Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
+| Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
+| Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
+| Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
+| Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
+| Theme | 顶部栏 System、Light、Dark 分段切换 |
+| Language | English、Simplified Chinese、System |
+| Diagnostics | 运行时、网络和会话检查 |
+| Log Viewer | 查看当天日志并打开日志目录 |
+| DevTools | 打开 WebView2 developer tools |
+
+---
+
 ## 技术栈
 
 | 组件 | 版本 |
@@ -48,6 +73,20 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 | MVVM | CommunityToolkit.Mvvm 8.x |
 | UI 语言 | 英文 + 简体中文 |
 | 打包方式 | Unpackaged, self-contained |
+
+---
+
+## 架构
+
+```text
+MainWindow
+|- MainViewModel
+|  |- ConfigurationService
+|  `- LoggingService
+`- WebViewService
+```
+
+设计原则：remote-first thin shell。真正的 OpenClaw runtime 位于 VPS 上；本应用是托管 Control UI 的原生控制面。
 
 ---
 
@@ -92,19 +131,6 @@ Claw_winui3/
 - `ViewModels/`：外壳状态、命令和设置编辑
 - `Views/`：设置、关于和日志查看对话框
 - `Strings/`：本地化 UI 资源
-
----
-
-## 运行时要求
-
-编译后的应用需要：
-
-| 依赖 | 下载 |
-|---|---|
-| .NET 10 Desktop Runtime | [Download](https://dotnet.microsoft.com/download/dotnet/10.0) |
-| WebView2 Runtime | [Download](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
-
-Windows 11 通常已经内置 WebView2 Runtime。Windows 10 用户可能需要手动安装。
 
 ---
 
@@ -172,31 +198,6 @@ dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
 
 ---
 
-## 功能
-
-| 功能 | 说明 |
-|---|---|
-| WebView2 Shell | 在原生窗口内托管远程 OpenClaw UI |
-| Environment Switching | 管理多个托管 Control UI 端点 |
-| Connection Status | 状态栏、错误 InfoBar 和重试支持 |
-| Auto-Reconnect | 导航失败后自动重试 |
-| Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
-| System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
-| Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口，并支持设置界面校验和重置 |
-| Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
-| Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
-| Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
-| Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
-| Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
-| Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
-| Theme | 顶部栏 System、Light、Dark 分段切换 |
-| Language | English、Simplified Chinese、System |
-| Diagnostics | 运行时、网络和会话检查 |
-| Log Viewer | 查看当天日志并打开日志目录 |
-| DevTools | 打开 WebView2 developer tools |
-
----
-
 ## 设置
 
 Settings 窗口包含五个部分：
@@ -229,17 +230,16 @@ Settings 窗口包含五个部分：
 
 ---
 
-## 架构
+## 运行时要求
 
-```text
-MainWindow
-|- MainViewModel
-|  |- ConfigurationService
-|  `- LoggingService
-`- WebViewService
-```
+编译后的应用需要：
 
-设计原则：remote-first thin shell。真正的 OpenClaw runtime 位于 VPS 上；本应用是托管 Control UI 的原生控制面。
+| 依赖 | 下载 |
+|---|---|
+| .NET 10 Desktop Runtime | [Download](https://dotnet.microsoft.com/download/dotnet/10.0) |
+| WebView2 Runtime | [Download](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
+
+Windows 11 通常已经内置 WebView2 Runtime。Windows 10 用户可能需要手动安装。
 
 ---
 
