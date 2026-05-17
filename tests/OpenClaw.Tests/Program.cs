@@ -41,6 +41,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
+    ("Top status pill leaves room for long model names", Tests.TopStatusPillLeavesRoomForLongModelNames),
     ("Settings window is prewarmed after startup", Tests.SettingsWindowIsPrewarmedAfterStartup),
     ("Settings language selection syncs after load", Tests.SettingsLanguageSelectionSyncsAfterLoad),
     ("Settings language options are code populated", Tests.SettingsLanguageOptionsAreCodePopulated),
@@ -56,6 +57,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hosted UI bridge reads current model from OpenClaw model select", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect),
     ("Hosted UI bridge reads current model from OpenClaw app state", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawAppState),
     ("Hosted UI bridge ignores sidebar-only mutations during status polling", Tests.HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling),
+    ("Hosted UI bridge ignores settings and cron mutation storms", Tests.HostedUiBridgeIgnoresSettingsAndCronMutationStorms),
     ("Main view model preserves known model on empty snapshots", Tests.MainViewModelPreservesKnownModelOnEmptySnapshots),
     ("HotkeyBinding parses standard modifier+key string", Tests.HotkeyBindingParsesStandardModifierKeyString),
     ("HotkeyBinding round-trips through ToString", Tests.HotkeyBindingRoundTripsThroughToString),
@@ -982,6 +984,24 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
+    public static Task TopStatusPillLeavesRoomForLongModelNames()
+    {
+        var xamlPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.xaml");
+        var xaml = File.ReadAllText(xamlPath);
+
+        Assert.Contains("MaxWidth=\"780\"", xaml, "Top status pill should be wide enough for provider/model labels.");
+        Assert.Contains("MinWidth=\"440\"", xaml, "Top status pill should not collapse the model column before auth/status indicators.");
+        Assert.Contains("x:Name=\"ModelStatusSegment\"", xaml, "Model status segment should be named so layout regressions are easy to test.");
+        Assert.Contains("MinWidth=\"190\"", xaml, "Model status segment should reserve room for current OpenClaw provider/model names.");
+        Assert.Contains("x:Name=\"AccessStatusSegment\"", xaml, "Auth/access segment should be explicit in the status pill layout.");
+        Assert.Contains("Margin=\"18,0,0,0\"", xaml, "Auth/access segment should leave a visible gap after long model labels.");
+        return Task.CompletedTask;
+    }
+
     public static Task SettingsWindowIsPrewarmedAfterStartup()
     {
         var commandsPath = Path.Combine(
@@ -1379,6 +1399,27 @@ internal static class Tests
         Assert.Contains("if (mutations.length > 0 && mutations.every(isSidebarOnlyMutation))", source, "Sidebar-only mutation storms should be classified before scheduling status work.");
         Assert.Contains("return;\n    }\n\n    schedule();", source, "Sidebar-only mutations should not schedule any status inspection.");
         Assert.DoesNotContain("scheduleSlow", source, "Sidebar-only changes should be ignored, not converted into periodic expensive DOM scans.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeIgnoresSettingsAndCronMutationStorms()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("readOpenClawAppStateStatus", source, "Bridge should use OpenClaw Lit app state as the connected-page status source before scanning DOM.");
+        Assert.Contains("needsDomSignals", source, "Connected OpenClaw pages should not scan rendered settings/cron text for every status probe.");
+        Assert.Contains("settings-workspace__body", source, "Settings category bodies such as Communications and Automation should be excluded from status mutation probes.");
+        Assert.Contains("config-content", source, "Config form renders should be excluded from status mutation probes.");
+        Assert.Contains("cron-workspace", source, "Cron/automation job tables and run logs should be excluded from status mutation probes.");
+        Assert.Contains("cron-summary-strip", source, "Cron summary rerenders should not drive high-frequency native status probes.");
+        Assert.DoesNotContain("'class']", source, "Bridge should not subscribe to high-volume class attribute mutations from Lit rerenders.");
+        Assert.Contains("document.addEventListener('change'", source, "Form and model select changes should use explicit low-cost events instead of observing all class changes.");
         return Task.CompletedTask;
     }
 

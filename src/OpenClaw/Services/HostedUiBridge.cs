@@ -132,7 +132,7 @@ public sealed class HostedUiBridge
   };
 
   const compactText = (value) => (value || '').replace(/\s+/g, ' ').trim();
-  const STATUS_PROBE_EXCLUDED_SELECTOR = '.chat-sidebar, .sidebar-panel, .sidebar-content, .chat-tool-card__preview-frame';
+  const STATUS_PROBE_EXCLUDED_SELECTOR = '.chat-sidebar, .sidebar-panel, .sidebar-content, .chat-tool-card__preview-frame, .settings-workspace__body, .config-content, .config-form, .config-section-card, .cron-summary-strip, .cron-workspace';
   const isStatusProbeExcludedElement = (el) => Boolean(el?.closest?.(STATUS_PROBE_EXCLUDED_SELECTOR));
 
   const collectSignalText = () => {
@@ -266,6 +266,38 @@ public sealed class HostedUiBridge
     return activeModel || defaultsModel;
   };
 
+  const readOpenClawAppStateStatus = () => {
+    const app = document.querySelector('openclaw-app');
+    if (!app) return null;
+
+    const tab = compactText(app.tab || '');
+    const lastError = compactText(app.lastError || app.lastErrorCode || '');
+    const isBusy = Boolean(
+      app.chatLoading ||
+      app.chatSending ||
+      app.chatRunId ||
+      app.chatStream != null ||
+      app.chatManualRefreshInFlight ||
+      app.configLoading ||
+      app.configSaving ||
+      app.configApplying ||
+      app.updateRunning ||
+      app.channelsLoading ||
+      app.whatsappBusy ||
+      app.cronLoading ||
+      app.cronBusy ||
+      app.jobsLoadingMore ||
+      app.runsLoadingMore);
+
+    return {
+      connected: app.connected === true,
+      tab,
+      lastError,
+      shellDetected: app.connected === true || Boolean(tab),
+      isBusy
+    };
+  };
+
   const readOpenClawModelSelect = () => {
     const select = document.querySelector('select[data-chat-model-select="true"], select[data-chat-model-select]');
     if (!(select instanceof HTMLSelectElement) || !isVisible(select)) return '';
@@ -367,7 +399,9 @@ public sealed class HostedUiBridge
   const inspectControlUi = () => {
     const url = window.location ? window.location.href : '';
     const lowerUrl = url.toLowerCase();
-    const text = collectSignalText();
+    const appState = readOpenClawAppStateStatus();
+    const needsDomSignals = !appState || !appState.connected || Boolean(appState.lastError);
+    const text = needsDomSignals ? collectSignalText() : '';
     const activeElement = document.activeElement;
     const inputFocused = isEditableElement(activeElement) && isVisible(activeElement);
 
@@ -434,20 +468,21 @@ public sealed class HostedUiBridge
       'use https', 'tailscale serve'
     ]);
 
-    const shellDetected =
-      hasVisibleElement('textarea, input:not([type]), input[type="text"], [contenteditable="true"], [role="textbox"]') ||
-      hasVisibleElement('button, [role="button"], nav, aside, [role="navigation"]', (el) => {
-        const label = labelOf(el).toLowerCase();
-        return /stop|abort|dashboard|settings|sessions|workers|models|new chat|history/.test(label);
-      });
+    const shellDetected = appState?.shellDetected ||
+      (needsDomSignals && (
+        hasVisibleElement('textarea, input:not([type]), input[type="text"], [contenteditable="true"], [role="textbox"]') ||
+        hasVisibleElement('button, [role="button"], nav, aside, [role="navigation"]', (el) => {
+          const label = labelOf(el).toLowerCase();
+          return /stop|abort|dashboard|settings|sessions|workers|models|new chat|history/.test(label);
+        })));
 
-    const busyByButton = hasVisibleElement('button, [role="button"], [aria-label], [title]', (el) => {
+    const busyByButton = needsDomSignals && hasVisibleElement('button, [role="button"], [aria-label], [title]', (el) => {
       const label = labelOf(el).toLowerCase();
       return /\b(stop|abort|cancel)\b/.test(label);
     });
-    const busyBySignals = hasVisibleElement(
+    const busyBySignals = needsDomSignals && hasVisibleElement(
       '[aria-busy="true"], [role="progressbar"], [data-busy="true"], [data-running="true"], [data-state="running"], [data-state="streaming"], [data-status="running"], [data-status="streaming"]');
-    const isBusy = detectBusyFromApi() || busyByButton || busyBySignals;
+    const isBusy = Boolean(appState?.isBusy) || detectBusyFromApi() || busyByButton || busyBySignals;
     const workState = isBusy ? 'busy' : shellDetected ? 'idle' : 'unknown';
 
     let phase = 'page_loaded';
@@ -734,6 +769,12 @@ public sealed class HostedUiBridge
     return isStatusProbeExcludedElement(target);
   };
 
+  const scheduleFromInteraction = (event) => {
+    const target = asElement(event.target);
+    if (isStatusProbeExcludedElement(target)) return;
+    schedule();
+  };
+
   // Observe DOM changes
   const observer = new MutationObserver((mutations) => {
     if (mutations.length > 0 && mutations.every(isSidebarOnlyMutation)) {
@@ -746,7 +787,7 @@ public sealed class HostedUiBridge
     observer.observe(document.documentElement, {
       childList: true, subtree: true,
       attributes: true,
-      attributeFilter: ['aria-busy', 'data-busy', 'data-running', 'data-state', 'data-status', 'aria-label', 'title', 'class']
+      attributeFilter: ['aria-busy', 'data-busy', 'data-running', 'data-state', 'data-status', 'aria-label', 'title']
     });
   }
 
@@ -767,6 +808,7 @@ public sealed class HostedUiBridge
   window.addEventListener('popstate', schedule);
   window.addEventListener('load', schedule);
   document.addEventListener('readystatechange', schedule);
+  document.addEventListener('change', scheduleFromInteraction, true);
 
   let pollInterval = 8000;
   let pollTimer = 0;

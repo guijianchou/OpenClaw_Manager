@@ -94,14 +94,14 @@
             <Border Grid.Column="1"
                     Margin="16,0,12,0"
                     Padding="12,5"
-                    MinWidth="320"
-                    MaxWidth="620"
+                    MinWidth="440"
+                    MaxWidth="780"
                     HorizontalAlignment="Stretch"
                     Background="{ThemeResource ControlAltFillColorSecondaryBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="16">
-                <Grid ColumnSpacing="8"
+                <Grid ColumnSpacing="10"
                       VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -144,9 +144,11 @@
                         </ItemsRepeater>
                     </Grid>
 
-                    <Grid Grid.Column="2"
+                    <Grid x:Name="ModelStatusSegment"
+                          Grid.Column="2"
                           Margin="6,0,0,0"
                           ColumnSpacing="8"
+                          MinWidth="190"
                           MinHeight="24"
                           VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
@@ -172,7 +174,9 @@
                                    Foreground="{StaticResource SuccessBrush}" />
                     </Grid>
 
-                    <Grid Grid.Column="3"
+                    <Grid x:Name="AccessStatusSegment"
+                          Grid.Column="3"
+                          Margin="18,0,0,0"
                           MinWidth="76"
                           VerticalAlignment="Center">
                         <TextBlock Text="{x:Bind ViewModel.AccessSummaryText, Mode=OneWay}"
