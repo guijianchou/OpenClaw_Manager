@@ -36,7 +36,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings switch rows use compact spacing", Tests.SettingsSwitchRowsUseCompactSpacing),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places General after Language", Tests.SettingsNavigationPlacesGeneralAfterLanguage),
-    ("Version metadata is 3.3.0", Tests.VersionMetadataIs330),
+    ("Version metadata is 3.3.1", Tests.VersionMetadataIs331),
     ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
@@ -53,6 +53,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tray menu strings default fallback uses English", Tests.TrayMenuStringsDefaultFallbackUsesEnglish),
     ("Tray menu exposes reload and view logs commands", Tests.TrayMenuExposesReloadAndViewLogsCommands),
     ("Tray menu status header reflects work status", Tests.TrayMenuStatusHeaderReflectsWorkStatus),
+    ("Hosted UI bridge reads current model from OpenClaw model select", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect),
+    ("Hosted UI bridge throttles sidebar-only mutations during status polling", Tests.HostedUiBridgeThrottlesSidebarOnlyMutationsDuringStatusPolling),
     ("HotkeyBinding parses standard modifier+key string", Tests.HotkeyBindingParsesStandardModifierKeyString),
     ("HotkeyBinding round-trips through ToString", Tests.HotkeyBindingRoundTripsThroughToString),
     ("HotkeyBinding parse returns null for empty or invalid input", Tests.HotkeyBindingParseReturnsNullForInvalidInput),
@@ -863,7 +865,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs330()
+    public static Task VersionMetadataIs331()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -892,11 +894,11 @@ internal static class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.3.0</Version>", project, "Project package version should be 3.3.0.");
-        Assert.Contains("<AssemblyVersion>3.3.0.0</AssemblyVersion>", project, "Assembly version should be 3.3.0.0.");
-        Assert.Contains("<FileVersion>3.3.0.0</FileVersion>", project, "File version should be 3.3.0.0.");
-        Assert.Contains("Version=\"3.3.0.0\"", packageManifest, "Package manifest version should be 3.3.0.0.");
-        Assert.Contains("version=\"3.3.0.0\"", appManifest, "Application manifest assembly identity should be 3.3.0.0.");
+        Assert.Contains("<Version>3.3.1</Version>", project, "Project package version should be 3.3.1.");
+        Assert.Contains("<AssemblyVersion>3.3.1.0</AssemblyVersion>", project, "Assembly version should be 3.3.1.0.");
+        Assert.Contains("<FileVersion>3.3.1.0</FileVersion>", project, "File version should be 3.3.1.0.");
+        Assert.Contains("Version=\"3.3.1.0\"", packageManifest, "Package manifest version should be 3.3.1.0.");
+        Assert.Contains("version=\"3.3.1.0\"", appManifest, "Application manifest assembly identity should be 3.3.1.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
         return Task.CompletedTask;
     }
@@ -1324,6 +1326,38 @@ internal static class Tests
         Assert.Contains("private string _statusText", source, "TrayIconService should track the current status text.");
         Assert.Contains("public void UpdateStatus(string statusText)", source, "TrayIconService should expose a status update method.");
         Assert.Contains("$\"Status: {_statusText}\"", source, "TrayIconService should render the current status in the context menu header.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("data-chat-model-select", source, "Bridge should read OpenClaw Web UI's explicit model select before generic heuristics.");
+        Assert.Contains("selectedModelOptionValue", source, "Bridge should consider the selected option value when the visible label is localized or default-only.");
+        Assert.Contains("selectedModelTitle", source, "Bridge should consider the select title that OpenClaw uses for the displayed model label.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeThrottlesSidebarOnlyMutationsDuringStatusPolling()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("isSidebarOnlyMutation", source, "Bridge should classify right-sidebar content changes separately from status-relevant UI changes.");
+        Assert.Contains(".chat-sidebar", source, "Bridge should recognize OpenClaw Web UI's right sidebar container.");
+        Assert.Contains("scheduleSlow", source, "Sidebar-only changes should use a slow status probe instead of high-frequency full-page inspection.");
         return Task.CompletedTask;
     }
 

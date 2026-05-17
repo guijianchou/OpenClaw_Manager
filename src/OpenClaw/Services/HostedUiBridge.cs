@@ -176,6 +176,20 @@ public sealed class HostedUiBridge
       .trim();
 
     if (!normalized) return '';
+
+    const defaultWrappedModel = normalized.match(/^(?:default|selected|current)(?:\s+model)?\s*\(([^)]+)\)$/i);
+    if (defaultWrappedModel) {
+      return sanitizeModelLabel(defaultWrappedModel[1]);
+    }
+
+    const prefixedModel = normalized
+      .replace(/^(?:default|selected|current)(?:\s+model)?\s*[:\s-]+/i, '')
+      .replace(/^\(([^)]+)\)$/, '$1')
+      .trim();
+    if (prefixedModel && prefixedModel !== normalized) {
+      return sanitizeModelLabel(prefixedModel);
+    }
+
     if (normalized.length <= 32 && modelPattern.test(normalized)) return normalized;
 
     const segment = normalized
@@ -188,7 +202,33 @@ public sealed class HostedUiBridge
     return match ? match[0] : '';
   };
 
+  const readOpenClawModelSelect = () => {
+    const select = document.querySelector('select[data-chat-model-select="true"], select[data-chat-model-select]');
+    if (!(select instanceof HTMLSelectElement) || !isVisible(select)) return '';
+
+    const selectedOption = select.selectedOptions?.[0] || null;
+    const selectedModelOptionValue = compactText(selectedOption?.value || '');
+    const selectedModelValue = compactText(select.value || '');
+    const selectedModelTitle = compactText(select.getAttribute('title') || '');
+    const selectedModelText = compactText(selectedOption?.textContent || '');
+
+    for (const value of [
+      selectedModelOptionValue,
+      selectedModelValue,
+      selectedModelTitle,
+      selectedModelText
+    ]) {
+      const label = sanitizeModelLabel(value);
+      if (label) return label;
+    }
+
+    return '';
+  };
+
   const readCurrentModel = () => {
+    const openClawModel = readOpenClawModelSelect();
+    if (openClawModel) return openClawModel;
+
     const candidates = [];
     const selectionBoostOf = (el) => {
       const selected = [
@@ -595,18 +635,51 @@ public sealed class HostedUiBridge
 
   // Schedule posts
   let scheduledPost = 0;
-  const schedule = () => {
-    if (scheduledPost) return;
+  let scheduledPostDelay = 0;
+  const scheduleAfter = (delay) => {
+    if (scheduledPost && delay >= scheduledPostDelay) return;
+    if (scheduledPost) {
+      window.clearTimeout(scheduledPost);
+    }
+
+    scheduledPostDelay = delay;
     scheduledPost = window.setTimeout(() => {
       scheduledPost = 0;
+      scheduledPostDelay = 0;
       const snapshot = inspectControlUi();
       postStatus(snapshot);
       checkSessionReady(snapshot);
-    }, document.visibilityState === 'visible' ? 180 : 1200);
+    }, delay);
+  };
+
+  const schedule = () => {
+    scheduleAfter(document.visibilityState === 'visible' ? 220 : 1200);
+  };
+
+  const scheduleSlow = () => {
+    scheduleAfter(document.visibilityState === 'visible' ? 3000 : 8000);
+  };
+
+  const asElement = (node) => {
+    if (!node) return null;
+    if (node.nodeType === Node.ELEMENT_NODE) return node;
+    return node.parentElement || null;
+  };
+
+  const isSidebarOnlyMutation = (mutation) => {
+    const target = asElement(mutation.target);
+    return Boolean(target?.closest?.('.chat-sidebar'));
   };
 
   // Observe DOM changes
-  const observer = new MutationObserver(schedule);
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.length > 0 && mutations.every(isSidebarOnlyMutation)) {
+      scheduleSlow();
+      return;
+    }
+
+    schedule();
+  });
   if (document.documentElement) {
     observer.observe(document.documentElement, {
       childList: true, subtree: true,

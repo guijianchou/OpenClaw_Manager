@@ -8,6 +8,12 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v3.3.1 (2026-05-17)
+
+- Fixed the status-bar MODEL field so it reads the current model from OpenClaw Web UI's explicit model selector.
+- Reduced WebView2 CPU spikes while long right-sidebar content loads by slowing sidebar-only DOM status probes.
+- Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.1`.
+
 ### v3.3.0 (2026-05-12)
 
 - Refined Settings with PowerToys-style settings rows, compact ToggleSwitch spacing, and localized always-on-top text.
@@ -156,6 +162,12 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v3.3.1 (2026-05-17)
+
+- 修复状态栏 MODEL 字段不显示当前模型的问题，现在会读取 OpenClaw Web UI 明确的模型选择器。
+- 降低右侧栏长内容加载时的 WebView2 CPU 飙升风险，对仅发生在 sidebar 内的 DOM 变化改用低频状态探测。
+- 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.1`。
 
 ### v3.3.0 (2026-05-12)
 

@@ -2,6 +2,8 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
+**Current version:** 3.3.1
+
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
 OpenClaw Manager is a thin desktop shell for the hosted OpenClaw Control UI. It is designed for remote Gateway deployments running on a VPS and exposed through Cloudflare Tunnel, reverse proxy, or another public HTTPS origin.
