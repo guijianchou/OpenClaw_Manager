@@ -132,6 +132,8 @@ public sealed class HostedUiBridge
   };
 
   const compactText = (value) => (value || '').replace(/\s+/g, ' ').trim();
+  const STATUS_PROBE_EXCLUDED_SELECTOR = '.chat-sidebar, .sidebar-panel, .sidebar-content, .chat-tool-card__preview-frame';
+  const isStatusProbeExcludedElement = (el) => Boolean(el?.closest?.(STATUS_PROBE_EXCLUDED_SELECTOR));
 
   const collectSignalText = () => {
     const selectors = [
@@ -147,7 +149,7 @@ public sealed class HostedUiBridge
 
     for (const selector of selectors) {
       for (const element of document.querySelectorAll(selector)) {
-        if (!isVisible(element)) continue;
+        if (isStatusProbeExcludedElement(element) || !isVisible(element)) continue;
         const text = compactText(textOf(element)).toLowerCase();
         if (!text) continue;
         const normalized = text.length > 240 ? `${text.slice(0, 240)}...` : text;
@@ -202,6 +204,68 @@ public sealed class HostedUiBridge
     return match ? match[0] : '';
   };
 
+  const cleanTrustedModelValue = (value) => compactText(value).slice(0, 96);
+
+  const resolveCatalogModelValue = (model, catalog) => {
+    const cleanModel = cleanTrustedModelValue(model);
+    if (!cleanModel || cleanModel.includes('/') || !Array.isArray(catalog)) return cleanModel;
+
+    const matches = catalog
+      .filter((entry) => compactText(entry?.id).toLowerCase() === cleanModel.toLowerCase())
+      .map((entry) => formatModelValue(entry.id, entry.provider, []))
+      .filter(Boolean);
+    const uniqueMatches = Array.from(new Set(matches.map((entry) => entry.toLowerCase())));
+    return uniqueMatches.length === 1 ? matches[0] : cleanModel;
+  };
+
+  const formatModelValue = (model, provider, catalog = []) => {
+    const cleanModel = cleanTrustedModelValue(model);
+    const cleanProvider = cleanTrustedModelValue(provider);
+    if (!cleanModel) return '';
+    if (!cleanProvider || cleanModel.includes('/')) return resolveCatalogModelValue(cleanModel, catalog);
+    const providerPrefix = `${cleanProvider.toLowerCase()}/`;
+    return cleanModel.toLowerCase().startsWith(providerPrefix)
+      ? cleanModel
+      : `${cleanProvider}/${cleanModel}`;
+  };
+
+  const readServerModelValue = (entry, catalog = []) => {
+    if (!entry || typeof entry !== 'object') return '';
+    return formatModelValue(entry.model, entry.modelProvider, catalog);
+  };
+
+  const readOverrideModelValue = (override, catalog = []) => {
+    if (!override) return '';
+    if (typeof override === 'string') return resolveCatalogModelValue(override, catalog);
+    if (typeof override !== 'object') return '';
+    return resolveCatalogModelValue(override.value, catalog);
+  };
+
+  const readOpenClawAppStateModel = () => {
+    const app = document.querySelector('openclaw-app');
+    if (!app) return '';
+
+    const sessionKey = compactText(app.sessionKey || app.settings?.sessionKey || '');
+    const sessionsResult = app.sessionsResult || null;
+    const chatModelCatalog = Array.isArray(app.chatModelCatalog) ? app.chatModelCatalog : [];
+    const defaultsModel = readServerModelValue(sessionsResult?.defaults, chatModelCatalog);
+    const overrides = app.chatModelOverrides && typeof app.chatModelOverrides === 'object'
+      ? app.chatModelOverrides
+      : {};
+
+    if (sessionKey && Object.prototype.hasOwnProperty.call(overrides, sessionKey)) {
+      const override = overrides[sessionKey];
+      if (override === null) return defaultsModel;
+      const overrideModel = readOverrideModelValue(override, chatModelCatalog);
+      if (overrideModel) return overrideModel;
+    }
+
+    const sessions = Array.isArray(sessionsResult?.sessions) ? sessionsResult.sessions : [];
+    const activeSession = sessions.find((row) => compactText(row?.key) === sessionKey);
+    const activeModel = readServerModelValue(activeSession, chatModelCatalog);
+    return activeModel || defaultsModel;
+  };
+
   const readOpenClawModelSelect = () => {
     const select = document.querySelector('select[data-chat-model-select="true"], select[data-chat-model-select]');
     if (!(select instanceof HTMLSelectElement) || !isVisible(select)) return '';
@@ -226,6 +290,9 @@ public sealed class HostedUiBridge
   };
 
   const readCurrentModel = () => {
+    const openClawStateModel = readOpenClawAppStateModel();
+    if (openClawStateModel) return openClawStateModel;
+
     const openClawModel = readOpenClawModelSelect();
     if (openClawModel) return openClawModel;
 
@@ -254,11 +321,11 @@ public sealed class HostedUiBridge
     };
 
     Array.from(document.querySelectorAll('[data-current-model], [data-selected-model], [data-model-name]'))
-      .filter((el) => isVisible(el))
+      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
       .forEach((el) => pushCandidate(textOf(el), 120, el));
 
     Array.from(document.querySelectorAll('select'))
-      .filter((el) => isVisible(el))
+      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
       .forEach((el) => {
         const selectedText = Array.from(el.selectedOptions || [])
           .map((option) => option.textContent || '')
@@ -270,7 +337,7 @@ public sealed class HostedUiBridge
       });
 
     Array.from(document.querySelectorAll('[role="combobox"], button[aria-haspopup="listbox"], button, [role="button"], input[type="text"], input:not([type])'))
-      .filter((el) => isVisible(el))
+      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
       .forEach((el) => {
         const rawValue = 'value' in el && typeof el.value === 'string' ? el.value : '';
         const combined = [labelOf(el), rawValue, el.getAttribute?.('placeholder')].filter(Boolean).join(' ').trim();
@@ -459,7 +526,7 @@ public sealed class HostedUiBridge
 
   const hasVisibleElement = (selector, predicate) => {
     return Array.from(document.querySelectorAll(selector))
-      .some((el) => isVisible(el) && (!predicate || predicate(el)));
+      .some((el) => !isStatusProbeExcludedElement(el) && isVisible(el) && (!predicate || predicate(el)));
   };
 
   const bridgeTargets = () => [
@@ -656,10 +723,6 @@ public sealed class HostedUiBridge
     scheduleAfter(document.visibilityState === 'visible' ? 220 : 1200);
   };
 
-  const scheduleSlow = () => {
-    scheduleAfter(document.visibilityState === 'visible' ? 3000 : 8000);
-  };
-
   const asElement = (node) => {
     if (!node) return null;
     if (node.nodeType === Node.ELEMENT_NODE) return node;
@@ -668,13 +731,12 @@ public sealed class HostedUiBridge
 
   const isSidebarOnlyMutation = (mutation) => {
     const target = asElement(mutation.target);
-    return Boolean(target?.closest?.('.chat-sidebar'));
+    return isStatusProbeExcludedElement(target);
   };
 
   // Observe DOM changes
   const observer = new MutationObserver((mutations) => {
     if (mutations.length > 0 && mutations.every(isSidebarOnlyMutation)) {
-      scheduleSlow();
       return;
     }
 

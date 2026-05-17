@@ -54,7 +54,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tray menu exposes reload and view logs commands", Tests.TrayMenuExposesReloadAndViewLogsCommands),
     ("Tray menu status header reflects work status", Tests.TrayMenuStatusHeaderReflectsWorkStatus),
     ("Hosted UI bridge reads current model from OpenClaw model select", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect),
-    ("Hosted UI bridge throttles sidebar-only mutations during status polling", Tests.HostedUiBridgeThrottlesSidebarOnlyMutationsDuringStatusPolling),
+    ("Hosted UI bridge reads current model from OpenClaw app state", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawAppState),
+    ("Hosted UI bridge ignores sidebar-only mutations during status polling", Tests.HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling),
+    ("Main view model preserves known model on empty snapshots", Tests.MainViewModelPreservesKnownModelOnEmptySnapshots),
     ("HotkeyBinding parses standard modifier+key string", Tests.HotkeyBindingParsesStandardModifierKeyString),
     ("HotkeyBinding round-trips through ToString", Tests.HotkeyBindingRoundTripsThroughToString),
     ("HotkeyBinding parse returns null for empty or invalid input", Tests.HotkeyBindingParseReturnsNullForInvalidInput),
@@ -1345,7 +1347,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task HostedUiBridgeThrottlesSidebarOnlyMutationsDuringStatusPolling()
+    public static Task HostedUiBridgeReadsCurrentModelFromOpenClawAppState()
     {
         var sourcePath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -1355,11 +1357,63 @@ internal static class Tests
             "HostedUiBridge.cs");
         var source = File.ReadAllText(sourcePath);
 
-        Assert.Contains("isSidebarOnlyMutation", source, "Bridge should classify right-sidebar content changes separately from status-relevant UI changes.");
-        Assert.Contains(".chat-sidebar", source, "Bridge should recognize OpenClaw Web UI's right sidebar container.");
-        Assert.Contains("scheduleSlow", source, "Sidebar-only changes should use a slow status probe instead of high-frequency full-page inspection.");
+        Assert.Contains("readOpenClawAppStateModel", source, "Bridge should read OpenClaw's app state before falling back to visible DOM controls.");
+        Assert.Contains("openclaw-app", source, "Bridge should locate the OpenClaw Lit app host.");
+        Assert.Contains("chatModelOverrides", source, "Bridge should consider the local model override cache used by OpenClaw Web UI.");
+        Assert.Contains("sessionsResult?.defaults", source, "Bridge should resolve the inherited default model when a session has no override.");
         return Task.CompletedTask;
     }
+
+    public static Task HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("isStatusProbeExcludedElement", source, "Bridge should exclude status-irrelevant content before scanning the DOM.");
+        Assert.Contains(".chat-sidebar, .sidebar-panel, .sidebar-content, .chat-tool-card__preview-frame", source, "Bridge should recognize OpenClaw Web UI's right sidebar and hosted canvas frame containers.");
+        Assert.Contains("if (mutations.length > 0 && mutations.every(isSidebarOnlyMutation))", source, "Sidebar-only mutation storms should be classified before scheduling status work.");
+        Assert.Contains("return;\n    }\n\n    schedule();", source, "Sidebar-only mutations should not schedule any status inspection.");
+        Assert.DoesNotContain("scheduleSlow", source, "Sidebar-only changes should be ignored, not converted into periodic expensive DOM scans.");
+        return Task.CompletedTask;
+    }
+
+    public static Task MainViewModelPreservesKnownModelOnEmptySnapshots()
+    {
+        var statusPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "ViewModels",
+            "MainViewModel.Status.cs");
+        var fieldsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "ViewModels",
+            "MainViewModel.Fields.cs");
+        var stateEffectsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "ShellSessionCoordinator.StateEffects.cs");
+
+        var statusSource = File.ReadAllText(statusPath);
+        var fieldsSource = File.ReadAllText(fieldsPath);
+        var stateEffectsSource = File.ReadAllText(stateEffectsPath);
+
+        Assert.DoesNotContain("ModelSummaryText = FormatModelSummary(snapshot.CurrentModel);", statusSource, "Empty snapshots should not directly clear the last known model.");
+        Assert.Contains("_lastKnownModelSummaryText", fieldsSource, "ViewModel should track the last non-empty model summary.");
+        Assert.Contains("ApplyModelSummary(snapshot)", statusSource, "Model update behavior should be centralized so empty snapshots preserve the last known model.");
+        Assert.Contains("currentModel = string.IsNullOrWhiteSpace(snapshot.CurrentModel)", stateEffectsSource, "Hosted UI state logs should expose whether model detection reached the native layer.");
+        return Task.CompletedTask;
+    }
+
 
     public static Task HotkeyBindingParsesStandardModifierKeyString()
     {

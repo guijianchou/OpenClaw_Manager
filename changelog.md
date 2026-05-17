@@ -11,7 +11,8 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ### v3.3.1 (2026-05-17)
 
 - Fixed the status-bar MODEL field so it reads the current model from OpenClaw Web UI's explicit model selector.
-- Reduced WebView2 CPU spikes while long right-sidebar content loads by slowing sidebar-only DOM status probes.
+- Hardened MODEL detection to read OpenClaw app state when DOM controls are not ready, and preserve the last non-empty model across transient empty snapshots.
+- Reduced WebView2 CPU spikes while long right-sidebar content loads by ignoring status-irrelevant sidebar DOM changes and hosted preview frames.
 - Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.1`.
 
 ### v3.3.0 (2026-05-12)
@@ -166,7 +167,8 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ### v3.3.1 (2026-05-17)
 
 - 修复状态栏 MODEL 字段不显示当前模型的问题，现在会读取 OpenClaw Web UI 明确的模型选择器。
-- 降低右侧栏长内容加载时的 WebView2 CPU 飙升风险，对仅发生在 sidebar 内的 DOM 变化改用低频状态探测。
+- 加固 MODEL 检测：DOM 控件尚未就绪时会读取 OpenClaw app state，并在瞬时空快照期间保留最近一次非空模型。
+- 降低右侧栏长内容加载时的 WebView2 CPU 飙升风险，忽略与状态栏无关的 sidebar DOM 变化和内嵌 preview frame。
 - 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.1`。
 
 ### v3.3.0 (2026-05-12)

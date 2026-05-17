@@ -14,6 +14,7 @@ public partial class MainViewModel
         HeartbeatSummary = StringResources.HeartbeatWait;
         HeartbeatSummaryBrush = WarningBrush;
         StatusIndicatorBrush = NeutralBrush;
+        _lastKnownModelSummaryText = DefaultModelSummary;
         ModelSummaryText = DefaultModelSummary;
         AccessSummaryText = DefaultAccessSummary;
         AccessSummaryBrush = WarningBrush;

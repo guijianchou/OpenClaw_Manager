@@ -42,6 +42,7 @@ public partial class MainViewModel
     private string _heartbeatSummary = DefaultHeartbeatSummary;
     private Brush _heartbeatSummaryBrush = NeutralBrush;
     private string _modelSummaryText = DefaultModelSummary;
+    private string _lastKnownModelSummaryText = DefaultModelSummary;
     private string _accessSummaryText = DefaultAccessSummary;
     private Brush _accessSummaryBrush = NeutralBrush;
     private string _latencySummaryText = DefaultLatencySummary;

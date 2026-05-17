@@ -71,7 +71,7 @@ public partial class MainViewModel
 
     private void ApplyControlUiSnapshot(ControlUiProbeSnapshot snapshot)
     {
-        ModelSummaryText = FormatModelSummary(snapshot.CurrentModel);
+        ApplyModelSummary(snapshot);
         (AccessSummaryText, AccessSummaryBrush) = FormatAccessSummary(snapshot);
 
         ApplyWorkStatus(snapshot);
@@ -79,6 +79,40 @@ public partial class MainViewModel
         StartHeartbeatIfReady(snapshot);
 
         UpdateStatusPresentation();
+    }
+
+    private void ApplyModelSummary(ControlUiProbeSnapshot snapshot)
+    {
+        var modelSummary = FormatModelSummary(snapshot.CurrentModel);
+        if (modelSummary != DefaultModelSummary)
+        {
+            _lastKnownModelSummaryText = modelSummary;
+            ModelSummaryText = modelSummary;
+            return;
+        }
+
+        if (ShouldClearModelSummary(snapshot))
+        {
+            _lastKnownModelSummaryText = DefaultModelSummary;
+            ModelSummaryText = DefaultModelSummary;
+            return;
+        }
+
+        if (_lastKnownModelSummaryText != DefaultModelSummary)
+        {
+            ModelSummaryText = _lastKnownModelSummaryText;
+        }
+    }
+
+    private static bool ShouldClearModelSummary(ControlUiProbeSnapshot snapshot)
+    {
+        return snapshot.Phase is ControlUiPhase.Loading
+            or ControlUiPhase.AuthRequired
+            or ControlUiPhase.PairingRequired
+            or ControlUiPhase.OriginRejected
+            or ControlUiPhase.GatewayError
+            or ControlUiPhase.Unavailable
+            or ControlUiPhase.Unknown;
     }
 
     private void ApplyRecoveryState(RecoveryState state)
