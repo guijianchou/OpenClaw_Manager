@@ -134,3 +134,33 @@ The WinUI `OverlappedPresenter.IsAlwaysOnTop` state could appear enabled in app 
 - Update both the `Button.Foreground` and the nested `FontIcon.Foreground`; the icon is the visible state indicator.
 - Persist only the user preference in settings. Reapply the native topmost state from that preference when the main window is initialized.
 - Cover the integration with regression tests that assert the native fallback path and the theme-aware Pin colors are present.
+
+## Hosted OpenClaw UI Status Bridge
+
+This note records the v3.3.1 follow-up for status-bar model display and WebView2 CPU spikes when heavy OpenClaw Control UI surfaces are open.
+
+### Symptoms
+
+The top status MODEL field could stay empty even though the hosted OpenClaw chat page had a selected model. After the model value was detected, the old top status pill still truncated long provider/model labels too aggressively before the AUTH indicator.
+
+Opening heavy hosted UI areas such as Communications and Automation/Cron also caused WebView2 CPU spikes. The right-sidebar fix helped sidebar content, but settings/config/Cron pages could still trigger repeated native status probes while Lit rerendered large DOM regions.
+
+### Root Cause
+
+MODEL was not just a XAML binding issue. During startup and session switches, the visible DOM controls can be absent or not yet ready while the OpenClaw Lit root already has the real session state. The bridge must read `openclaw-app` state first, including `sessionKey`, `chatModelOverrides`, `sessionsResult.defaults`, `sessionsResult.sessions`, and `chatModelCatalog`.
+
+The CPU issue came from treating most DOM mutations as status-relevant. Communications, settings/config, and Cron pages render many controls, `details` sections, status chips, markdown/JSON blocks, and run/job lists. Those mutations do not change the native shell status, but the bridge was still scheduling page-level inspection from them.
+
+### Implementation Rules
+
+- Prefer OpenClaw app state for connected-page status before scanning DOM text.
+- Read model state from the OpenClaw Lit root before falling back to visible selectors.
+- Preserve the last non-empty native model summary across transient connected snapshots.
+- Exclude status-irrelevant heavy regions from status mutation probes: sidebar, hosted preview frames, settings workspace body, config content/forms, and Cron workspace/summary.
+- Do not observe high-volume `class` attribute churn from Lit rerenders for native status updates.
+- Use explicit low-cost events, such as `change`, for user selection changes that can affect status.
+- Keep the status pill wide enough for common provider/model labels, but continue using ellipsis for extreme names or narrow windows.
+
+### Remaining Caveat
+
+The v3.3.1 behavior is a usable mitigation, not proof that every future OpenClaw Control UI page will remain cheap. If upstream class names or page structure changes, re-check the excluded selectors against the current OpenClaw `app-render`, `config`, `channels`, and `cron` views before tuning WebView2 or WinUI code.

@@ -26,6 +26,12 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
+## 当前 3.3.1 注意事项
+
+- 顶部 MODEL 指示器现在会读取 OpenClaw app state，并在瞬时空快照期间保留最近一次非空值。
+- 顶部状态 pill 已为 provider/model 标签预留更多空间，并拉开 MODEL 与 AUTH/Status 的间距；窗口较窄或模型名特别长时仍可能省略显示。
+- WebView2 bridge 现在会避开右侧栏内容、settings/config 主体和 Cron 重渲染区域的原生状态 DOM 扫描。这是对 Communications 与 Automation/Cron 页面 CPU 飙升的实用缓解方案；如果上游 Control UI 页面继续变重，仍需要继续跟进上游性能变化。
+
 ### 本项目是
 
 - WinUI 3 + WebView2 远程管理外壳

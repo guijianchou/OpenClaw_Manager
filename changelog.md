@@ -14,6 +14,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - Hardened MODEL detection to read OpenClaw app state when DOM controls are not ready, and preserve the last non-empty model across transient empty snapshots.
 - Reduced WebView2 CPU spikes while long right-sidebar content loads by ignoring status-irrelevant sidebar DOM changes and hosted preview frames.
 - Expanded the top status pill so long provider/model names retain more context before AUTH/Status indicators, and moved connected OpenClaw settings/cron pages onto an app-state status fast path to avoid DOM mutation storms.
+- Documented the current mitigation status after manual testing: MODEL display and WebView2 CPU spikes are improved enough for current use, while very long model names and especially heavy settings/Cron pages remain areas to monitor.
 - Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.1`.
 
 ### v3.3.0 (2026-05-12)
@@ -171,6 +172,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - 加固 MODEL 检测：DOM 控件尚未就绪时会读取 OpenClaw app state，并在瞬时空快照期间保留最近一次非空模型。
 - 降低右侧栏长内容加载时的 WebView2 CPU 飙升风险，忽略与状态栏无关的 sidebar DOM 变化和内嵌 preview frame。
 - 拉宽顶部状态 pill，让较长 provider/model 名称在 AUTH/Status 指示器前保留更多上下文；已连接的 OpenClaw settings/cron 页面改走 app-state 状态快路径，避免 DOM mutation storm。
+- 记录手动验证后的当前缓解状态：MODEL 显示和 WebView2 CPU 飙升已有可用级别改善，但超长模型名和特别重的 settings/Cron 页面仍需要继续观察。
 - 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.1`。
 
 ### v3.3.0 (2026-05-12)

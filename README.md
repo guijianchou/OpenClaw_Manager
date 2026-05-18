@@ -26,6 +26,12 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
+## Current 3.3.1 Notes
+
+- The top MODEL indicator now reads OpenClaw app state and keeps the last non-empty value during transient empty snapshots.
+- The top status pill reserves more room for provider/model labels before AUTH and Status, but very long model names may still ellipsize at narrow window widths.
+- The WebView2 bridge now avoids native status DOM scans for right-sidebar content, settings/config bodies, and Cron-heavy rerenders. This is a practical mitigation for CPU spikes in Communications and Automation/Cron pages, not a replacement for upstream Control UI performance work if those pages become heavier.
+
 ### This project is
 
 - A WinUI 3 + WebView2 remote management shell
