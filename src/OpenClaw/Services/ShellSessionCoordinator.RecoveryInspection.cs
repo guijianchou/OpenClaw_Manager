@@ -75,7 +75,7 @@ public sealed partial class ShellSessionCoordinator
             return true;
         }
 
-        if (!IsSessionAlive(snapshot))
+        if (!IsSessionAlive(snapshot) || snapshot.IsBusyStale)
         {
             return false;
         }
@@ -122,7 +122,7 @@ public sealed partial class ShellSessionCoordinator
 
     private bool TryHandleReloadDeferredForInput(ControlUiProbeSnapshot snapshot, string reason, string stage)
     {
-        if (!snapshot.InputFocused)
+        if (!snapshot.InputFocused || !snapshot.FocusedInputHasText)
         {
             return false;
         }

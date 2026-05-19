@@ -32,6 +32,11 @@ public sealed partial class ShellSessionCoordinator
 
     private void ApplyHostedUiRecoveryState(ControlUiProbeSnapshot snapshot)
     {
+        if (TryRecoverStaleBusySession(snapshot))
+        {
+            return;
+        }
+
         switch (snapshot.Phase)
         {
             case ControlUiPhase.Connected when _recoveryState is RecoveryState.Connecting or RecoveryState.Reconnecting or RecoveryState.Resyncing:
@@ -44,6 +49,32 @@ public sealed partial class ShellSessionCoordinator
                 MarkRecoveryAuthIssue(snapshot.DetailOrSummary);
                 break;
         }
+    }
+
+    private bool TryRecoverStaleBusySession(ControlUiProbeSnapshot snapshot)
+    {
+        if (!snapshot.IsBusyStale || _isInBackground)
+        {
+            return false;
+        }
+
+        _logger.Warning("stream.busy_stale.detected", new
+        {
+            snapshot.BusyStaleSeconds,
+            snapshot.WorkState,
+            softResyncAttempts = _softResyncAttempts,
+            activity = string.IsNullOrWhiteSpace(snapshot.ActivitySignature) ? null : snapshot.ActivitySignature
+        });
+
+        if (_softResyncAttempts >= _recoveryOptions.MaxSoftResyncAttempts)
+        {
+            _ = RequestHardRefreshAsync(
+                $"Hosted Control UI busy for {snapshot.BusyStaleSeconds}s without chat progress after {_softResyncAttempts} soft resync attempt(s).");
+            return true;
+        }
+
+        _ = RequestSoftResyncAsync($"Hosted Control UI busy for {snapshot.BusyStaleSeconds}s without chat progress.");
+        return true;
     }
 
     private void LogIgnoredGap(EventGapEventArgs args)

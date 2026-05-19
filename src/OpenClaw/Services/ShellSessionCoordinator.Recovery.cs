@@ -114,9 +114,13 @@ public sealed partial class ShellSessionCoordinator
             {
                 var snapshot = await webViewService.InspectControlUiStateAsync();
                 ThrowIfRecoveryCancelled(operation);
-                if (IsSessionAlive(snapshot))
+                if (IsSessionAlive(snapshot) && !snapshot.IsBusyStale)
                 {
                     _streamHealth = HealthStatus.Healthy;
+                }
+                else if (snapshot.IsBusyStale)
+                {
+                    _streamHealth = HealthStatus.Degraded;
                 }
             }
 

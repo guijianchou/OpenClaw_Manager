@@ -57,6 +57,14 @@ public sealed record ControlUiProbeSnapshot(
     public static ControlUiProbeSnapshot Unknown { get; } =
         new(ControlUiPhase.Unknown, string.Empty, string.Empty, string.Empty, false, false, false, string.Empty, string.Empty);
 
+    public bool FocusedInputHasText { get; init; }
+
+    public bool IsBusyStale { get; init; }
+
+    public int BusyStaleSeconds { get; init; }
+
+    public string ActivitySignature { get; init; } = string.Empty;
+
     public bool IsIssue => Phase is ControlUiPhase.AuthRequired
         or ControlUiPhase.PairingRequired
         or ControlUiPhase.OriginRejected

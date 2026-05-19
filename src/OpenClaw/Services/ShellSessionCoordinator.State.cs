@@ -29,6 +29,11 @@ public sealed partial class ShellSessionCoordinator
 
     private HealthStatus MapStreamHealth(ControlUiProbeSnapshot snapshot)
     {
+        if (snapshot.IsBusyStale)
+        {
+            return HealthStatus.Degraded;
+        }
+
         return snapshot.Phase switch
         {
             ControlUiPhase.Connected => HealthStatus.Healthy,

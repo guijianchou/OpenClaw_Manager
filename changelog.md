@@ -8,6 +8,14 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v3.3.2 (2026-05-19)
+
+- Added stale busy-stream detection for hosted chat sessions: the bridge now tracks chat activity signatures and polls busy connected pages more frequently.
+- Added stale-stream recovery escalation: OpenClaw Manager first soft-resyncs lightweight state and recent messages, then performs a hard refresh after the soft-resync budget is exhausted.
+- Narrowed the input-focus reload guard so an empty focused editor no longer blocks recovery refreshes, while unsent user text still defers automatic reload.
+- Expanded diagnostics with the latest hosted UI phase, busy state, stale duration, and focused-input text state.
+- Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.2`.
+
 ### v3.3.1 (2026-05-17)
 
 - Fixed the status-bar MODEL field so it reads the current model from OpenClaw Web UI's explicit model selector.
@@ -165,6 +173,14 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v3.3.2 (2026-05-19)
+
+- 增加托管聊天会话的 stale busy-stream 检测：bridge 会跟踪聊天活动签名，并更频繁轮询 busy 的已连接页面。
+- 增加 stale-stream 恢复升级链路：OpenClaw Manager 会先 soft-resync lightweight state 和 recent messages，soft-resync 预算耗尽后再执行 hard refresh。
+- 收窄输入焦点 reload 保护：空的聚焦编辑器不再阻止恢复刷新，但存在未发送文本时仍会延迟自动 reload。
+- 扩展诊断信息，加入最近一次 hosted UI phase、busy 状态、stale 持续时间和聚焦输入框文本状态。
+- 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.2`。
 
 ### v3.3.1 (2026-05-17)
 

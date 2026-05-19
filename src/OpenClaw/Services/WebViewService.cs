@@ -1308,9 +1308,27 @@ public class WebViewService
         var inputFocused = root.TryGetProperty("inputFocused", out var inputFocusedProperty) &&
             inputFocusedProperty.ValueKind is JsonValueKind.True or JsonValueKind.False &&
             inputFocusedProperty.GetBoolean();
+        var focusedInputHasText = root.TryGetProperty("focusedInputHasText", out var focusedInputHasTextProperty) &&
+            focusedInputHasTextProperty.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+            focusedInputHasTextProperty.GetBoolean();
+        var isBusyStale = root.TryGetProperty("isBusyStale", out var staleProperty) &&
+            staleProperty.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+            staleProperty.GetBoolean();
+        var busyStaleSeconds = root.TryGetProperty("busyStaleSeconds", out var staleSecondsProperty) &&
+            staleSecondsProperty.ValueKind == JsonValueKind.Number &&
+            staleSecondsProperty.TryGetInt32(out var parsedBusyStaleSeconds)
+                ? parsedBusyStaleSeconds
+                : 0;
         var workState = GetString(root, "workState");
         var currentModel = GetString(root, "currentModel");
-        return new ControlUiProbeSnapshot(phase, summary, detail, url, shellDetected, isBusy, inputFocused, workState, currentModel);
+        var activitySignature = GetString(root, "activitySignature");
+        return new ControlUiProbeSnapshot(phase, summary, detail, url, shellDetected, isBusy, inputFocused, workState, currentModel)
+        {
+            FocusedInputHasText = focusedInputHasText,
+            IsBusyStale = isBusyStale,
+            BusyStaleSeconds = busyStaleSeconds,
+            ActivitySignature = activitySignature,
+        };
     }
 
     private static string GetString(JsonElement root, string propertyName)

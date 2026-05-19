@@ -9,6 +9,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Reset cancels in-flight reconnect", Tests.ResetCancelsInFlightReconnectAsync),
     ("Reconnect falls back to reload when in-page recovery stalls", Tests.ReconnectFallsBackToReloadWhenInPageRecoveryDoesNotReviveSessionAsync),
     ("Input-focused reload defer does not record successful recovery", Tests.InputFocusedReloadDeferDoesNotRecordSuccessAsync),
+    ("Input-focused empty editor does not block hard refresh", Tests.InputFocusedEmptyEditorDoesNotBlockHardRefreshAsync),
+    ("Stale busy snapshot requests soft resync", Tests.StaleBusySnapshotRequestsSoftResyncAsync),
+    ("Stale busy snapshot escalates to hard refresh after soft resync budget", Tests.StaleBusySnapshotEscalatesToHardRefreshAfterSoftResyncBudgetAsync),
     ("Soft resync unsupported marks recovery degraded", Tests.SoftResyncUnsupportedMarksRecoveryDegradedAsync),
     ("Event gap requests soft resync while session is alive", Tests.EventGapRequestsSoftResyncAsync),
     ("Event gap escalates to hard refresh when attempts are exhausted", Tests.EventGapEscalatesToHardRefreshAsync),
@@ -36,7 +39,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings switch rows use compact spacing", Tests.SettingsSwitchRowsUseCompactSpacing),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places General after Language", Tests.SettingsNavigationPlacesGeneralAfterLanguage),
-    ("Version metadata is 3.3.1", Tests.VersionMetadataIs331),
+    ("Version metadata is 3.3.2", Tests.VersionMetadataIs332),
     ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
@@ -58,6 +61,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hosted UI bridge reads current model from OpenClaw app state", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawAppState),
     ("Hosted UI bridge ignores sidebar-only mutations during status polling", Tests.HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling),
     ("Hosted UI bridge ignores settings and cron mutation storms", Tests.HostedUiBridgeIgnoresSettingsAndCronMutationStorms),
+    ("Hosted UI bridge reports stale busy and input text state", Tests.HostedUiBridgeReportsStaleBusyAndInputTextState),
     ("Main view model preserves known model on empty snapshots", Tests.MainViewModelPreservesKnownModelOnEmptySnapshots),
     ("HotkeyBinding parses standard modifier+key string", Tests.HotkeyBindingParsesStandardModifierKeyString),
     ("HotkeyBinding round-trips through ToString", Tests.HotkeyBindingRoundTripsThroughToString),
@@ -67,6 +71,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings load without hotkey fields uses defaults", Tests.SettingsLoadWithoutHotkeyFieldsUsesDefaults),
     ("Settings Shell exposes global hotkey controls", Tests.SettingsShellExposesGlobalHotkeyControls),
     ("SettingsViewModel persists and validates global hotkey fields", Tests.SettingsViewModelPersistsAndValidatesGlobalHotkeyFields),
+    ("Diagnostic instrumentation includes hosted UI stream state", Tests.DiagnosticInstrumentationIncludesHostedUiStreamState),
     ("DiagnosticBundle redacts gateway URL host", Tests.DiagnosticBundleRedactsGatewayUrlHost),
     ("DiagnosticBundle redacts token-like values", Tests.DiagnosticBundleRedactsTokenLikeValues),
     ("DiagnosticBundle includes runtime info", Tests.DiagnosticBundleIncludesRuntimeInfo),
@@ -180,23 +185,129 @@ internal static class Tests
     {
         var webView = new FakeShellSessionWebView();
         webView.EnqueueSnapshot(new ControlUiProbeSnapshot(
+            ControlUiPhase.GatewayError,
+            "Gateway error",
+            "stream unavailable",
+            "https://gateway.example",
+            ShellDetected: true,
+            IsBusy: false,
+            InputFocused: true,
+            WorkState: "unknown",
+            CurrentModel: "gpt-test")
+        {
+            FocusedInputHasText = true,
+        });
+        var coordinator = CreateCoordinator(webView, new FakeShellSessionBridge());
+
+        await coordinator.RequestHardRefreshAsync("input-focused");
+
+        var telemetry = coordinator.GetTelemetrySnapshot();
+        Assert.Equal(RecoveryState.Degraded, telemetry.CurrentRecoveryState, "Focused input with unsent text should defer reload and mark recovery degraded.");
+        Assert.Null(telemetry.LastSuccessfulRecoveryAt, "Deferred reload should not be recorded as a successful recovery.");
+        Assert.Equal(0, webView.ReloadCount, "Deferred reload should not reload the page.");
+    }
+
+    public static async Task InputFocusedEmptyEditorDoesNotBlockHardRefreshAsync()
+    {
+        var webView = new FakeShellSessionWebView();
+        webView.EnqueueSnapshot(new ControlUiProbeSnapshot(
+            ControlUiPhase.GatewayError,
+            "Gateway error",
+            "stream unavailable",
+            "https://gateway.example",
+            ShellDetected: true,
+            IsBusy: false,
+            InputFocused: true,
+            WorkState: "unknown",
+            CurrentModel: "gpt-test")
+        {
+            FocusedInputHasText = false,
+        });
+        var coordinator = CreateCoordinator(webView, new FakeShellSessionBridge());
+
+        await coordinator.RequestHardRefreshAsync("input-focused-empty");
+
+        Assert.Equal(1, webView.ReloadCount, "Focused but empty chat input should not block recovery reload.");
+        Assert.Equal(RecoveryState.Connecting, coordinator.CurrentRecoveryState, "Hard refresh should leave the coordinator reconnecting.");
+    }
+
+    public static async Task StaleBusySnapshotRequestsSoftResyncAsync()
+    {
+        var webView = new FakeShellSessionWebView();
+        var bridge = new FakeShellSessionBridge
+        {
+            LightweightSyncResult = true,
+            RecentMessagesResult = true,
+        };
+        var coordinator = CreateCoordinator(webView, bridge);
+
+        webView.EnqueueSnapshot(new ControlUiProbeSnapshot(
             ControlUiPhase.Connected,
             "Connected",
             string.Empty,
             "https://gateway.example",
             ShellDetected: true,
             IsBusy: false,
-            InputFocused: true,
+            InputFocused: false,
             WorkState: "idle",
             CurrentModel: "gpt-test"));
-        var coordinator = CreateCoordinator(webView, new FakeShellSessionBridge());
+        webView.RaiseControlUiSnapshotUpdated(new ControlUiProbeSnapshot(
+            ControlUiPhase.Connected,
+            "Connected",
+            string.Empty,
+            "https://gateway.example",
+            ShellDetected: true,
+            IsBusy: true,
+            InputFocused: false,
+            WorkState: "busy",
+            CurrentModel: "gpt-test")
+        {
+            IsBusyStale = true,
+            BusyStaleSeconds = 35,
+            ActivitySignature = "run-123:assistant:42",
+        });
 
-        await coordinator.RequestHardRefreshAsync("input-focused");
+        await WaitUntilAsync(() => bridge.RequestLightweightSyncCalls == 1, TimeSpan.FromSeconds(2));
+        await WaitUntilAsync(() => coordinator.CurrentRecoveryState == RecoveryState.Ready, TimeSpan.FromSeconds(3));
 
-        var telemetry = coordinator.GetTelemetrySnapshot();
-        Assert.Equal(RecoveryState.Ready, telemetry.CurrentRecoveryState, "Focused input on a connected session should stay ready.");
-        Assert.Null(telemetry.LastSuccessfulRecoveryAt, "Deferred reload should not be recorded as a successful recovery.");
-        Assert.Equal(0, webView.ReloadCount, "Deferred reload should not reload the page.");
+        Assert.Equal(1, bridge.RequestRecentMessagesCalls, "Stale busy recovery should also fetch recent messages.");
+        Assert.Equal(0, webView.ReloadCount, "Stale busy recovery should attempt soft resync before reload.");
+        Assert.Equal(RecoveryState.Ready, coordinator.CurrentRecoveryState, "Successful stale busy soft resync should return the coordinator to ready.");
+    }
+
+    public static async Task StaleBusySnapshotEscalatesToHardRefreshAfterSoftResyncBudgetAsync()
+    {
+        var webView = new FakeShellSessionWebView();
+        var bridge = new FakeShellSessionBridge();
+        var coordinator = CreateCoordinator(webView, bridge, new RecoveryPolicyOptions
+        {
+            MaxSoftResyncAttempts = 0,
+            HardRefreshCooldownSeconds = 0,
+        });
+        var staleSnapshot = new ControlUiProbeSnapshot(
+            ControlUiPhase.Connected,
+            "Connected",
+            string.Empty,
+            "https://gateway.example",
+            ShellDetected: true,
+            IsBusy: true,
+            InputFocused: false,
+            WorkState: "busy",
+            CurrentModel: "gpt-test")
+        {
+            IsBusyStale = true,
+            BusyStaleSeconds = 45,
+            ActivitySignature = "run-456:assistant:42",
+        };
+
+        webView.EnqueueSnapshot(staleSnapshot);
+        webView.RaiseControlUiSnapshotUpdated(staleSnapshot);
+
+        await WaitUntilAsync(() => webView.ReloadCount == 1, TimeSpan.FromSeconds(2));
+        await WaitUntilAsync(() => coordinator.CurrentRecoveryState == RecoveryState.Connecting, TimeSpan.FromSeconds(3));
+
+        Assert.Equal(0, bridge.RequestLightweightSyncCalls, "Exhausted stale busy recovery should skip additional soft resync attempts.");
+        Assert.Equal(0, bridge.RequestRecentMessagesCalls, "Exhausted stale busy recovery should reload instead of repeatedly fetching recent messages.");
     }
 
     public static async Task SoftResyncUnsupportedMarksRecoveryDegradedAsync()
@@ -869,7 +980,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs331()
+    public static Task VersionMetadataIs332()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -898,11 +1009,11 @@ internal static class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.3.1</Version>", project, "Project package version should be 3.3.1.");
-        Assert.Contains("<AssemblyVersion>3.3.1.0</AssemblyVersion>", project, "Assembly version should be 3.3.1.0.");
-        Assert.Contains("<FileVersion>3.3.1.0</FileVersion>", project, "File version should be 3.3.1.0.");
-        Assert.Contains("Version=\"3.3.1.0\"", packageManifest, "Package manifest version should be 3.3.1.0.");
-        Assert.Contains("version=\"3.3.1.0\"", appManifest, "Application manifest assembly identity should be 3.3.1.0.");
+        Assert.Contains("<Version>3.3.2</Version>", project, "Project package version should be 3.3.2.");
+        Assert.Contains("<AssemblyVersion>3.3.2.0</AssemblyVersion>", project, "Assembly version should be 3.3.2.0.");
+        Assert.Contains("<FileVersion>3.3.2.0</FileVersion>", project, "File version should be 3.3.2.0.");
+        Assert.Contains("Version=\"3.3.2.0\"", packageManifest, "Package manifest version should be 3.3.2.0.");
+        Assert.Contains("version=\"3.3.2.0\"", appManifest, "Application manifest assembly identity should be 3.3.2.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
         return Task.CompletedTask;
     }
@@ -1423,6 +1534,23 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
+    public static Task HostedUiBridgeReportsStaleBusyAndInputTextState()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("focusedInputHasText", source, "Bridge should distinguish focused empty editors from unsent user text.");
+        Assert.Contains("activitySignature", source, "Bridge should emit a compact activity signature for stale stream detection.");
+        Assert.Contains("isBusyStale", source, "Bridge should flag busy chat sessions that stop making visible or state progress.");
+        Assert.Contains("snapshot.phase === 'connected' && snapshot.isBusy ? 4000 : 15000", source, "Busy connected pages should be polled faster than idle connected pages.");
+        return Task.CompletedTask;
+    }
+
     public static Task MainViewModelPreservesKnownModelOnEmptySnapshots()
     {
         var statusPath = Path.Combine(
@@ -1598,6 +1726,23 @@ internal static class Tests
         Assert.Contains("TryValidateHotkey", source, "Settings save should validate the hotkey before persisting.");
         Assert.Contains("HotkeyBinding.Parse(GlobalHotkey)", source, "Hotkey validation should use the shared parser.");
         Assert.Contains("binding.GetVirtualKeyCode() == 0", source, "Hotkey validation should reject keys that cannot be registered.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DiagnosticInstrumentationIncludesHostedUiStreamState()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "DiagnosticService.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("LatestControlUiSnapshot", source, "Diagnostic instrumentation should include the current hosted UI snapshot.");
+        Assert.Contains("IsBusyStale", source, "Diagnostic instrumentation should report stale busy state.");
+        Assert.Contains("BusyStaleSeconds", source, "Diagnostic instrumentation should report stale busy duration.");
+        Assert.Contains("FocusedInputHasText", source, "Diagnostic instrumentation should distinguish focused empty input from unsent user text.");
         return Task.CompletedTask;
     }
 
@@ -1953,15 +2098,16 @@ internal sealed class FakeShellSessionWebView : IShellSessionWebView
         remove { }
     }
 
-    public event Action<ControlUiProbeSnapshot>? ControlUiSnapshotUpdated
-    {
-        add { }
-        remove { }
-    }
+    public event Action<ControlUiProbeSnapshot>? ControlUiSnapshotUpdated;
 
     public void EnqueueSnapshot(ControlUiProbeSnapshot snapshot)
     {
         _snapshots.Enqueue(snapshot);
+    }
+
+    public void RaiseControlUiSnapshotUpdated(ControlUiProbeSnapshot snapshot)
+    {
+        ControlUiSnapshotUpdated?.Invoke(snapshot);
     }
 
     public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync()

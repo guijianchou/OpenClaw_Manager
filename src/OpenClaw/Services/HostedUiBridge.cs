@@ -266,6 +266,46 @@ public sealed class HostedUiBridge
     return activeModel || defaultsModel;
   };
 
+  const readMessageText = (message) => {
+    if (!message || typeof message !== 'object') return '';
+    const rawParts = Array.isArray(message.parts) ? message.parts : [];
+    const partText = rawParts
+      .map((part) => typeof part === 'string'
+        ? part
+        : compactText(part?.text || part?.content || part?.value || ''))
+      .join(' ');
+    return compactText(message.text || message.content || message.message || partText || '');
+  };
+
+  const readChatActivitySignature = (app) => {
+    if (!app) return '';
+    const sessionKey = compactText(app.sessionKey || app.settings?.sessionKey || '');
+    const runId = compactText(app.chatRunId || app.currentRunId || app.activeRunId || '');
+    const seq = compactText(app.eventSeq || app.lastEventSeq || app.chatEventSeq || app.gatewayEventSeq || '');
+    const stateVersion = compactText(app.stateVersion || app.lastStateVersion || app.chatStateVersion || app.gatewayStateVersion || '');
+    const messages = Array.isArray(app.chatMessages)
+      ? app.chatMessages
+      : Array.isArray(app.messages)
+        ? app.messages
+        : Array.isArray(app.sessionMessages)
+          ? app.sessionMessages
+          : [];
+    const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+    const lastMessageId = compactText(lastMessage?.id || lastMessage?.key || lastMessage?.uuid || '');
+    const lastText = readMessageText(lastMessage);
+    const lastTextTail = lastText.slice(Math.max(0, lastText.length - 96));
+    return [
+      sessionKey,
+      runId,
+      seq,
+      stateVersion,
+      String(messages.length),
+      lastMessageId,
+      String(lastText.length),
+      lastTextTail
+    ].filter(Boolean).join('|').slice(0, 512);
+  };
+
   const readOpenClawAppStateStatus = () => {
     const app = document.querySelector('openclaw-app');
     if (!app) return null;
@@ -294,7 +334,8 @@ public sealed class HostedUiBridge
       tab,
       lastError,
       shellDetected: app.connected === true || Boolean(tab),
-      isBusy
+      isBusy,
+      activitySignature: readChatActivitySignature(app)
     };
   };
 
@@ -396,6 +437,67 @@ public sealed class HostedUiBridge
       candidate && busyKeys.some((key) => typeof candidate[key] === 'boolean' && candidate[key]));
   };
 
+  const collectDomActivitySignature = () => {
+    const selectors = [
+      '[data-message-id]', '[data-run-id]', '[data-chat-message]',
+      '[class*="message"]', '[class*="response"]', '[class*="assistant"]',
+      '[role="log"]', '[aria-live]'
+    ];
+    const fragments = [];
+    const seen = new Set();
+
+    for (const selector of selectors) {
+      for (const element of document.querySelectorAll(selector)) {
+        if (isStatusProbeExcludedElement(element) || !isVisible(element)) continue;
+        const text = compactText(textOf(element));
+        const id = compactText(
+          element.getAttribute?.('data-message-id') ||
+          element.getAttribute?.('data-run-id') ||
+          element.id ||
+          '');
+        const tail = text.slice(Math.max(0, text.length - 96));
+        const fragment = [selector, id, String(text.length), tail].filter(Boolean).join(':');
+        if (!fragment || seen.has(fragment)) continue;
+        seen.add(fragment);
+        fragments.push(fragment);
+        if (fragments.length >= 4) break;
+      }
+      if (fragments.length >= 4) break;
+    }
+
+    return fragments.join('|').slice(0, 512);
+  };
+
+  const BUSY_STALE_THRESHOLD_MS = 30000;
+  let lastBusyActivitySignature = '';
+  let lastBusyActivityChangedAt = Date.now();
+
+  const applyBusyStaleness = (snapshot) => {
+    if (!snapshot.isBusy) {
+      lastBusyActivitySignature = '';
+      lastBusyActivityChangedAt = Date.now();
+      return {
+        ...snapshot,
+        isBusyStale: false,
+        busyStaleSeconds: 0
+      };
+    }
+
+    const now = Date.now();
+    const activitySignature = snapshot.activitySignature || `${snapshot.phase}:${snapshot.workState}`;
+    if (activitySignature !== lastBusyActivitySignature) {
+      lastBusyActivitySignature = activitySignature;
+      lastBusyActivityChangedAt = now;
+    }
+
+    const staleMs = now - lastBusyActivityChangedAt;
+    return {
+      ...snapshot,
+      isBusyStale: staleMs >= BUSY_STALE_THRESHOLD_MS,
+      busyStaleSeconds: Math.floor(staleMs / 1000)
+    };
+  };
+
   const inspectControlUi = () => {
     const url = window.location ? window.location.href : '';
     const lowerUrl = url.toLowerCase();
@@ -404,6 +506,10 @@ public sealed class HostedUiBridge
     const text = needsDomSignals ? collectSignalText() : '';
     const activeElement = document.activeElement;
     const inputFocused = isEditableElement(activeElement) && isVisible(activeElement);
+    const focusedInputHasText = inputFocused && compactText(
+      activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement
+        ? activeElement.value
+        : activeElement?.textContent || '').length > 0;
 
     const authMatch = matchAny(text, [
       'authentication required', 'authorization failed', 'unauthorized',
@@ -484,6 +590,10 @@ public sealed class HostedUiBridge
       '[aria-busy="true"], [role="progressbar"], [data-busy="true"], [data-running="true"], [data-state="running"], [data-state="streaming"], [data-status="running"], [data-status="streaming"]');
     const isBusy = Boolean(appState?.isBusy) || detectBusyFromApi() || busyByButton || busyBySignals;
     const workState = isBusy ? 'busy' : shellDetected ? 'idle' : 'unknown';
+    const activitySignature = [
+      appState?.activitySignature,
+      isBusy ? collectDomActivitySignature() : ''
+    ].filter(Boolean).join('|').slice(0, 512);
 
     let phase = 'page_loaded';
     let summary = STRINGS.bridgeGatewayUiLoaded;
@@ -553,10 +663,11 @@ public sealed class HostedUiBridge
       summary = STRINGS.bridgeConnectedSummary;
     }
 
-    return {
-      kind: KIND, phase, summary, detail, url, shellDetected, isBusy, inputFocused, workState,
+    return applyBusyStaleness({
+      kind: KIND, phase, summary, detail, url, shellDetected, isBusy, inputFocused, focusedInputHasText, workState,
+      activitySignature,
       currentModel: readCurrentModel()
-    };
+    });
   };
 
   const hasVisibleElement = (selector, predicate) => {
@@ -816,7 +927,10 @@ public sealed class HostedUiBridge
     const snapshot = inspectControlUi();
     postStatus(snapshot);
     checkSessionReady(snapshot);
-    pollInterval = snapshot.phase === 'connected' ? 15000 : 4000;
+    pollInterval = snapshot.phase === 'connected' && snapshot.isBusy ? 4000 : 15000;
+    if (snapshot.phase !== 'connected') {
+      pollInterval = 4000;
+    }
     pollTimer = window.setTimeout(tick, pollInterval);
   };
 

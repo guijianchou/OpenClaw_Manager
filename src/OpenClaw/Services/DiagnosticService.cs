@@ -209,11 +209,16 @@ public class DiagnosticService
 
     public static DiagnosticResult DescribeInstrumentation(WebViewService webViewService)
     {
+        var snapshot = webViewService.LatestControlUiSnapshot;
         var summary =
             $"Inspect req={webViewService.TotalControlUiInspectionRequests}, " +
             $"cache={webViewService.CachedControlUiInspectionRequests}, " +
             $"coalesced={webViewService.CoalescedControlUiInspectionRequests}, " +
-            $"hb reload={webViewService.HeartbeatRecoveryRequests}.";
+            $"hb reload={webViewService.HeartbeatRecoveryRequests}, " +
+            $"phase={snapshot.Phase}, " +
+            $"busy={snapshot.IsBusy}, " +
+            $"stale={snapshot.IsBusyStale}/{snapshot.BusyStaleSeconds}s, " +
+            $"inputText={snapshot.FocusedInputHasText}.";
 
         return DiagnosticResult.Pass(summary);
     }

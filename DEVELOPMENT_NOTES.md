@@ -164,3 +164,23 @@ The CPU issue came from treating most DOM mutations as status-relevant. Communic
 ### Remaining Caveat
 
 The v3.3.1 behavior is a usable mitigation, not proof that every future OpenClaw Control UI page will remain cheap. If upstream class names or page structure changes, re-check the excluded selectors against the current OpenClaw `app-render`, `config`, `channels`, and `cron` views before tuning WebView2 or WinUI code.
+
+## Hosted Chat Stale-Stream Recovery
+
+This note records the v3.3.2 follow-up for hosted chat sessions that keep showing a busy output state even though a manual reload reveals the completed Gateway result.
+
+### Symptom
+
+After submitting a task in the hosted Control UI, output can appear stuck until the user clicks Reload. The result then appears immediately after refresh, which indicates the remote Gateway run often completed and persisted state, but the current WebView session missed or stopped applying chat events.
+
+### Root Cause
+
+The Manager shell only owned the hosted WebView session, not the upstream Gateway WebSocket event stream. It could detect page-level connected/auth/error states, and it had an optional `reportSeq` gap path, but it did not have a fallback signal for the common half-broken case where the page still reports `connected` and `busy` while chat activity stops advancing.
+
+### Implementation Rules
+
+- Treat a connected busy chat session as suspicious when its app-state or visible activity signature does not change for the stale threshold.
+- Prefer soft recovery first: lightweight sync and recent-message fetch before full reload.
+- Escalate stale busy recovery to hard refresh once the soft-resync budget is exhausted; do not treat a stale connected snapshot as a successful reload fallback.
+- Keep reload protection for focused inputs only when the focused editor contains unsent text. An empty focused editor should not block recovery.
+- Include phase, busy, stale duration, and focused-input text state in diagnostics so tunnel/proxy and app-state failures can be separated later.
