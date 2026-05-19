@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
-**Current version:** 3.3.2
+**Current version:** 3.3.3
 
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
@@ -26,9 +26,10 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
-## Current 3.3.2 Notes
+## Current 3.3.3 Notes
 
-- The top MODEL indicator now reads OpenClaw app state and keeps the last non-empty value during transient empty snapshots.
+- The top MODEL indicator now reads OpenClaw app state variants, URL session keys, and Map-backed model overrides, then keeps the last non-empty value during transient empty snapshots.
+- The MODEL value typography now matches the native status bar text size for a more consistent status readout.
 - The top status pill reserves more room for provider/model labels before AUTH and Status, but very long model names may still ellipsize at narrow window widths.
 - The WebView2 bridge now avoids native status DOM scans for right-sidebar content, settings/config bodies, and Cron-heavy rerenders. This is a practical mitigation for CPU spikes in Communications and Automation/Cron pages, not a replacement for upstream Control UI performance work if those pages become heavier.
 - Busy hosted chat sessions now expose a stale-stream signal when visible/app-state activity stops advancing. OpenClaw Manager first attempts lightweight sync/recent-message recovery, then escalates to reload after the soft-resync budget is exhausted; this helps when a Cloudflare Tunnel or proxy drops chat events but the Gateway run has already finished.

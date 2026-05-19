@@ -166,7 +166,7 @@
 
                         <TextBlock Grid.Column="1"
                                    Text="{x:Bind ViewModel.ModelSummaryText, Mode=OneWay}"
-                                   FontSize="10"
+                                   FontSize="12"
                                    FontWeight="SemiBold"
                                    CharacterSpacing="10"
                                    VerticalAlignment="Center"

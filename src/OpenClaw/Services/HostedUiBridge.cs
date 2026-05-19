@@ -131,7 +131,7 @@ public sealed class HostedUiBridge
     return el.isContentEditable || role === 'textbox';
   };
 
-  const compactText = (value) => (value || '').replace(/\s+/g, ' ').trim();
+  const compactText = (value) => (value == null ? '' : String(value)).replace(/\s+/g, ' ').trim();
   const STATUS_PROBE_EXCLUDED_SELECTOR = '.chat-sidebar, .sidebar-panel, .sidebar-content, .chat-tool-card__preview-frame, .settings-workspace__body, .config-content, .config-form, .config-section-card, .cron-summary-strip, .cron-workspace';
   const isStatusProbeExcludedElement = (el) => Boolean(el?.closest?.(STATUS_PROBE_EXCLUDED_SELECTOR));
 
@@ -231,21 +231,56 @@ public sealed class HostedUiBridge
 
   const readServerModelValue = (entry, catalog = []) => {
     if (!entry || typeof entry !== 'object') return '';
-    return formatModelValue(entry.model, entry.modelProvider, catalog);
+    const model = entry.model || entry.modelOverride || entry.selectedModel || entry.chatModel || entry.modelId || '';
+    const provider = entry.modelProvider || entry.providerOverride || entry.provider || entry.modelProviderOverride || '';
+    return formatModelValue(model, provider, catalog);
   };
 
   const readOverrideModelValue = (override, catalog = []) => {
     if (!override) return '';
     if (typeof override === 'string') return resolveCatalogModelValue(override, catalog);
     if (typeof override !== 'object') return '';
-    return resolveCatalogModelValue(override.value, catalog);
+    const model = override.value || override.model || override.modelOverride || override.selectedModel || override.chatModel || override.modelId || '';
+    const provider = override.provider || override.modelProvider || override.providerOverride || override.modelProviderOverride || '';
+    return formatModelValue(model, provider, catalog);
+  };
+
+  const readSessionKeyFromUrl = () => {
+    try {
+      return compactText(new URL(window.location.href).searchParams.get('session') || '');
+    } catch {
+      return '';
+    }
+  };
+
+  const readCurrentSessionKey = (app) => {
+    return compactText(
+      app.sessionKey ||
+      app.activeSessionKey ||
+      app.currentSessionKey ||
+      app.chatSessionKey ||
+      app.session?.key ||
+      app.settings?.sessionKey ||
+      readSessionKeyFromUrl() ||
+      '');
+  };
+
+  const hasOverrideForSession = (overrides, sessionKey) => {
+    if (!sessionKey || !overrides || typeof overrides !== 'object') return false;
+    return overrides instanceof Map
+      ? overrides.has(sessionKey)
+      : Object.prototype.hasOwnProperty.call(overrides, sessionKey);
+  };
+
+  const readOverrideForSession = (overrides, sessionKey) => {
+    return overrides instanceof Map ? overrides.get(sessionKey) : overrides[sessionKey];
   };
 
   const readOpenClawAppStateModel = () => {
     const app = document.querySelector('openclaw-app');
     if (!app) return '';
 
-    const sessionKey = compactText(app.sessionKey || app.settings?.sessionKey || '');
+    const sessionKey = readCurrentSessionKey(app);
     const sessionsResult = app.sessionsResult || null;
     const chatModelCatalog = Array.isArray(app.chatModelCatalog) ? app.chatModelCatalog : [];
     const defaultsModel = readServerModelValue(sessionsResult?.defaults, chatModelCatalog);
@@ -253,15 +288,15 @@ public sealed class HostedUiBridge
       ? app.chatModelOverrides
       : {};
 
-    if (sessionKey && Object.prototype.hasOwnProperty.call(overrides, sessionKey)) {
-      const override = overrides[sessionKey];
+    if (hasOverrideForSession(overrides, sessionKey)) {
+      const override = readOverrideForSession(overrides, sessionKey);
       if (override === null) return defaultsModel;
       const overrideModel = readOverrideModelValue(override, chatModelCatalog);
       if (overrideModel) return overrideModel;
     }
 
     const sessions = Array.isArray(sessionsResult?.sessions) ? sessionsResult.sessions : [];
-    const activeSession = sessions.find((row) => compactText(row?.key) === sessionKey);
+    const activeSession = sessions.find((row) => compactText(row?.key || row?.sessionKey || row?.id) === sessionKey);
     const activeModel = readServerModelValue(activeSession, chatModelCatalog);
     return activeModel || defaultsModel;
   };

@@ -39,12 +39,13 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings switch rows use compact spacing", Tests.SettingsSwitchRowsUseCompactSpacing),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places General after Language", Tests.SettingsNavigationPlacesGeneralAfterLanguage),
-    ("Version metadata is 3.3.2", Tests.VersionMetadataIs332),
+    ("Version metadata is 3.3.3", Tests.VersionMetadataIs333),
     ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
     ("Top status pill leaves room for long model names", Tests.TopStatusPillLeavesRoomForLongModelNames),
+    ("Top status model text matches status bar font size", Tests.TopStatusModelTextMatchesStatusBarFontSize),
     ("Settings window is prewarmed after startup", Tests.SettingsWindowIsPrewarmedAfterStartup),
     ("Settings language selection syncs after load", Tests.SettingsLanguageSelectionSyncsAfterLoad),
     ("Settings language options are code populated", Tests.SettingsLanguageOptionsAreCodePopulated),
@@ -980,7 +981,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs332()
+    public static Task VersionMetadataIs333()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -1009,11 +1010,11 @@ internal static class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.3.2</Version>", project, "Project package version should be 3.3.2.");
-        Assert.Contains("<AssemblyVersion>3.3.2.0</AssemblyVersion>", project, "Assembly version should be 3.3.2.0.");
-        Assert.Contains("<FileVersion>3.3.2.0</FileVersion>", project, "File version should be 3.3.2.0.");
-        Assert.Contains("Version=\"3.3.2.0\"", packageManifest, "Package manifest version should be 3.3.2.0.");
-        Assert.Contains("version=\"3.3.2.0\"", appManifest, "Application manifest assembly identity should be 3.3.2.0.");
+        Assert.Contains("<Version>3.3.3</Version>", project, "Project package version should be 3.3.3.");
+        Assert.Contains("<AssemblyVersion>3.3.3.0</AssemblyVersion>", project, "Assembly version should be 3.3.3.0.");
+        Assert.Contains("<FileVersion>3.3.3.0</FileVersion>", project, "File version should be 3.3.3.0.");
+        Assert.Contains("Version=\"3.3.3.0\"", packageManifest, "Package manifest version should be 3.3.3.0.");
+        Assert.Contains("version=\"3.3.3.0\"", appManifest, "Application manifest assembly identity should be 3.3.3.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
         return Task.CompletedTask;
     }
@@ -1110,6 +1111,28 @@ internal static class Tests
         Assert.Contains("MinWidth=\"190\"", xaml, "Model status segment should reserve room for current OpenClaw provider/model names.");
         Assert.Contains("x:Name=\"AccessStatusSegment\"", xaml, "Auth/access segment should be explicit in the status pill layout.");
         Assert.Contains("Margin=\"18,0,0,0\"", xaml, "Auth/access segment should leave a visible gap after long model labels.");
+        return Task.CompletedTask;
+    }
+
+    public static Task TopStatusModelTextMatchesStatusBarFontSize()
+    {
+        var xamlPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.xaml");
+        var xaml = File.ReadAllText(xamlPath);
+        var modelTextIndex = xaml.IndexOf("Text=\"{x:Bind ViewModel.ModelSummaryText, Mode=OneWay}\"", StringComparison.Ordinal);
+        var statusTextIndex = xaml.IndexOf("x:Name=\"StatusText\"", StringComparison.Ordinal);
+
+        Assert.True(modelTextIndex >= 0, "Model summary TextBlock should be present in the top status pill.");
+        Assert.True(statusTextIndex >= 0, "Status bar text should be present for font-size comparison.");
+
+        var modelTextBlock = xaml.Substring(modelTextIndex, Math.Min(260, xaml.Length - modelTextIndex));
+        var statusTextBlock = xaml.Substring(statusTextIndex, Math.Min(260, xaml.Length - statusTextIndex));
+
+        Assert.Contains("FontSize=\"12\"", statusTextBlock, "Status bar text should use 12px as the comparison size.");
+        Assert.Contains("FontSize=\"12\"", modelTextBlock, "Top MODEL value should use the same 12px font size as the status bar text.");
         return Task.CompletedTask;
     }
 
@@ -1492,6 +1515,11 @@ internal static class Tests
         Assert.Contains("openclaw-app", source, "Bridge should locate the OpenClaw Lit app host.");
         Assert.Contains("chatModelOverrides", source, "Bridge should consider the local model override cache used by OpenClaw Web UI.");
         Assert.Contains("sessionsResult?.defaults", source, "Bridge should resolve the inherited default model when a session has no override.");
+        Assert.Contains("modelOverride", source, "Bridge should read OpenClaw session modelOverride fields when no plain model field is present.");
+        Assert.Contains("providerOverride", source, "Bridge should read OpenClaw session providerOverride fields when no plain modelProvider field is present.");
+        Assert.Contains("searchParams.get('session')", source, "Bridge should fall back to the hosted chat session query string when app.sessionKey is absent.");
+        Assert.Contains("overrides instanceof Map", source, "Bridge should support Map-backed chatModelOverrides from Lit app state.");
+        Assert.Contains("value == null ? '' : String(value)", source, "Bridge text normalization should not throw when app-state message parts contain object payloads.");
         return Task.CompletedTask;
     }
 
