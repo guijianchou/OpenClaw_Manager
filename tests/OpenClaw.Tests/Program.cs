@@ -44,7 +44,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Directory build enables analyzers and style", Tests.DirectoryBuildEnablesAnalyzersAndStyle),
     ("Executable test harness rejects dotnet test false positives", Tests.ExecutableTestHarnessRejectsDotnetTestFalsePositives),
     ("Documentation includes WinUI format platform", Tests.DocumentationIncludesWinUiFormatPlatform),
-    ("About dialog repository link targets Guijianchou profile", Tests.AboutDialogRepositoryLinkTargetsGuijianchouProfile),
+    ("About dialog GitHub link targets Guijianchou profile", Tests.AboutDialogGitHubLinkTargetsGuijianchouProfile),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -1093,7 +1093,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task AboutDialogRepositoryLinkTargetsGuijianchouProfile()
+    public static Task AboutDialogGitHubLinkTargetsGuijianchouProfile()
     {
         var aboutPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -1102,10 +1102,42 @@ internal static class Tests
             "Views",
             "AboutDialog.xaml");
 
-        var about = File.ReadAllText(aboutPath);
+        var stringResourcesPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "StringResources.cs");
 
-        Assert.Contains("NavigateUri=\"https://github.com/Guijianchou\"", about, "About dialog repository link should target the Guijianchou GitHub profile.");
+        var about = File.ReadAllText(aboutPath);
+        var stringResources = File.ReadAllText(stringResourcesPath);
+        var enResources = File.ReadAllText(Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Strings",
+            "en-us",
+            "Resources.resw"));
+        var zhResources = File.ReadAllText(Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Strings",
+            "zh-cn",
+            "Resources.resw"));
+
+        Assert.Contains("NavigateUri=\"https://github.com/Guijianchou\"", about, "About dialog GitHub link should target the Guijianchou profile.");
         Assert.Contains(">@Guijianchou</Hyperlink>", about, "About dialog developer link should show the Guijianchou GitHub profile.");
+        Assert.Contains("<value>GitHub Profile</value>", enResources, "About dialog GitHub label should match the profile target.");
+        Assert.Contains("<value>GitHub 主页</value>", zhResources, "Chinese About dialog GitHub label should match the profile target.");
+        Assert.Contains("StringResources.AboutGitHubProfile", about, "About dialog should bind through a profile-named resource property.");
+        Assert.Contains("AboutGitHubProfile", stringResources, "String resource helper should expose a profile-named About label.");
+        Assert.DoesNotContain("<value>GitHub Repository</value>", enResources, "About dialog GitHub label should not claim a repository when it opens a profile.");
+        Assert.DoesNotContain("<value>GitHub 仓库</value>", zhResources, "Chinese About dialog GitHub label should not claim a repository when it opens a profile.");
+        Assert.DoesNotContain("AboutRepository", about, "About dialog should not bind through a repository-named resource for a profile target.");
+        Assert.DoesNotContain("AboutRepository", stringResources, "String resource helper should not expose a repository-named About profile label.");
+        Assert.DoesNotContain("AboutRepository", enResources, "English resources should not keep the old repository-named About key.");
+        Assert.DoesNotContain("AboutRepository", zhResources, "Chinese resources should not keep the old repository-named About key.");
         Assert.DoesNotContain("NavigateUri=\"https://github.com/guijianchou/OpenClaw_Manager\"", about, "About dialog repository link should no longer target the old OpenClaw Manager repository URL.");
         Assert.DoesNotContain("NavigateUri=\"https://github.com/Jutaosay/openclaw_for_windows\"", about, "About dialog should not link to the old repository.");
         Assert.DoesNotContain("https://github.com/Jutaosay", about, "About dialog should not link to the old developer profile.");

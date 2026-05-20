@@ -28,7 +28,7 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 
 ## 当前 3.3.4 注意事项
 
-- About 对话框里的 GitHub 链接现在指向 `https://github.com/Guijianchou`。
+- About 对话框里的 GitHub 主页链接和文案现在指向 `https://github.com/Guijianchou`。
 - Settings 保存后会立即应用 Always-on-top 和全局热键变更，不再需要重启。
 - 紧凑模式现在会折叠非必要顶栏状态段并放宽固定宽度，让 480px 小窗仍能显示模型和状态信息。
 - WebView2 状态探测现在带有 WebView/导航 generation 归属，导航、重建或进程失败后的过期脚本结果会被忽略。

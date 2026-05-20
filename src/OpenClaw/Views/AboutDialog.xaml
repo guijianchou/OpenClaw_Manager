@@ -34,7 +34,7 @@
                    TextAlignment="Center"
                    TextWrapping="Wrap" />
 
-        <HyperlinkButton Content="{x:Bind helpers:StringResources.AboutRepository}"
+        <HyperlinkButton Content="{x:Bind helpers:StringResources.AboutGitHubProfile}"
                          HorizontalAlignment="Center"
                          NavigateUri="https://github.com/Guijianchou" />
 

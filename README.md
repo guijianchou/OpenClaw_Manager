@@ -28,7 +28,7 @@ It is best suited for users who:
 
 ## Current 3.3.4 Notes
 
-- The About dialog GitHub links now point to `https://github.com/Guijianchou`.
+- The About dialog GitHub profile links and labels now point to `https://github.com/Guijianchou`.
 - Always-on-top and global hotkey settings now apply immediately after saving Settings instead of waiting for a restart.
 - Compact mode now collapses nonessential top-bar segments and relaxes fixed status/model widths so the 480px shell keeps the model/status readout visible.
 - WebView2 status probes now carry WebView/navigation generation ownership, so stale script results are ignored after navigation, recreation, or process failure.

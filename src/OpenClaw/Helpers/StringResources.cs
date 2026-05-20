@@ -161,7 +161,7 @@ public static class StringResources
     // --- About Dialog ---
     public static string AboutTitle => Get("AboutTitle");
     public static string AboutDescription => Get("AboutDescription");
-    public static string AboutRepository => Get("AboutRepository");
+    public static string AboutGitHubProfile => Get("AboutGitHubProfile");
     public static string AboutDevelopedBy => Get("AboutDevelopedBy");
     public static string AboutCopyright => Get("AboutCopyright");
 

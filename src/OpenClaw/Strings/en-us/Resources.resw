@@ -361,8 +361,8 @@
   <data name="AboutDescription" xml:space="preserve">
     <value>A native Windows management shell for OpenClaw Gateway, built with WinUI 3 and WebView2.</value>
   </data>
-  <data name="AboutRepository" xml:space="preserve">
-    <value>GitHub Repository</value>
+  <data name="AboutGitHubProfile" xml:space="preserve">
+    <value>GitHub Profile</value>
   </data>
   <data name="AboutDevelopedBy" xml:space="preserve">
     <value>Developed by </value>

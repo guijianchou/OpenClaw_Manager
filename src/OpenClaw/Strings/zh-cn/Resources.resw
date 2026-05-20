@@ -361,8 +361,8 @@
   <data name="AboutDescription" xml:space="preserve">
     <value>基于 WinUI 3 与 WebView2 的 OpenClaw Gateway 原生 Windows 管理外壳。</value>
   </data>
-  <data name="AboutRepository" xml:space="preserve">
-    <value>GitHub 仓库</value>
+  <data name="AboutGitHubProfile" xml:space="preserve">
+    <value>GitHub 主页</value>
   </data>
   <data name="AboutDevelopedBy" xml:space="preserve">
     <value>开发者：</value>

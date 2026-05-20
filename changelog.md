@@ -10,7 +10,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ### v3.3.4 (2026-05-20)
 
-- Updated the About dialog GitHub links to `https://github.com/Guijianchou`.
+- Updated the About dialog GitHub profile links and labels to `https://github.com/Guijianchou`.
 - Applied Always-on-top and global hotkey changes immediately after Settings save.
 - Tightened compact mode top-bar layout so nonessential status segments collapse cleanly at 480px.
 - Guarded WebView2 status probes with WebView/navigation generation ownership so stale async script results cannot overwrite current state.
@@ -192,7 +192,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ### v3.3.4 (2026-05-20)
 
-- About 对话框里的 GitHub 链接已更新为 `https://github.com/Guijianchou`。
+- About 对话框里的 GitHub 主页链接和文案已更新为 `https://github.com/Guijianchou`。
 - Settings 保存后会立即应用 Always-on-top 和全局热键变更，不再需要重启。
 - 收紧紧凑模式顶栏布局，在 480px 宽度下折叠非必要状态段并保留模型/状态可读性。
 - WebView2 状态探测现在带有 WebView/导航 generation 归属，避免过期异步脚本结果覆盖当前状态。
