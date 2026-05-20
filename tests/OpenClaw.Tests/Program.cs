@@ -1,8 +1,8 @@
-using OpenClaw.Models;
-using OpenClaw.Services;
-using OpenClaw.Helpers;
 using System.Net;
 using System.Reflection;
+using OpenClaw.Helpers;
+using OpenClaw.Models;
+using OpenClaw.Services;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
@@ -40,6 +40,10 @@ var tests = new (string Name, Func<Task> Run)[]
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places General after Language", Tests.SettingsNavigationPlacesGeneralAfterLanguage),
     ("Version metadata is 3.3.3", Tests.VersionMetadataIs333),
+    ("Repository code style is explicit", Tests.RepositoryCodeStyleIsExplicit),
+    ("Directory build enables analyzers and style", Tests.DirectoryBuildEnablesAnalyzersAndStyle),
+    ("Executable test harness rejects dotnet test false positives", Tests.ExecutableTestHarnessRejectsDotnetTestFalsePositives),
+    ("Documentation includes WinUI format platform", Tests.DocumentationIncludesWinUiFormatPlatform),
     ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
@@ -61,7 +65,11 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hosted UI bridge reads current model from OpenClaw model select", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect),
     ("Hosted UI bridge reads current model from OpenClaw app state", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawAppState),
     ("Hosted UI bridge uses structured model source pipeline", Tests.HostedUiBridgeUsesStructuredModelSourcePipeline),
+    ("Hosted UI bridge defers app-state defaults", Tests.HostedUiBridgeDefersAppStateDefaults),
+    ("Hosted UI bridge keeps null override default semantics", Tests.HostedUiBridgeKeepsNullOverrideDefaultSemantics),
+    ("Hosted UI bridge avoids object-shaped model strings", Tests.HostedUiBridgeAvoidsObjectShapedModelStrings),
     ("Hosted UI snapshots carry model source instrumentation", Tests.HostedUiSnapshotsCarryModelSourceInstrumentation),
+    ("Hosted UI session ready carries model source", Tests.HostedUiSessionReadyCarriesModelSource),
     ("Hosted UI bridge ignores sidebar-only mutations during status polling", Tests.HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling),
     ("Hosted UI bridge ignores settings and cron mutation storms", Tests.HostedUiBridgeIgnoresSettingsAndCronMutationStorms),
     ("Hosted UI bridge reports stale busy and input text state", Tests.HostedUiBridgeReportsStaleBusyAndInputTextState),
@@ -1021,6 +1029,62 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
+    public static Task RepositoryCodeStyleIsExplicit()
+    {
+        var editorConfigPath = Path.Combine(Directory.GetCurrentDirectory(), ".editorconfig");
+        Assert.True(File.Exists(editorConfigPath), "Repository should define a root .editorconfig.");
+
+        var editorConfig = File.ReadAllText(editorConfigPath);
+        Assert.Contains("root = true", editorConfig, ".editorconfig should be the root style source.");
+        Assert.Contains("end_of_line = lf", editorConfig, "Source files should default to Linux-style LF endings.");
+        Assert.Contains("insert_final_newline = true", editorConfig, "Files should end with one final newline.");
+        Assert.Contains("trim_trailing_whitespace = true", editorConfig, "Trailing whitespace should be rejected by formatter verification.");
+        Assert.Contains("indent_size = 4", editorConfig, "C# and XAML indentation should be four spaces.");
+        Assert.Contains("csharp_prefer_braces = true", editorConfig, "Control flow should use braces consistently.");
+        Assert.Contains("dotnet_diagnostic.IDE0055.severity", editorConfig, "Formatting diagnostics should be explicit.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DirectoryBuildEnablesAnalyzersAndStyle()
+    {
+        var propsPath = Path.Combine(Directory.GetCurrentDirectory(), "Directory.Build.props");
+        var props = File.ReadAllText(propsPath);
+
+        Assert.Contains("<EnableNETAnalyzers>true</EnableNETAnalyzers>", props, "Shared build props should enable .NET analyzers.");
+        Assert.Contains("<AnalysisLevel>latest</AnalysisLevel>", props, "Analyzer level should follow the SDK used by the repo.");
+        Assert.Contains("<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>", props, "Builds should honor .editorconfig code-style severities.");
+        Assert.Contains("<Nullable>enable</Nullable>", props, "Nullable analysis should be project-wide by default.");
+        Assert.Contains("<ImplicitUsings>enable</ImplicitUsings>", props, "Implicit usings should be project-wide by default.");
+        return Task.CompletedTask;
+    }
+
+    public static Task ExecutableTestHarnessRejectsDotnetTestFalsePositives()
+    {
+        var projectPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "tests",
+            "OpenClaw.Tests",
+            "OpenClaw.Tests.csproj");
+        var project = File.ReadAllText(projectPath);
+
+        Assert.Contains("FailDotNetTestForExecutableHarness", project, "Executable test harness should not let dotnet test report a false green run.");
+        Assert.Contains("dotnet run --project tests\\OpenClaw.Tests\\OpenClaw.Tests.csproj", project, "The dotnet test error should point to the real test command.");
+        Assert.Contains("BeforeTargets=\"VSTest\"", project, "The guard should run when dotnet test invokes the VSTest target.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DocumentationIncludesWinUiFormatPlatform()
+    {
+        var readme = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "README.md"));
+        var readmeZh = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "readme_zh.md"));
+        var notes = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "DEVELOPMENT_NOTES.md"));
+
+        Assert.Contains("$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore", readme, "README should document the WinUI platform needed for dotnet format.");
+        Assert.Contains("$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore", readmeZh, "Chinese README should document the WinUI platform needed for dotnet format.");
+        Assert.Contains("$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore", notes, "Development notes should document the WinUI platform needed for dotnet format.");
+        return Task.CompletedTask;
+    }
+
     public static Task AboutDialogRepositoryLinkTargetsOpenClawManagerRepo()
     {
         var aboutPath = Path.Combine(
@@ -1546,6 +1610,53 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
+    public static Task HostedUiBridgeDefersAppStateDefaults()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("let firstDefaultModel = ''", source, "App-state defaults should be retained as a fallback instead of returned before later state candidates are checked.");
+        Assert.Contains("if (!firstDefaultModel && defaultsModel)", source, "The first default should be remembered once while overrides and active sessions remain higher priority.");
+        Assert.Contains("return firstDefaultModel", source, "Default model return should happen after every state candidate has been checked.");
+        Assert.DoesNotContain("if (defaultsModel) return modelResult(defaultsModel, 'app-state:default');", source, "A root default must not mask a nested state override or active session.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeKeepsNullOverrideDefaultSemantics()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("if (override === null && defaultsModel) return modelResult(defaultsModel, 'app-state:default');", source, "A null override means the current app-state candidate should inherit its own default model.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeAvoidsObjectShapedModelStrings()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("readScalarText", source, "Model field readers should only accept scalar text values.");
+        Assert.Contains("readModelLikeValue", source, "Object-shaped model fields should be resolved through explicit id/name/provider fields.");
+        Assert.DoesNotContain("const text = compactText(target[key]);", source, "Generic field lookup should not stringify arbitrary objects into '[object Object]'.");
+        return Task.CompletedTask;
+    }
+
     public static Task HostedUiSnapshotsCarryModelSourceInstrumentation()
     {
         var modelsPath = Path.Combine(
@@ -1582,6 +1693,38 @@ internal static class Tests
         Assert.Contains("currentModelSource", bridgeSource, "The injected bridge should emit model-source instrumentation.");
         Assert.Contains("GetString(root, \"currentModelSource\")", webViewSource, "Native parsing should retain the bridge-reported model source.");
         Assert.Contains("modelSource = string.IsNullOrWhiteSpace(snapshot.ModelSource)", stateEffectsSource, "Hosted UI state logs should expose the model source or null.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiSessionReadyCarriesModelSource()
+    {
+        var modelsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "SessionProbeModels.cs");
+        var bridgePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var eventHandlersPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "ShellSessionCoordinator.EventHandlers.cs");
+
+        var modelsSource = File.ReadAllText(modelsPath);
+        var bridgeSource = File.ReadAllText(bridgePath);
+        var eventHandlersSource = File.ReadAllText(eventHandlersPath);
+
+        Assert.Contains("string ModelSource", modelsSource, "Session ready event args should carry the model source.");
+        Assert.Contains("modelSource: snapshot.currentModelSource", bridgeSource, "Session ready bridge messages should preserve the detected model source.");
+        Assert.Contains("GetString(root, \"modelSource\")", bridgeSource, "Native session-ready parsing should read the bridge-reported model source.");
+        Assert.Contains("args.ModelSource", eventHandlersSource, "Session-ready logging should include the model source for diagnostics.");
         return Task.CompletedTask;
     }
 

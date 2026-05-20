@@ -82,10 +82,26 @@ public sealed class HotkeyBinding
     public override string ToString()
     {
         var parts = new List<string>(4);
-        if (Ctrl) parts.Add("Ctrl");
-        if (Alt) parts.Add("Alt");
-        if (Shift) parts.Add("Shift");
-        if (Win) parts.Add("Win");
+        if (Ctrl)
+        {
+            parts.Add("Ctrl");
+        }
+
+        if (Alt)
+        {
+            parts.Add("Alt");
+        }
+
+        if (Shift)
+        {
+            parts.Add("Shift");
+        }
+
+        if (Win)
+        {
+            parts.Add("Win");
+        }
+
         parts.Add(Key);
         return string.Join('+', parts);
     }
@@ -96,10 +112,26 @@ public sealed class HotkeyBinding
     public int GetWin32Modifiers()
     {
         int modifiers = 0;
-        if (Alt) modifiers |= 0x0001;   // MOD_ALT
-        if (Ctrl) modifiers |= 0x0002;  // MOD_CONTROL
-        if (Shift) modifiers |= 0x0004; // MOD_SHIFT
-        if (Win) modifiers |= 0x0008;   // MOD_WIN
+        if (Alt)
+        {
+            modifiers |= 0x0001;   // MOD_ALT
+        }
+
+        if (Ctrl)
+        {
+            modifiers |= 0x0002;  // MOD_CONTROL
+        }
+
+        if (Shift)
+        {
+            modifiers |= 0x0004; // MOD_SHIFT
+        }
+
+        if (Win)
+        {
+            modifiers |= 0x0008;   // MOD_WIN
+        }
+
         modifiers |= 0x4000;            // MOD_NOREPEAT
         return modifiers;
     }
@@ -127,8 +159,15 @@ public sealed class HotkeyBinding
         if (normalized.Length == 1)
         {
             var ch = normalized[0];
-            if (ch is >= 'A' and <= 'Z') return ch;
-            if (ch is >= '0' and <= '9') return ch;
+            if (ch is >= 'A' and <= 'Z')
+            {
+                return ch;
+            }
+
+            if (ch is >= '0' and <= '9')
+            {
+                return ch;
+            }
         }
 
         // Named keys

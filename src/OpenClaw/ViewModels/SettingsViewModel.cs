@@ -191,7 +191,11 @@ public class SettingsViewModel : INotifyPropertyChanged
     /// </summary>
     public void RemoveEnvironment()
     {
-        if (_selectedEnvironment is null) return;
+        if (_selectedEnvironment is null)
+        {
+            return;
+        }
+
         _originalNames.Remove(_selectedEnvironment);
         _originalSnapshots.Remove(_selectedEnvironment);
         Environments.Remove(_selectedEnvironment);

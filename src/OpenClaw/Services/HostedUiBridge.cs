@@ -1,7 +1,7 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
-using System.Text.Json;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using OpenClaw.Helpers;
@@ -205,6 +205,13 @@ public sealed class HostedUiBridge
   };
 
   const cleanTrustedModelValue = (value) => compactText(value).slice(0, 96);
+  const readScalarText = (value) => {
+    if (value == null) return '';
+    return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+      ? compactText(value)
+      : '';
+  };
+
   const emptyModelResult = () => ({ value: '', source: '' });
   const modelResult = (value, source) => {
     return { value: cleanTrustedModelValue(value), source };
@@ -212,6 +219,8 @@ public sealed class HostedUiBridge
   const MODEL_FIELD_KEYS = ['model', 'modelOverride', 'selectedModel', 'chatModel', 'modelId'];
   const PROVIDER_FIELD_KEYS = ['modelProvider', 'providerOverride', 'provider', 'modelProviderOverride'];
   const OVERRIDE_MODEL_FIELD_KEYS = ['value', ...MODEL_FIELD_KEYS];
+  const MODEL_OBJECT_FIELD_KEYS = ['id', 'value', 'name', ...MODEL_FIELD_KEYS];
+  const PROVIDER_OBJECT_FIELD_KEYS = ['id', 'value', 'name', ...PROVIDER_FIELD_KEYS];
   const SESSION_ID_KEYS = ['key', 'sessionKey', 'id'];
   const SESSION_KEY_PATHS = [
     ['sessionKey'],
@@ -252,7 +261,7 @@ public sealed class HostedUiBridge
   const readFirstPath = (target, paths) => {
     if (!target || typeof target !== 'object') return '';
     for (const path of paths) {
-      const text = compactText(readPath(target, path));
+      const text = readScalarText(readPath(target, path));
       if (text) return text;
     }
 
@@ -262,8 +271,24 @@ public sealed class HostedUiBridge
   const readFirstKey = (target, keys) => {
     if (!target || typeof target !== 'object') return '';
     for (const key of keys) {
-      const text = compactText(target[key]);
+      const text = readScalarText(target[key]);
       if (text) return text;
+    }
+
+    return '';
+  };
+
+  const readModelLikeValue = (target, keys, objectKeys = keys) => {
+    if (!target || typeof target !== 'object') return '';
+    for (const key of keys) {
+      const value = target[key];
+      const scalar = readScalarText(value);
+      if (scalar) return scalar;
+
+      if (value && typeof value === 'object') {
+        const nested = readFirstKey(value, objectKeys);
+        if (nested) return nested;
+      }
     }
 
     return '';
@@ -324,8 +349,8 @@ public sealed class HostedUiBridge
   const readServerModelValue = (entry, catalog = []) => {
     if (!entry || typeof entry !== 'object') return '';
     return formatModelValue(
-      readFirstKey(entry, MODEL_FIELD_KEYS),
-      readFirstKey(entry, PROVIDER_FIELD_KEYS),
+      readModelLikeValue(entry, MODEL_FIELD_KEYS, MODEL_OBJECT_FIELD_KEYS),
+      readModelLikeValue(entry, PROVIDER_FIELD_KEYS, PROVIDER_OBJECT_FIELD_KEYS),
       catalog);
   };
 
@@ -334,8 +359,8 @@ public sealed class HostedUiBridge
     if (typeof override === 'string') return resolveCatalogModelValue(override, catalog);
     if (typeof override !== 'object') return '';
     return formatModelValue(
-      readFirstKey(override, OVERRIDE_MODEL_FIELD_KEYS),
-      readFirstKey(override, PROVIDER_FIELD_KEYS),
+      readModelLikeValue(override, OVERRIDE_MODEL_FIELD_KEYS, MODEL_OBJECT_FIELD_KEYS),
+      readModelLikeValue(override, PROVIDER_FIELD_KEYS, PROVIDER_OBJECT_FIELD_KEYS),
       catalog);
   };
 
@@ -385,11 +410,16 @@ public sealed class HostedUiBridge
     if (states.length === 0) return emptyModelResult();
 
     const sessionKey = readCurrentSessionKey(states);
+    let firstDefaultModel = '';
     for (const state of states) {
       const sessionsResult = readFirstObjectPath(state, SESSIONS_RESULT_PATHS);
       const chatModelCatalog = readFirstArrayPath(state, MODEL_CATALOG_PATHS);
       const defaultsModel = readServerModelValue(sessionsResult?.defaults, chatModelCatalog);
       const overrides = readFirstObjectPath(state, MODEL_OVERRIDES_PATHS) || {};
+
+      if (!firstDefaultModel && defaultsModel) {
+        firstDefaultModel = defaultsModel;
+      }
 
       if (hasOverrideForSession(overrides, sessionKey)) {
         const override = readOverrideForSession(overrides, sessionKey);
@@ -402,10 +432,11 @@ public sealed class HostedUiBridge
       const activeSession = sessions.find((row) => compactText(readSessionIdentifier(row)) === sessionKey);
       const activeModel = readServerModelValue(activeSession, chatModelCatalog);
       if (activeModel) return modelResult(activeModel, 'app-state:session');
-      if (defaultsModel) return modelResult(defaultsModel, 'app-state:default');
     }
 
-    return emptyModelResult();
+    return firstDefaultModel
+      ? modelResult(firstDefaultModel, 'app-state:default')
+      : emptyModelResult();
   };
 
   const readOpenClawModelSelect = () => {
@@ -899,6 +930,7 @@ public sealed class HostedUiBridge
         kind: SESSION_READY_KIND,
         detectedAt: new Date().toISOString(),
         model: snapshot.currentModel,
+        modelSource: snapshot.currentModelSource,
         uri: snapshot.url
       });
     }
@@ -993,6 +1025,7 @@ public sealed class HostedUiBridge
           kind: SESSION_READY_KIND,
           detectedAt: new Date().toISOString(),
           model: snapshot.currentModel,
+          modelSource: snapshot.currentModelSource,
           uri: snapshot.url
         });
       }
@@ -1296,9 +1329,10 @@ public sealed class HostedUiBridge
     {
         var detectedAt = GetString(root, "detectedAt");
         var model = GetString(root, "model");
+        var modelSource = GetString(root, "modelSource");
         var uri = GetString(root, "uri");
 
-        return new SessionReadyEventArgs(detectedAt, model, uri);
+        return new SessionReadyEventArgs(detectedAt, model, uri, modelSource);
     }
 
     private static EventGapEventArgs ParseEventGapEventArgs(JsonElement root)

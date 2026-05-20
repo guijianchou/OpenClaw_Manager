@@ -1,11 +1,11 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 
 namespace OpenClaw.Services;
 
@@ -142,7 +142,7 @@ public class WebViewService
 
             // Make WebView2 follow system Light/Dark theme preferred scheme
             coreWebView.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto;
-            
+
             // Set default background to transparent (blends with Mica)
             _webView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
 
@@ -215,7 +215,11 @@ public class WebViewService
     public void Reload()
     {
         var coreWebView = GetCoreWebView();
-        if (coreWebView is null) return;
+        if (coreWebView is null)
+        {
+            return;
+        }
+
         App.Logger.Info("Reloading page.");
         SetState(ConnectionState.Loading);
         try
@@ -234,7 +238,10 @@ public class WebViewService
     public async Task StopAsync()
     {
         var coreWebView = GetCoreWebView();
-        if (coreWebView is null) return;
+        if (coreWebView is null)
+        {
+            return;
+        }
 
         var aborted = await TryAbortActiveRunAsync();
         if (aborted)
@@ -273,7 +280,10 @@ public class WebViewService
     public async Task ClearBrowsingDataAsync()
     {
         var coreWebView = GetCoreWebView();
-        if (coreWebView is null) return;
+        if (coreWebView is null)
+        {
+            return;
+        }
 
         try
         {
@@ -577,7 +587,9 @@ public class WebViewService
     {
         var coreWebView = GetCoreWebView();
         if (string.IsNullOrEmpty(_lastNavigatedUrl) || !_isInitialized || coreWebView is null)
+        {
             return false;
+        }
 
         _retryCount = 0; // manual retry resets counter
         App.Logger.Info($"Manual retry navigation to: {_lastNavigatedUrl}");

@@ -33,7 +33,12 @@ public sealed partial class ShellSessionCoordinator
         if (_recoveryState is RecoveryState.Connecting or RecoveryState.Reconnecting)
         {
             MarkRecoveryReady();
-            _logger.Info("session.ready", new { args.Model, args.Uri });
+            _logger.Info("session.ready", new
+            {
+                args.Model,
+                args.Uri,
+                modelSource = string.IsNullOrWhiteSpace(args.ModelSource) ? null : args.ModelSource
+            });
         }
         else
         {

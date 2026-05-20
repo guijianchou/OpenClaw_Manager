@@ -1,5 +1,27 @@
 # OpenClaw Development Notes
 
+## Project Code Standards
+
+This project uses C# and WinUI conventions, but follows the Linux engineering bias toward small, explicit, boring code:
+
+- Keep control flow readable. Use braces on every `if`, loop, and branch even for one-line bodies.
+- Keep files focused. New service/view-model code should prefer small partials or helper types over growing `WebViewService`, `HostedUiBridge`, or the test harness further.
+- Own background work explicitly. A background loop should have a stored `Task`, a stored cancellation source, and one logging boundary for exceptions.
+- Prefer structured logs with stable event keys and context objects. Avoid interpolated operational logs for state transitions.
+- Keep user-visible text in `StringResources` unless the string is diagnostic-only or a protocol/status token.
+- Keep `.editorconfig` as the source of formatting truth. Do not rely on local IDE defaults.
+
+Canonical local verification:
+
+```powershell
+dotnet restore OpenClaw.sln --locked-mode
+dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
+dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
+$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
+```
+
+`OpenClaw.Tests` is an executable harness. `dotnet test` is guarded because it otherwise exits successfully without running the harness.
+
 ## WinUI 3 Window Chrome And Theme Sync
 
 This note records the debugging lesson from the v3.0.4 top-edge artifact fix.

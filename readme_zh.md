@@ -156,13 +156,22 @@ Claw_winui3/
 
 - 解决方案使用 SDK-style 项目和 `PackageReference`。
 - 仓库本地的 `packages/` 文件夹不是必需的，可以安全删除。
-- 解决方案级 [Directory.Build.props](Directory.Build.props) 启用 `RestorePackagesConfig=true`，因此如果未来加入 `packages.config` 项目，完整 Visual Studio / MSBuild 构建仍会自动恢复依赖。
+- 解决方案级 [Directory.Build.props](Directory.Build.props) 启用 NuGet lock file 和 static graph restore，用于可重复的 SDK-style 依赖恢复。
 - 清理本地缓存后的预期流程是：
 
 ```powershell
-dotnet restore OpenClaw.sln
-dotnet build OpenClaw.sln
+dotnet restore OpenClaw.sln --locked-mode
+dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
+dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 ```
+
+`OpenClaw.Tests` 是可执行回归测试 harness。请使用上面的 `dotnet run --project ...` 命令；`dotnet test` 已加保护，避免在没有执行 harness 的情况下返回假绿。
+
+### 代码规范
+
+- `.editorconfig` 是仓库根级代码风格契约：LF 换行、文件末尾换行、清理行尾空白、C#/XAML 四空格缩进、控制流必须加花括号，并通过 SDK 执行格式诊断。
+- 按 Linux 工程纪律写代码：控制流简单明确、后台任务有明确 owner、日志结构化、文件职责收窄。
+- 提交涉及代码风格的改动前运行 `$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore`。
 
 ### 开发日志
 

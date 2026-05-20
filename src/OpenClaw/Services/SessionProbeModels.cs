@@ -95,7 +95,8 @@ public sealed record ControlUiProbeSnapshot(
 public record SessionReadyEventArgs(
     string DetectedAt,
     string Model,
-    string Uri
+    string Uri,
+    string ModelSource = ""
 );
 
 public record EventGapEventArgs(

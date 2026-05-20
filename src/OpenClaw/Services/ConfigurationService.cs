@@ -228,7 +228,10 @@ public class ConfigurationService
         {
             var env = Settings.Environments.FirstOrDefault(
                 e => e.Name.Equals(Settings.SelectedEnvironmentName, StringComparison.Ordinal));
-            if (env is not null) return env;
+            if (env is not null)
+            {
+                return env;
+            }
         }
 
         return GetDefaultEnvironment();

@@ -3,6 +3,7 @@
 
 # Repository metadata
 .gitattributes text eol=lf
+.editorconfig text eol=lf
 .gitignore text eol=lf
 
 # .NET / WinUI source and project files

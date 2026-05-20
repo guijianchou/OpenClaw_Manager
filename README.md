@@ -156,13 +156,22 @@ Claw_winui3/
 
 - The solution uses SDK-style projects with `PackageReference`.
 - Repository-local `packages/` folders are not required and can be deleted safely.
-- A solution-level [Directory.Build.props](Directory.Build.props) enables `RestorePackagesConfig=true` so full Visual Studio / MSBuild builds still auto-restore if a future `packages.config` project is added.
-- The expected workflow after clearing local caches is simply:
+- A solution-level [Directory.Build.props](Directory.Build.props) enables NuGet lock files and static graph restore for repeatable SDK-style restores.
+- The expected workflow after clearing local caches is:
 
 ```powershell
-dotnet restore OpenClaw.sln
-dotnet build OpenClaw.sln
+dotnet restore OpenClaw.sln --locked-mode
+dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
+dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 ```
+
+`OpenClaw.Tests` is an executable regression harness. Use the `dotnet run --project ...` command above; `dotnet test` is intentionally guarded so it cannot report a false green run without executing the harness.
+
+### Code Style
+
+- `.editorconfig` is the root style contract: LF endings, final newline, trimmed trailing whitespace, four-space C#/XAML indentation, required braces, and SDK-enforced formatting diagnostics.
+- Keep code small and explicit in the Linux engineering style: simple control flow, owned background tasks, structured logging, and narrow files with one responsibility.
+- Run `$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore` before committing style-sensitive changes.
 
 ### Development Notes
 

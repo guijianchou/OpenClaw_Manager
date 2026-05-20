@@ -36,16 +36,16 @@ public sealed partial class SettingsDialog
         _isSyncingLanguageSelection = true;
         try
         {
-        for (int i = 0; i < LanguageComboBox.Items.Count; i++)
-        {
-            if (LanguageComboBox.Items[i] is ComboBoxItem item && item.Tag is string tag && tag == language)
+            for (int i = 0; i < LanguageComboBox.Items.Count; i++)
             {
-                LanguageComboBox.SelectedIndex = i;
-                return;
+                if (LanguageComboBox.Items[i] is ComboBoxItem item && item.Tag is string tag && tag == language)
+                {
+                    LanguageComboBox.SelectedIndex = i;
+                    return;
+                }
             }
-        }
 
-        LanguageComboBox.SelectedIndex = 0;
+            LanguageComboBox.SelectedIndex = 0;
         }
         finally
         {
