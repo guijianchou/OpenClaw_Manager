@@ -8,7 +8,8 @@ namespace OpenClaw.Views;
 public readonly record struct SettingsSaveResult(
     bool DidChangeEnvironmentState,
     bool DidChangeSessionTopology,
-    bool DidChangeLanguage);
+    bool DidChangeLanguage,
+    bool DidChangeLiveShellOptions);
 
 public sealed partial class SettingsDialog
 {

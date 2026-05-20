@@ -94,8 +94,16 @@ var tests = new (string Name, Func<Task> Run)[]
     ("AppSettings defaults AlwaysOnTop to false", Tests.AppSettingsDefaultsAlwaysOnTopToFalse),
     ("Always-on-top applies native topmost fallback", Tests.AlwaysOnTopAppliesNativeTopmostFallback),
     ("Always-on-top pin button uses accent color when active", Tests.AlwaysOnTopPinButtonUsesAccentColorWhenActive),
+    ("Settings save reapplies live shell options", Tests.SettingsSaveReappliesLiveShellOptions),
     ("AppSettings defaults CompactMode to false", Tests.AppSettingsDefaultsCompactModeToFalse),
     ("Compact mode bounds bypass minimum persistable size", Tests.CompactModeBoundsBypassMinimumPersistableSize),
+    ("Compact mode switches top bar to compact layout", Tests.CompactModeSwitchesTopBarToCompactLayout),
+    ("WebView status probes ignore stale generations", Tests.WebViewStatusProbesIgnoreStaleGenerations),
+    ("Heartbeat loop owns timer and task lifetime", Tests.HeartbeatLoopOwnsTimerAndTaskLifetime),
+    ("Disposable services implement IDisposable", Tests.DisposableServicesImplementIDisposable),
+    ("Log viewer loads tail asynchronously", Tests.LogViewerLoadsTailAsynchronously),
+    ("Log tail reader reads from file end", Tests.LogTailReaderReadsFromFileEnd),
+    ("Hosted bridge script has testable asset seam", Tests.HostedBridgeScriptHasTestableAssetSeam),
     ("WebView circuit breaker trips after repeated failures", Tests.WebViewCircuitBreakerTripsAfterRepeatedFailures),
     ("WebView circuit breaker resets after cooldown", Tests.WebViewCircuitBreakerResetsAfterCooldown),
     ("Window hide restores minimized placement first", Tests.WindowHideRestoresMinimizedPlacementFirst),
@@ -1558,7 +1566,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("data-chat-model-select", source, "Bridge should read OpenClaw Web UI's explicit model select before generic heuristics.");
@@ -1574,7 +1582,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("readOpenClawAppStateModel", source, "Bridge should read OpenClaw's app state before falling back to visible DOM controls.");
@@ -1596,7 +1604,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("MODEL_FIELD_KEYS", source, "Model field aliases should be centralized instead of repeated in ad hoc OR chains.");
@@ -1617,7 +1625,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("let firstDefaultModel = ''", source, "App-state defaults should be retained as a fallback instead of returned before later state candidates are checked.");
@@ -1635,7 +1643,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("if (override === null)", source, "A null override means the current app-state candidate should inherit its own default model.");
@@ -1652,7 +1660,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("readScalarText", source, "Model field readers should only accept scalar text values.");
@@ -1680,7 +1688,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var stateEffectsPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "src",
@@ -1713,6 +1721,12 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
+            "HostedUiBridge.Script.cs");
+        var nativeBridgePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
             "HostedUiBridge.cs");
         var eventHandlersPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -1723,11 +1737,12 @@ internal static class Tests
 
         var modelsSource = File.ReadAllText(modelsPath);
         var bridgeSource = File.ReadAllText(bridgePath);
+        var nativeBridgeSource = File.ReadAllText(nativeBridgePath);
         var eventHandlersSource = File.ReadAllText(eventHandlersPath);
 
         Assert.Contains("string ModelSource", modelsSource, "Session ready event args should carry the model source.");
         Assert.Contains("modelSource: snapshot.currentModelSource", bridgeSource, "Session ready bridge messages should preserve the detected model source.");
-        Assert.Contains("GetString(root, \"modelSource\")", bridgeSource, "Native session-ready parsing should read the bridge-reported model source.");
+        Assert.Contains("GetString(root, \"modelSource\")", nativeBridgeSource, "Native session-ready parsing should read the bridge-reported model source.");
         Assert.Contains("args.ModelSource", eventHandlersSource, "Session-ready logging should include the model source for diagnostics.");
         return Task.CompletedTask;
     }
@@ -1739,7 +1754,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("isStatusProbeExcludedElement", source, "Bridge should exclude status-irrelevant content before scanning the DOM.");
@@ -1757,7 +1772,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("readOpenClawAppStateStatus", source, "Bridge should use OpenClaw Lit app state as the connected-page status source before scanning DOM.");
@@ -1778,7 +1793,7 @@ internal static class Tests
             "src",
             "OpenClaw",
             "Services",
-            "HostedUiBridge.cs");
+            "HostedUiBridge.Script.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("focusedInputHasText", source, "Bridge should distinguish focused empty editors from unsent user text.");
@@ -2150,6 +2165,48 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
+    public static Task SettingsSaveReappliesLiveShellOptions()
+    {
+        var sharedPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "SettingsDialog.Shared.cs");
+        var viewModelPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "ViewModels",
+            "SettingsViewModel.cs");
+        var commandsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.Commands.cs");
+        var hotkeyPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.Hotkey.cs");
+
+        var shared = File.ReadAllText(sharedPath);
+        var viewModel = File.ReadAllText(viewModelPath);
+        var commands = File.ReadAllText(commandsPath);
+        var hotkey = File.ReadAllText(hotkeyPath);
+
+        Assert.Contains("DidChangeLiveShellOptions", shared, "Settings save results should report live shell option changes.");
+        Assert.Contains("_originalAlwaysOnTop", viewModel, "Settings view model should compare the saved always-on-top value against the original value.");
+        Assert.Contains("_originalEnableGlobalHotkey", viewModel, "Settings view model should compare the saved hotkey enable flag against the original value.");
+        Assert.Contains("_originalGlobalHotkey", viewModel, "Settings view model should compare the saved hotkey binding against the original value.");
+        Assert.Contains("ApplyLiveShellSettings()", commands, "MainWindow should reapply live shell settings after Settings is saved.");
+        Assert.Contains("SetAlwaysOnTop(App.Configuration.Settings.AlwaysOnTop)", commands, "Saving Settings should update the current topmost state immediately.");
+        Assert.Contains("ReapplyGlobalHotkey()", commands, "Saving Settings should update the registered hotkey immediately.");
+        Assert.Contains("private void ReapplyGlobalHotkey()", hotkey, "Hotkey registration should expose a safe reapply path.");
+        Assert.Contains("DisposeGlobalHotkey();", hotkey, "Hotkey reapply should unregister the old binding before registering the new one.");
+        return Task.CompletedTask;
+    }
+
     public static Task AppSettingsDefaultsCompactModeToFalse()
     {
         var settings = new AppSettings();
@@ -2173,6 +2230,155 @@ internal static class Tests
         var settings = new AppSettings();
         Assert.Equal(-1d, settings.CompactWindowLeft, "CompactWindowLeft should default to -1 (unset).");
         Assert.Equal(-1d, settings.CompactWindowTop, "CompactWindowTop should default to -1 (unset).");
+        return Task.CompletedTask;
+    }
+
+    public static Task CompactModeSwitchesTopBarToCompactLayout()
+    {
+        var xamlPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.xaml");
+        var compactPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "MainWindow.CompactMode.cs");
+
+        var xaml = File.ReadAllText(xamlPath);
+        var compact = File.ReadAllText(compactPath);
+
+        Assert.Contains("x:Name=\"EnvironmentSummaryGroup\"", xaml, "The environment/url group should be nameable so compact mode can hide it.");
+        Assert.Contains("x:Name=\"TopStatusPill\"", xaml, "The top status pill should be nameable so compact mode can reduce its fixed footprint.");
+        Assert.Contains("x:Name=\"LatencyBadge\"", xaml, "The latency badge should be nameable so compact mode can hide secondary controls.");
+        Assert.Contains("x:Name=\"CommandBarSurface\"", xaml, "Compact mode should operate on the top command surface explicitly.");
+        Assert.Contains("ApplyCompactTopBarState(true)", compact, "Entering compact mode should switch the top bar to a compact layout.");
+        Assert.Contains("ApplyCompactTopBarState(false)", compact, "Exiting compact mode should restore the full top bar layout.");
+        Assert.Contains("TopStatusPill.MinWidth = 0", compact, "Compact mode should remove the 440px status pill minimum.");
+        Assert.Contains("ModelStatusSegment.MinWidth = 0", compact, "Compact mode should remove the model segment minimum width.");
+        Assert.Contains("EnvironmentSummaryGroup.Visibility = Visibility.Collapsed", compact, "Compact mode should hide the environment/url group that cannot fit in 480px.");
+        Assert.Contains("LatencyBadge.Visibility = Visibility.Collapsed", compact, "Compact mode should hide the secondary latency badge at compact width.");
+        return Task.CompletedTask;
+    }
+
+    public static Task WebViewStatusProbesIgnoreStaleGenerations()
+    {
+        var servicePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "WebViewService.cs");
+        var source = File.ReadAllText(servicePath);
+
+        Assert.Contains("_webViewGeneration", source, "WebViewService should track active WebView/navigation generations.");
+        Assert.Contains("NextWebViewGeneration()", source, "Navigation and detach paths should advance the generation.");
+        Assert.Contains("ProbeControlUiStateAfterNavigationAsync(_statusProbeCts.Token, generation)", source, "Status probes should capture the generation they belong to.");
+        Assert.Contains("InspectControlUiStateAsync(token, generation)", source, "Status probes should pass cancellation and generation into inspection.");
+        Assert.Contains("IsCurrentGeneration(generation)", source, "Inspection results should be discarded if they belong to an old generation.");
+        Assert.Contains("CancellationToken token", source, "Inspection should be cancellable after navigation or detach.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HeartbeatLoopOwnsTimerAndTaskLifetime()
+    {
+        var servicePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "WebViewService.cs");
+        var source = File.ReadAllText(servicePath);
+
+        Assert.Contains("private Task? _heartbeatTask;", source, "Heartbeat loop task should be stored so shutdown observes ownership.");
+        Assert.Contains("var timer = new PeriodicTimer", source, "Heartbeat loop should capture its own timer instead of reading a mutable shared timer field.");
+        Assert.Contains("_heartbeatTask = RunSessionAwareHeartbeatLoopAsync(gatewayUrl, timer, _heartbeatCts.Token);", source, "Starting heartbeat should retain the loop task.");
+        Assert.Contains("ObserveHeartbeatShutdownAsync", source, "Stopping heartbeat should observe loop completion instead of dropping exceptions.");
+        Assert.DoesNotContain("_heartbeatTimer!", source, "Heartbeat loop should not dereference a shared nullable timer.");
+        return Task.CompletedTask;
+    }
+
+    public static Task DisposableServicesImplementIDisposable()
+    {
+        var webViewPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "WebViewService.cs");
+        var bridgePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var coordinatorPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "ShellSessionCoordinator.cs");
+
+        Assert.Contains("public class WebViewService : IDisposable", File.ReadAllText(webViewPath), "WebViewService exposes Dispose and should implement IDisposable.");
+        Assert.Contains("public sealed class HostedUiBridge : IDisposable", File.ReadAllText(bridgePath), "HostedUiBridge exposes Dispose and should implement IDisposable.");
+        Assert.Contains("public sealed partial class ShellSessionCoordinator : IDisposable", File.ReadAllText(coordinatorPath), "ShellSessionCoordinator exposes Dispose and should implement IDisposable.");
+        return Task.CompletedTask;
+    }
+
+    public static Task LogViewerLoadsTailAsynchronously()
+    {
+        var dialogPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Views",
+            "LogViewerDialog.xaml.cs");
+        var source = File.ReadAllText(dialogPath);
+
+        Assert.Contains("Loaded += OnLoaded", source, "Log viewer should defer log loading until the dialog has loaded.");
+        Assert.Contains("private async void OnLoaded", source, "Loaded handler should use an async boundary.");
+        Assert.Contains("await LoadTodayLogAsync()", source, "Log loading should be asynchronous instead of blocking the constructor.");
+        Assert.Contains("await Task.Run", source, "Log tail reading should run off the UI thread.");
+        Assert.DoesNotContain("LoadTodayLog();", source, "The log viewer constructor/refresh should not synchronously scan log files on the UI thread.");
+        return Task.CompletedTask;
+    }
+
+    public static Task LogTailReaderReadsFromFileEnd()
+    {
+        var utilitiesPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Helpers",
+            "LogFileUtilities.cs");
+        var source = File.ReadAllText(utilitiesPath);
+
+        Assert.Contains("FileStream", source, "Tail reading should use a stream so it can seek near the end of large logs.");
+        Assert.Contains("SeekOrigin.End", source, "Tail reading should scan from the end of the file.");
+        Assert.Contains("Encoding.UTF8", source, "Tail reading should decode the retained byte range explicitly.");
+        Assert.DoesNotContain("foreach (var line in File.ReadLines(path))", source, "Tail reading should not enumerate the whole log on refresh.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedBridgeScriptHasTestableAssetSeam()
+    {
+        var bridgePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var scriptPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.Script.cs");
+
+        Assert.True(File.Exists(scriptPath), "The hosted bridge script should be isolated in a dedicated file instead of growing the service file.");
+        Assert.Contains("HostedUiBridgeScript", File.ReadAllText(scriptPath), "The bridge script file should expose a named script builder seam.");
+        Assert.Contains("HostedUiBridgeScript.Build", File.ReadAllText(bridgePath), "HostedUiBridge should delegate script construction to the dedicated builder.");
         return Task.CompletedTask;
     }
 

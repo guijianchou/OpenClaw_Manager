@@ -47,6 +47,12 @@ public sealed partial class MainWindow
         _globalHotkeyService = null;
     }
 
+    private void ReapplyGlobalHotkey()
+    {
+        DisposeGlobalHotkey();
+        InitializeGlobalHotkey();
+    }
+
     private void OnGlobalHotkeyPressed()
     {
         DispatcherQueue.TryEnqueue(() =>

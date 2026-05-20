@@ -34,6 +34,10 @@ It is best suited for users who:
 - The top status pill reserves more room for provider/model labels before AUTH and Status, but very long model names may still ellipsize at narrow window widths.
 - The WebView2 bridge now avoids native status DOM scans for right-sidebar content, settings/config bodies, and Cron-heavy rerenders. This is a practical mitigation for CPU spikes in Communications and Automation/Cron pages, not a replacement for upstream Control UI performance work if those pages become heavier.
 - Busy hosted chat sessions now expose a stale-stream signal when visible/app-state activity stops advancing. OpenClaw Manager first attempts lightweight sync/recent-message recovery, then escalates to reload after the soft-resync budget is exhausted; this helps when a Cloudflare Tunnel or proxy drops chat events but the Gateway run has already finished.
+- Always-on-top and global hotkey settings now apply immediately after saving Settings instead of waiting for a restart.
+- Compact mode now collapses nonessential top-bar segments and relaxes fixed status/model widths so the 480px shell keeps the model/status readout visible.
+- WebView2 status probes now carry WebView/navigation generation ownership, so stale script results are ignored after navigation, recreation, or process failure.
+- Heartbeat timers and log viewing now have explicit lifetime boundaries: heartbeat owns its loop task/timer, and the log viewer tails large files off the UI thread.
 
 ### This project is
 

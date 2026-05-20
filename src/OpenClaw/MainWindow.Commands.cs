@@ -117,6 +117,17 @@ public sealed partial class MainWindow
         {
             ScheduleWebViewRecreation("settings_saved_topology_changed");
         }
+
+        if (saveResult.DidChangeLiveShellOptions)
+        {
+            ApplyLiveShellSettings();
+        }
+    }
+
+    private void ApplyLiveShellSettings()
+    {
+        SetAlwaysOnTop(App.Configuration.Settings.AlwaysOnTop);
+        ReapplyGlobalHotkey();
     }
 
     private void OnError(string message)

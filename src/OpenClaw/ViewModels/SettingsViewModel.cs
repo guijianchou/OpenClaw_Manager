@@ -20,6 +20,9 @@ public class SettingsViewModel : INotifyPropertyChanged
     private readonly Dictionary<EnvironmentConfig, EnvironmentConfig> _originalSnapshots = [];
     private readonly string? _originalSelectedEnvironmentName = App.Configuration.Settings.SelectedEnvironmentName;
     private readonly string _originalLanguage;
+    private readonly bool _originalAlwaysOnTop;
+    private readonly bool _originalEnableGlobalHotkey;
+    private readonly string _originalGlobalHotkey;
     private EnvironmentConfig? _selectedEnvironment;
     private string _editName = string.Empty;
     private string _editUrl = string.Empty;
@@ -56,6 +59,9 @@ public class SettingsViewModel : INotifyPropertyChanged
         _enableGlobalHotkey = App.Configuration.Settings.EnableGlobalHotkey;
         _globalHotkey = App.Configuration.Settings.GlobalHotkey;
         _alwaysOnTop = App.Configuration.Settings.AlwaysOnTop;
+        _originalAlwaysOnTop = _alwaysOnTop;
+        _originalEnableGlobalHotkey = _enableGlobalHotkey;
+        _originalGlobalHotkey = _globalHotkey;
         _validationMessage = StringResources.SettingsValidationDefaultMessage;
     }
 
@@ -305,8 +311,16 @@ public class SettingsViewModel : INotifyPropertyChanged
         result = new SettingsSaveResult(
             DidChangeEnvironmentState,
             DidChangeSessionTopology,
-            !string.Equals(_originalLanguage, SelectedLanguage, StringComparison.Ordinal));
+            !string.Equals(_originalLanguage, SelectedLanguage, StringComparison.Ordinal),
+            DidChangeLiveShellOptions());
         return true;
+    }
+
+    private bool DidChangeLiveShellOptions()
+    {
+        return _originalAlwaysOnTop != AlwaysOnTop ||
+            _originalEnableGlobalHotkey != EnableGlobalHotkey ||
+            !string.Equals(_originalGlobalHotkey, GlobalHotkey.Trim(), StringComparison.Ordinal);
     }
 
     private void LoadEditFields()

@@ -9,7 +9,7 @@ namespace OpenClaw.Services;
 /// Manages reconnection, resync, and refresh decisions based on
 /// transport health, session state, and event stream consistency.
 /// </summary>
-public sealed partial class ShellSessionCoordinator
+public sealed partial class ShellSessionCoordinator : IDisposable
 {
     private RecoveryPolicyOptions _recoveryOptions;
     private HeartbeatOptions _heartbeatOptions;

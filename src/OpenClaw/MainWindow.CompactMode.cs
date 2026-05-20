@@ -9,6 +9,8 @@ public sealed partial class MainWindow
 {
     private const int CompactWidth = 480;
     private const int CompactHeight = 120;
+    private const double FullTopStatusPillMinWidth = 440;
+    private const double FullModelStatusSegmentMinWidth = 190;
 
     private bool _isCompactMode;
     private SizeInt32 _normalSize;
@@ -53,6 +55,7 @@ public sealed partial class MainWindow
 
         // Hide WebView and InfoBars (Rows 2-4)
         SetCompactVisibility(Visibility.Collapsed);
+        ApplyCompactTopBarState(true);
 
         // Restore compact position if previously saved
         var settings = App.Configuration.Settings;
@@ -76,6 +79,7 @@ public sealed partial class MainWindow
 
         // Restore normal bounds
         SetCompactVisibility(Visibility.Visible);
+        ApplyCompactTopBarState(false);
         appWindow.Resize(_normalSize.Width > 0 ? _normalSize : new SizeInt32(1280, 800));
         if (_normalSize.Width > 0)
         {
@@ -113,5 +117,30 @@ public sealed partial class MainWindow
         {
             loadingRing.Visibility = visibility;
         }
+    }
+
+    private void ApplyCompactTopBarState(bool isCompact)
+    {
+        if (isCompact)
+        {
+            CommandBarSurface.Padding = new Thickness(8, 6, 8, 6);
+            EnvironmentSummaryGroup.Visibility = Visibility.Collapsed;
+            LatencyBadge.Visibility = Visibility.Collapsed;
+            TopStatusPill.MinWidth = 0;
+            TopStatusPill.Margin = new Thickness(0, 0, 8, 0);
+            TopStatusPill.Padding = new Thickness(8, 5, 8, 5);
+            ModelStatusSegment.MinWidth = 0;
+            ModelStatusSegment.Margin = new Thickness(4, 0, 0, 0);
+            return;
+        }
+
+        CommandBarSurface.Padding = new Thickness(12, 8, 12, 8);
+        EnvironmentSummaryGroup.Visibility = Visibility.Visible;
+        LatencyBadge.Visibility = Visibility.Visible;
+        TopStatusPill.MinWidth = FullTopStatusPillMinWidth;
+        TopStatusPill.Margin = new Thickness(16, 0, 12, 0);
+        TopStatusPill.Padding = new Thickness(12, 5, 12, 5);
+        ModelStatusSegment.MinWidth = FullModelStatusSegmentMinWidth;
+        ModelStatusSegment.Margin = new Thickness(6, 0, 0, 0);
     }
 }

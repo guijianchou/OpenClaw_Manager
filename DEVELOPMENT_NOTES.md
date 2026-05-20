@@ -7,6 +7,9 @@ This project uses C# and WinUI conventions, but follows the Linux engineering bi
 - Keep control flow readable. Use braces on every `if`, loop, and branch even for one-line bodies.
 - Keep files focused. New service/view-model code should prefer small partials or helper types over growing `WebViewService`, `HostedUiBridge`, or the test harness further.
 - Own background work explicitly. A background loop should have a stored `Task`, a stored cancellation source, and one logging boundary for exceptions.
+- WebView/CoreWebView2 async work must carry a generation or equivalent ownership token across awaits before applying results back to app state.
+- Hosted bridge JavaScript belongs behind a dedicated script-builder seam; keep native WebView orchestration in `HostedUiBridge` and script content in `HostedUiBridge.Script.cs`.
+- Settings that affect live shell behavior must map to a current-process apply path, not only persisted configuration.
 - Prefer structured logs with stable event keys and context objects. Avoid interpolated operational logs for state transitions.
 - Keep user-visible text in `StringResources` unless the string is diagnostic-only or a protocol/status token.
 - Keep `.editorconfig` as the source of formatting truth. Do not rely on local IDE defaults.

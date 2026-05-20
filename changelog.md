@@ -13,6 +13,10 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - Fixed the top MODEL value typography so it uses the same 12px text size as the native status bar.
 - Hardened hosted OpenClaw model detection for app-state variants, URL session keys, Map-backed model overrides, and non-string payload normalization.
 - Deferred app-state default MODEL fallbacks, including `null` session overrides, so root defaults do not mask later nested active-session models.
+- Applied Always-on-top and global hotkey changes immediately after Settings save.
+- Tightened compact mode top-bar layout so nonessential status segments collapse cleanly at 480px.
+- Guarded WebView2 status probes with WebView/navigation generation ownership so stale async script results cannot overwrite current state.
+- Made heartbeat loop ownership and log viewer loading explicit: heartbeat owns its timer/task, and log tailing runs off the UI thread.
 - Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.3`.
 
 ### v3.3.2 (2026-05-19)
@@ -186,6 +190,10 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - 修复顶部 MODEL 值的字号，使其与原生状态栏的 12px 文本字号一致。
 - 加固托管 OpenClaw 模型检测，支持 app-state 变体、URL session key、Map 形式模型 override，以及非字符串 payload 归一化。
 - 延后 app-state 默认 MODEL fallback，包括 session 的 `null` override，避免根节点默认模型盖掉后续嵌套的当前会话模型。
+- Settings 保存后会立即应用 Always-on-top 和全局热键变更，不再需要重启。
+- 收紧紧凑模式顶栏布局，在 480px 宽度下折叠非必要状态段并保留模型/状态可读性。
+- WebView2 状态探测现在带有 WebView/导航 generation 归属，避免过期异步脚本结果覆盖当前状态。
+- 明确 heartbeat loop 和日志查看器的生命周期：heartbeat 独立持有 timer/task，日志 tail 在 UI 线程之外加载。
 - 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.3`。
 
 ### v3.3.2 (2026-05-19)

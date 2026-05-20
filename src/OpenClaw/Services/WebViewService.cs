@@ -12,7 +12,7 @@ namespace OpenClaw.Services;
 /// <summary>
 /// Manages WebView2 lifecycle, navigation, and connection state monitoring.
 /// </summary>
-public class WebViewService
+public class WebViewService : IDisposable
 {
     private const string ControlUiStatusMessageKind = "openclaw-control-ui-status";
     private const int DefaultHeartbeatFailureThreshold = 3;
@@ -24,8 +24,10 @@ public class WebViewService
     private int _retryCount;
     private CancellationTokenSource? _retryCts;
     private CancellationTokenSource? _statusProbeCts;
+    private int _webViewGeneration;
     private readonly object _inspectionGate = new();
     private Task<ControlUiProbeSnapshot>? _inFlightInspectionTask;
+    private int _inFlightInspectionGeneration;
     private DateTimeOffset _lastControlUiInspectionAt = DateTimeOffset.MinValue;
     private ControlUiProbeSnapshot _latestControlUiSnapshot = ControlUiProbeSnapshot.Unknown;
     private string? _lastReportedIssueKey;
@@ -39,8 +41,8 @@ public class WebViewService
     private int _heartbeatRecoveryRequests;
 
     // Heartbeat fields
-    private PeriodicTimer? _heartbeatTimer;
     private CancellationTokenSource? _heartbeatCts;
+    private Task? _heartbeatTask;
     private int _heartbeatFailureCount;
     private int _heartbeatConnectingCount;
     private string? _lastHeartbeatObservationKey;
@@ -119,6 +121,7 @@ public class WebViewService
         DetachCurrentWebView();
         _webView = webView;
         _coreWebView = null;
+        NextWebViewGeneration();
         CurrentEnvironmentName = environmentName;
         _isInitialized = false;
 
@@ -193,6 +196,7 @@ public class WebViewService
         _lastNavigatedUrl = url;
         _retryCount = 0;
         CancelStatusProbeLoop();
+        NextWebViewGeneration();
         _retryCts?.Cancel();
         _retryCts = new CancellationTokenSource();
         SetState(ConnectionState.Loading);
@@ -323,7 +327,17 @@ public class WebViewService
     /// </summary>
     public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync()
     {
+        return InspectControlUiStateAsync(CancellationToken.None, Volatile.Read(ref _webViewGeneration));
+    }
+
+    private Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(CancellationToken token, int generation)
+    {
         Interlocked.Increment(ref _totalControlUiInspectionRequests);
+        if (token.IsCancellationRequested || !IsCurrentGeneration(generation))
+        {
+            return Task.FromResult(ControlUiProbeSnapshot.Unknown);
+        }
+
         var coreWebView = GetCoreWebView();
         if (coreWebView is null)
         {
@@ -332,7 +346,8 @@ public class WebViewService
 
         lock (_inspectionGate)
         {
-            if (_inFlightInspectionTask is not null)
+            if (_inFlightInspectionTask is not null &&
+                _inFlightInspectionGeneration == generation)
             {
                 var coalescedCount = Interlocked.Increment(ref _coalescedControlUiInspectionRequests);
                 if (ShouldLogInspectionInstrumentationCount(coalescedCount))
@@ -363,7 +378,8 @@ public class WebViewService
 
             var inspectionSource = new TaskCompletionSource<ControlUiProbeSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
             _inFlightInspectionTask = inspectionSource.Task;
-            _ = CompleteControlUiInspectionAsync(coreWebView, inspectionSource);
+            _inFlightInspectionGeneration = generation;
+            _ = CompleteControlUiInspectionAsync(coreWebView, inspectionSource, token, generation);
             return inspectionSource.Task;
         }
     }
@@ -646,7 +662,7 @@ public class WebViewService
         }
 
         if (_heartbeatCts is not null &&
-            _heartbeatTimer is not null &&
+            _heartbeatTask is not null &&
             string.Equals(_heartbeatGatewayUrl, gatewayUrl, StringComparison.OrdinalIgnoreCase) &&
             _heartbeatIntervalSeconds == intervalSeconds)
         {
@@ -663,7 +679,7 @@ public class WebViewService
         _heartbeatFailureThreshold = Math.Max(1, heartbeatSettings.FailureThreshold);
         _heartbeatConnectingThreshold = Math.Max(1, heartbeatSettings.ConnectingThreshold);
         _heartbeatCts = new CancellationTokenSource();
-        _heartbeatTimer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+        var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
 
         var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{_heartbeatFailureThreshold}|{_heartbeatConnectingThreshold}";
         if (!string.Equals(_lastStartHeartbeatKey, heartbeatStartKey, StringComparison.Ordinal))
@@ -671,7 +687,7 @@ public class WebViewService
             _lastStartHeartbeatKey = heartbeatStartKey;
             App.Logger.Info($"Heartbeat started: interval={intervalSeconds}s, failureThreshold={_heartbeatFailureThreshold}, connectingThreshold={_heartbeatConnectingThreshold}, url={gatewayUrl}");
         }
-        _ = RunSessionAwareHeartbeatLoopAsync(gatewayUrl, _heartbeatCts.Token);
+        _heartbeatTask = RunSessionAwareHeartbeatLoopAsync(gatewayUrl, timer, _heartbeatCts.Token);
     }
 
     /// <summary>
@@ -679,15 +695,21 @@ public class WebViewService
     /// </summary>
     public void StopHeartbeat()
     {
-        if (_heartbeatCts is not null)
+        var heartbeatCts = _heartbeatCts;
+        var heartbeatTask = _heartbeatTask;
+        _heartbeatCts = null;
+        _heartbeatTask = null;
+
+        heartbeatCts?.Cancel();
+        if (heartbeatTask is not null)
         {
-            _heartbeatCts.Cancel();
-            _heartbeatCts.Dispose();
-            _heartbeatCts = null;
+            _ = ObserveHeartbeatShutdownAsync(heartbeatTask, heartbeatCts);
+        }
+        else
+        {
+            heartbeatCts?.Dispose();
         }
 
-        _heartbeatTimer?.Dispose();
-        _heartbeatTimer = null;
         _heartbeatFailureCount = 0;
         _heartbeatConnectingCount = 0;
         _lastHeartbeatObservationKey = null;
@@ -699,74 +721,11 @@ public class WebViewService
     }
 
 
-    private async Task RunSessionAwareHeartbeatLoopAsync(string gatewayUrl, CancellationToken token)
+    private async Task ObserveHeartbeatShutdownAsync(Task heartbeatTask, CancellationTokenSource? heartbeatCts)
     {
         try
         {
-            while (await _heartbeatTimer!.WaitForNextTickAsync(token))
-            {
-                if (token.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                var probe = await ProbeGatewayHealthAsync(gatewayUrl, token);
-                LogHeartbeatObservation(probe);
-
-                if (probe.Status == HeartbeatProbeStatus.Healthy)
-                {
-                    if (_heartbeatFailureCount > 0)
-                    {
-                        App.Logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
-                    }
-
-                    _heartbeatFailureCount = 0;
-                    _heartbeatConnectingCount = 0;
-                    continue;
-                }
-
-                if (probe.Status == HeartbeatProbeStatus.SessionBlocked)
-                {
-                    if (_heartbeatFailureCount > 0)
-                    {
-                        App.Logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
-                    }
-
-                    _heartbeatFailureCount = 0;
-                    _heartbeatConnectingCount = 0;
-                    continue;
-                }
-
-                if (probe.Status == HeartbeatProbeStatus.Connecting)
-                {
-                    _heartbeatFailureCount = 0;
-                    _heartbeatConnectingCount++;
-
-                    if (_heartbeatConnectingCount < _heartbeatConnectingThreshold)
-                    {
-                        continue;
-                    }
-
-                    if (TryScheduleHeartbeatReload(probe.Message, preserveConnectingCounter: true))
-                    {
-                        return;
-                    }
-
-                    continue;
-                }
-
-                _heartbeatConnectingCount = 0;
-                _heartbeatFailureCount++;
-                App.Logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
-
-                if (_heartbeatFailureCount >= _heartbeatFailureThreshold)
-                {
-                    if (TryScheduleHeartbeatReload(probe.Message))
-                    {
-                        return;
-                    }
-                }
-            }
+            await heartbeatTask;
         }
         catch (OperationCanceledException)
         {
@@ -774,7 +733,93 @@ public class WebViewService
         }
         catch (Exception ex)
         {
-            App.Logger.Error($"Heartbeat loop error: {ex.Message}");
+            App.Logger.Error($"Heartbeat loop shutdown error: {ex.Message}");
+        }
+        finally
+        {
+            heartbeatCts?.Dispose();
+        }
+    }
+
+    private async Task RunSessionAwareHeartbeatLoopAsync(string gatewayUrl, PeriodicTimer timer, CancellationToken token)
+    {
+        using (timer)
+        {
+            try
+            {
+                while (await timer.WaitForNextTickAsync(token))
+                {
+                    if (token.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    var probe = await ProbeGatewayHealthAsync(gatewayUrl, token);
+                    LogHeartbeatObservation(probe);
+
+                    if (probe.Status == HeartbeatProbeStatus.Healthy)
+                    {
+                        if (_heartbeatFailureCount > 0)
+                        {
+                            App.Logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
+                        }
+
+                        _heartbeatFailureCount = 0;
+                        _heartbeatConnectingCount = 0;
+                        continue;
+                    }
+
+                    if (probe.Status == HeartbeatProbeStatus.SessionBlocked)
+                    {
+                        if (_heartbeatFailureCount > 0)
+                        {
+                            App.Logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
+                        }
+
+                        _heartbeatFailureCount = 0;
+                        _heartbeatConnectingCount = 0;
+                        continue;
+                    }
+
+                    if (probe.Status == HeartbeatProbeStatus.Connecting)
+                    {
+                        _heartbeatFailureCount = 0;
+                        _heartbeatConnectingCount++;
+
+                        if (_heartbeatConnectingCount < _heartbeatConnectingThreshold)
+                        {
+                            continue;
+                        }
+
+                        if (TryScheduleHeartbeatReload(probe.Message, preserveConnectingCounter: true))
+                        {
+                            return;
+                        }
+
+                        continue;
+                    }
+
+                    _heartbeatConnectingCount = 0;
+                    _heartbeatFailureCount++;
+                    App.Logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
+
+                    if (_heartbeatFailureCount >= _heartbeatFailureThreshold)
+                    {
+                        if (TryScheduleHeartbeatReload(probe.Message))
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when StopHeartbeat() is called.
+            }
+            catch (Exception ex)
+            {
+                App.Logger.Error($"Heartbeat loop error: {ex.Message}");
+            }
         }
     }
 
@@ -948,6 +993,7 @@ public class WebViewService
     private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
     {
         CancelStatusProbeLoop();
+        NextWebViewGeneration();
         _lastReportedIssueKey = null;
         _heartbeatConnectingCount = 0;
         _lastHeartbeatObservationKey = null;
@@ -1030,6 +1076,7 @@ public class WebViewService
     private void OnProcessFailed(CoreWebView2 sender, CoreWebView2ProcessFailedEventArgs args)
     {
         CancelStatusProbeLoop();
+        NextWebViewGeneration();
         _latestControlUiSnapshot = ControlUiProbeSnapshot.Unavailable("Browser process failed.");
         App.Logger.Error($"WebView2 process failed: {args.Reason} ({args.ProcessFailedKind})");
         SetState(ConnectionState.Error);
@@ -1040,6 +1087,7 @@ public class WebViewService
     {
         CancelStatusProbeLoop();
         StopHeartbeat();
+        NextWebViewGeneration();
         _retryCts?.Cancel();
 
         var coreWebView = GetCoreWebView();
@@ -1094,6 +1142,16 @@ public class WebViewService
         return _coreWebView;
     }
 
+    private int NextWebViewGeneration()
+    {
+        return Interlocked.Increment(ref _webViewGeneration);
+    }
+
+    private bool IsCurrentGeneration(int generation)
+    {
+        return Volatile.Read(ref _webViewGeneration) == generation;
+    }
+
     private void LogLifecycleEventOnce(string eventName, object? context = null)
     {
         var logKey = context is null
@@ -1113,7 +1171,8 @@ public class WebViewService
     {
         CancelStatusProbeLoop();
         _statusProbeCts = new CancellationTokenSource();
-        _ = ProbeControlUiStateAfterNavigationAsync(_statusProbeCts.Token);
+        var generation = Volatile.Read(ref _webViewGeneration);
+        _ = ProbeControlUiStateAfterNavigationAsync(_statusProbeCts.Token, generation);
     }
 
     private void CancelStatusProbeLoop()
@@ -1126,7 +1185,7 @@ public class WebViewService
         }
     }
 
-    private async Task ProbeControlUiStateAfterNavigationAsync(CancellationToken token)
+    private async Task ProbeControlUiStateAfterNavigationAsync(CancellationToken token, int generation)
     {
         var delays = new[]
         {
@@ -1142,7 +1201,12 @@ public class WebViewService
             foreach (var delay in delays)
             {
                 await Task.Delay(delay, token);
-                var snapshot = await InspectControlUiStateAsync();
+                if (!IsCurrentGeneration(generation))
+                {
+                    return;
+                }
+
+                var snapshot = await InspectControlUiStateAsync(token, generation);
                 if (snapshot.IsTerminal)
                 {
                     return;
@@ -1213,11 +1277,17 @@ public class WebViewService
 
     private async Task CompleteControlUiInspectionAsync(
         CoreWebView2 coreWebView,
-        TaskCompletionSource<ControlUiProbeSnapshot> inspectionSource)
+        TaskCompletionSource<ControlUiProbeSnapshot> inspectionSource,
+        CancellationToken token,
+        int generation)
     {
         try
         {
-            inspectionSource.TrySetResult(await ExecuteControlUiInspectionAsync(coreWebView));
+            inspectionSource.TrySetResult(await ExecuteControlUiInspectionAsync(coreWebView, token, generation));
+        }
+        catch (OperationCanceledException)
+        {
+            inspectionSource.TrySetResult(ControlUiProbeSnapshot.Unknown);
         }
         catch (Exception ex)
         {
@@ -1241,7 +1311,7 @@ public class WebViewService
         return count == 1 || count % 25 == 0;
     }
 
-    private async Task<ControlUiProbeSnapshot> ExecuteControlUiInspectionAsync(CoreWebView2 coreWebView)
+    private async Task<ControlUiProbeSnapshot> ExecuteControlUiInspectionAsync(CoreWebView2 coreWebView, CancellationToken token, int generation)
     {
         const string script = """
 (() => {
@@ -1262,7 +1332,19 @@ public class WebViewService
 
         try
         {
+            token.ThrowIfCancellationRequested();
+            if (!IsCurrentGeneration(generation))
+            {
+                return ControlUiProbeSnapshot.Unknown;
+            }
+
             var rawResult = await coreWebView.ExecuteScriptAsync(script);
+            token.ThrowIfCancellationRequested();
+            if (!IsCurrentGeneration(generation))
+            {
+                return ControlUiProbeSnapshot.Unknown;
+            }
+
             _lastControlUiInspectionAt = DateTimeOffset.UtcNow;
 
             var payload = JsonSerializer.Deserialize<string>(rawResult);
@@ -1272,8 +1354,16 @@ public class WebViewService
             }
 
             var snapshot = ParseControlUiSnapshot(payload);
-            ApplyControlUiSnapshot(snapshot, raiseIssueEvent: false);
+            if (IsCurrentGeneration(generation))
+            {
+                ApplyControlUiSnapshot(snapshot, raiseIssueEvent: false);
+            }
+
             return snapshot;
+        }
+        catch (OperationCanceledException)
+        {
+            return ControlUiProbeSnapshot.Unknown;
         }
         catch (Exception ex)
         {

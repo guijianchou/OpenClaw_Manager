@@ -1,5 +1,6 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OpenClaw.Helpers;
 
@@ -16,10 +17,16 @@ public sealed partial class LogViewerDialog : ContentDialog
     {
         this.InitializeComponent();
         _logDirectory = App.Logger.LogFolderPath;
-        LoadTodayLog();
+        Loaded += OnLoaded;
     }
 
-    private void LoadTodayLog()
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnLoaded;
+        await LoadTodayLogAsync();
+    }
+
+    private async Task LoadTodayLogAsync()
     {
         try
         {
@@ -29,7 +36,7 @@ public sealed partial class LogViewerDialog : ContentDialog
 
             if (File.Exists(logFile))
             {
-                var tail = LogFileUtilities.ReadLastLines(logFile, LogFileUtilities.DefaultTailLineCount);
+                var tail = await Task.Run(() => LogFileUtilities.ReadLastLines(logFile, LogFileUtilities.DefaultTailLineCount));
                 var content = string.Join(Environment.NewLine, tail.Lines);
                 if (tail.WasTruncated)
                 {
@@ -52,12 +59,12 @@ public sealed partial class LogViewerDialog : ContentDialog
         }
     }
 
-    private void OnRefresh(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void OnRefresh(object sender, RoutedEventArgs e)
     {
-        LoadTodayLog();
+        await LoadTodayLogAsync();
     }
 
-    private void OnOpenLogFolder(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void OnOpenLogFolder(object sender, RoutedEventArgs e)
     {
         try
         {
