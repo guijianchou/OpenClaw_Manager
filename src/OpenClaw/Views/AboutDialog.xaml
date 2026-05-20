@@ -36,13 +36,13 @@
 
         <HyperlinkButton Content="{x:Bind helpers:StringResources.AboutRepository}"
                          HorizontalAlignment="Center"
-                         NavigateUri="https://github.com/guijianchou/OpenClaw_Manager" />
+                         NavigateUri="https://github.com/Guijianchou" />
 
         <TextBlock HorizontalAlignment="Center"
                    FontSize="12"
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}">
             <Run Text="{x:Bind helpers:StringResources.AboutDevelopedBy}" />
-            <Hyperlink NavigateUri="https://github.com/Jutaosay">@Jutaosay</Hyperlink>
+            <Hyperlink NavigateUri="https://github.com/Guijianchou">@Guijianchou</Hyperlink>
         </TextBlock>
 
         <TextBlock Text="{x:Bind helpers:StringResources.AboutCopyright}"

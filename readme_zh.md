@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 3.3.3
+**当前版本：** 3.3.4
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,14 +26,9 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 3.3.3 注意事项
+## 当前 3.3.4 注意事项
 
-- 顶部 MODEL 指示器现在会读取 OpenClaw app state 变体、URL session key 和 Map 形式的模型 override，并在瞬时空快照期间保留最近一次非空值。
-- app-state 默认模型 fallback，包括每个 session 的 `null` override，都会延后到嵌套 session 候选检查之后再使用，避免根节点默认模型盖掉当前会话模型。
-- MODEL 值的字号现在与原生状态栏文本字号一致，状态信息阅读更统一。
-- 顶部状态 pill 已为 provider/model 标签预留更多空间，并拉开 MODEL 与 AUTH/Status 的间距；窗口较窄或模型名特别长时仍可能省略显示。
-- WebView2 bridge 现在会避开右侧栏内容、settings/config 主体和 Cron 重渲染区域的原生状态 DOM 扫描。这是对 Communications 与 Automation/Cron 页面 CPU 飙升的实用缓解方案；如果上游 Control UI 页面继续变重，仍需要继续跟进上游性能变化。
-- busy 的托管聊天会话现在会在可见内容或 app-state 活动长时间不推进时暴露 stale-stream 信号。OpenClaw Manager 会先尝试 lightweight sync / recent-message 恢复，并在 soft-resync 预算耗尽后升级到 reload；这可以缓解 Cloudflare Tunnel 或反向代理丢失聊天事件，但 Gateway run 已经完成的情况。
+- About 对话框里的 GitHub 链接现在指向 `https://github.com/Guijianchou`。
 - Settings 保存后会立即应用 Always-on-top 和全局热键变更，不再需要重启。
 - 紧凑模式现在会折叠非必要顶栏状态段并放宽固定宽度，让 480px 小窗仍能显示模型和状态信息。
 - WebView2 状态探测现在带有 WebView/导航 generation 归属，导航、重建或进程失败后的过期脚本结果会被忽略。

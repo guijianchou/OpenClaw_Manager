@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
-**Current version:** 3.3.3
+**Current version:** 3.3.4
 
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
@@ -26,14 +26,9 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
-## Current 3.3.3 Notes
+## Current 3.3.4 Notes
 
-- The top MODEL indicator now reads OpenClaw app state variants, URL session keys, and Map-backed model overrides, then keeps the last non-empty value during transient empty snapshots.
-- App-state default model fallbacks, including `null` per-session overrides, are deferred until nested session candidates have been checked so a root default does not mask the active session model.
-- The MODEL value typography now matches the native status bar text size for a more consistent status readout.
-- The top status pill reserves more room for provider/model labels before AUTH and Status, but very long model names may still ellipsize at narrow window widths.
-- The WebView2 bridge now avoids native status DOM scans for right-sidebar content, settings/config bodies, and Cron-heavy rerenders. This is a practical mitigation for CPU spikes in Communications and Automation/Cron pages, not a replacement for upstream Control UI performance work if those pages become heavier.
-- Busy hosted chat sessions now expose a stale-stream signal when visible/app-state activity stops advancing. OpenClaw Manager first attempts lightweight sync/recent-message recovery, then escalates to reload after the soft-resync budget is exhausted; this helps when a Cloudflare Tunnel or proxy drops chat events but the Gateway run has already finished.
+- The About dialog GitHub links now point to `https://github.com/Guijianchou`.
 - Always-on-top and global hotkey settings now apply immediately after saving Settings instead of waiting for a restart.
 - Compact mode now collapses nonessential top-bar segments and relaxes fixed status/model widths so the 480px shell keeps the model/status readout visible.
 - WebView2 status probes now carry WebView/navigation generation ownership, so stale script results are ignored after navigation, recreation, or process failure.

@@ -39,12 +39,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings switch rows use compact spacing", Tests.SettingsSwitchRowsUseCompactSpacing),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places General after Language", Tests.SettingsNavigationPlacesGeneralAfterLanguage),
-    ("Version metadata is 3.3.3", Tests.VersionMetadataIs333),
+    ("Version metadata is 3.3.4", Tests.VersionMetadataIs334),
     ("Repository code style is explicit", Tests.RepositoryCodeStyleIsExplicit),
     ("Directory build enables analyzers and style", Tests.DirectoryBuildEnablesAnalyzersAndStyle),
     ("Executable test harness rejects dotnet test false positives", Tests.ExecutableTestHarnessRejectsDotnetTestFalsePositives),
     ("Documentation includes WinUI format platform", Tests.DocumentationIncludesWinUiFormatPlatform),
-    ("About dialog repository link targets OpenClaw Manager repo", Tests.AboutDialogRepositoryLinkTargetsOpenClawManagerRepo),
+    ("About dialog repository link targets Guijianchou profile", Tests.AboutDialogRepositoryLinkTargetsGuijianchouProfile),
     ("Settings window uses non-blocking frame refresh", Tests.SettingsWindowUsesNonBlockingFrameRefresh),
     ("Settings window avoids first-frame black flash", Tests.SettingsWindowAvoidsFirstFrameBlackFlash),
     ("Title bar caption button states use opaque theme colors", Tests.TitleBarCaptionButtonStatesUseOpaqueThemeColors),
@@ -999,7 +999,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task VersionMetadataIs333()
+    public static Task VersionMetadataIs334()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -1028,11 +1028,11 @@ internal static class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.3.3</Version>", project, "Project package version should be 3.3.3.");
-        Assert.Contains("<AssemblyVersion>3.3.3.0</AssemblyVersion>", project, "Assembly version should be 3.3.3.0.");
-        Assert.Contains("<FileVersion>3.3.3.0</FileVersion>", project, "File version should be 3.3.3.0.");
-        Assert.Contains("Version=\"3.3.3.0\"", packageManifest, "Package manifest version should be 3.3.3.0.");
-        Assert.Contains("version=\"3.3.3.0\"", appManifest, "Application manifest assembly identity should be 3.3.3.0.");
+        Assert.Contains("<Version>3.3.4</Version>", project, "Project package version should be 3.3.4.");
+        Assert.Contains("<AssemblyVersion>3.3.4.0</AssemblyVersion>", project, "Assembly version should be 3.3.4.0.");
+        Assert.Contains("<FileVersion>3.3.4.0</FileVersion>", project, "File version should be 3.3.4.0.");
+        Assert.Contains("Version=\"3.3.4.0\"", packageManifest, "Package manifest version should be 3.3.4.0.");
+        Assert.Contains("version=\"3.3.4.0\"", appManifest, "Application manifest assembly identity should be 3.3.4.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
         return Task.CompletedTask;
     }
@@ -1093,7 +1093,7 @@ internal static class Tests
         return Task.CompletedTask;
     }
 
-    public static Task AboutDialogRepositoryLinkTargetsOpenClawManagerRepo()
+    public static Task AboutDialogRepositoryLinkTargetsGuijianchouProfile()
     {
         var aboutPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -1104,8 +1104,11 @@ internal static class Tests
 
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("NavigateUri=\"https://github.com/guijianchou/OpenClaw_Manager\"", about, "About dialog repository link should target the OpenClaw Manager repository.");
+        Assert.Contains("NavigateUri=\"https://github.com/Guijianchou\"", about, "About dialog repository link should target the Guijianchou GitHub profile.");
+        Assert.Contains(">@Guijianchou</Hyperlink>", about, "About dialog developer link should show the Guijianchou GitHub profile.");
+        Assert.DoesNotContain("NavigateUri=\"https://github.com/guijianchou/OpenClaw_Manager\"", about, "About dialog repository link should no longer target the old OpenClaw Manager repository URL.");
         Assert.DoesNotContain("NavigateUri=\"https://github.com/Jutaosay/openclaw_for_windows\"", about, "About dialog should not link to the old repository.");
+        Assert.DoesNotContain("https://github.com/Jutaosay", about, "About dialog should not link to the old developer profile.");
         return Task.CompletedTask;
     }
 
