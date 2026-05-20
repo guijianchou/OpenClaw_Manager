@@ -60,6 +60,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tray menu status header reflects work status", Tests.TrayMenuStatusHeaderReflectsWorkStatus),
     ("Hosted UI bridge reads current model from OpenClaw model select", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect),
     ("Hosted UI bridge reads current model from OpenClaw app state", Tests.HostedUiBridgeReadsCurrentModelFromOpenClawAppState),
+    ("Hosted UI bridge uses structured model source pipeline", Tests.HostedUiBridgeUsesStructuredModelSourcePipeline),
+    ("Hosted UI snapshots carry model source instrumentation", Tests.HostedUiSnapshotsCarryModelSourceInstrumentation),
     ("Hosted UI bridge ignores sidebar-only mutations during status polling", Tests.HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling),
     ("Hosted UI bridge ignores settings and cron mutation storms", Tests.HostedUiBridgeIgnoresSettingsAndCronMutationStorms),
     ("Hosted UI bridge reports stale busy and input text state", Tests.HostedUiBridgeReportsStaleBusyAndInputTextState),
@@ -1520,6 +1522,66 @@ internal static class Tests
         Assert.Contains("searchParams.get('session')", source, "Bridge should fall back to the hosted chat session query string when app.sessionKey is absent.");
         Assert.Contains("overrides instanceof Map", source, "Bridge should support Map-backed chatModelOverrides from Lit app state.");
         Assert.Contains("value == null ? '' : String(value)", source, "Bridge text normalization should not throw when app-state message parts contain object payloads.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeUsesStructuredModelSourcePipeline()
+    {
+        var sourcePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("MODEL_FIELD_KEYS", source, "Model field aliases should be centralized instead of repeated in ad hoc OR chains.");
+        Assert.Contains("PROVIDER_FIELD_KEYS", source, "Provider field aliases should be centralized next to model aliases.");
+        Assert.Contains("SESSION_KEY_PATHS", source, "Session-key discovery should be data-driven across root and nested app-state variants.");
+        Assert.Contains("APP_STATE_PATHS", source, "OpenClaw app-state lookup should cover root and nested state containers without another patch per field move.");
+        Assert.Contains("MODEL_SOURCE_READERS", source, "Current model detection should run through an explicit ordered source pipeline.");
+        Assert.Contains("readFirstPath", source, "Nested app-state values should be resolved through one path reader instead of repeated optional chains.");
+        Assert.Contains("return { value:", source, "Model readers should return both the detected value and its source.");
+        Assert.DoesNotContain("entry.model || entry.modelOverride || entry.selectedModel || entry.chatModel || entry.modelId", source, "Model field fallback should no longer be a hand-written OR chain.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiSnapshotsCarryModelSourceInstrumentation()
+    {
+        var modelsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "SessionProbeModels.cs");
+        var webViewPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "WebViewService.cs");
+        var bridgePath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.cs");
+        var stateEffectsPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "ShellSessionCoordinator.StateEffects.cs");
+
+        var modelsSource = File.ReadAllText(modelsPath);
+        var webViewSource = File.ReadAllText(webViewPath);
+        var bridgeSource = File.ReadAllText(bridgePath);
+        var stateEffectsSource = File.ReadAllText(stateEffectsPath);
+
+        Assert.Contains("string ModelSource", modelsSource, "Snapshots should carry where the MODEL value came from for future diagnostics.");
+        Assert.Contains("currentModelSource", bridgeSource, "The injected bridge should emit model-source instrumentation.");
+        Assert.Contains("GetString(root, \"currentModelSource\")", webViewSource, "Native parsing should retain the bridge-reported model source.");
+        Assert.Contains("modelSource = string.IsNullOrWhiteSpace(snapshot.ModelSource)", stateEffectsSource, "Hosted UI state logs should expose the model source or null.");
         return Task.CompletedTask;
     }
 

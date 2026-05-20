@@ -65,6 +65,8 @@ public sealed record ControlUiProbeSnapshot(
 
     public string ActivitySignature { get; init; } = string.Empty;
 
+    public string ModelSource { get; init; } = string.Empty;
+
     public bool IsIssue => Phase is ControlUiPhase.AuthRequired
         or ControlUiPhase.PairingRequired
         or ControlUiPhase.OriginRejected

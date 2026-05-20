@@ -1321,6 +1321,7 @@ public class WebViewService
                 : 0;
         var workState = GetString(root, "workState");
         var currentModel = GetString(root, "currentModel");
+        var currentModelSource = GetString(root, "currentModelSource");
         var activitySignature = GetString(root, "activitySignature");
         return new ControlUiProbeSnapshot(phase, summary, detail, url, shellDetected, isBusy, inputFocused, workState, currentModel)
         {
@@ -1328,6 +1329,7 @@ public class WebViewService
             IsBusyStale = isBusyStale,
             BusyStaleSeconds = busyStaleSeconds,
             ActivitySignature = activitySignature,
+            ModelSource = currentModelSource,
         };
     }
 

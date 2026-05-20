@@ -205,6 +205,98 @@ public sealed class HostedUiBridge
   };
 
   const cleanTrustedModelValue = (value) => compactText(value).slice(0, 96);
+  const emptyModelResult = () => ({ value: '', source: '' });
+  const modelResult = (value, source) => {
+    return { value: cleanTrustedModelValue(value), source };
+  };
+  const MODEL_FIELD_KEYS = ['model', 'modelOverride', 'selectedModel', 'chatModel', 'modelId'];
+  const PROVIDER_FIELD_KEYS = ['modelProvider', 'providerOverride', 'provider', 'modelProviderOverride'];
+  const OVERRIDE_MODEL_FIELD_KEYS = ['value', ...MODEL_FIELD_KEYS];
+  const SESSION_ID_KEYS = ['key', 'sessionKey', 'id'];
+  const SESSION_KEY_PATHS = [
+    ['sessionKey'],
+    ['activeSessionKey'],
+    ['currentSessionKey'],
+    ['chatSessionKey'],
+    ['session', 'key'],
+    ['settings', 'sessionKey']
+  ];
+  const APP_STATE_PATHS = [
+    ['state'],
+    ['appState'],
+    ['store', 'state'],
+    ['controller', 'state'],
+    ['chatState'],
+    ['sessionState']
+  ];
+  const SESSIONS_RESULT_PATHS = [
+    ['sessionsResult'],
+    ['chatSessionsResult'],
+    ['sessionResult']
+  ];
+  const MODEL_CATALOG_PATHS = [
+    ['chatModelCatalog'],
+    ['modelCatalog'],
+    ['models']
+  ];
+  const MODEL_OVERRIDES_PATHS = [
+    ['chatModelOverrides'],
+    ['modelOverrides'],
+    ['settings', 'chatModelOverrides']
+  ];
+
+  const readPath = (target, path) => {
+    return path.reduce((current, key) => current == null ? undefined : current[key], target);
+  };
+
+  const readFirstPath = (target, paths) => {
+    if (!target || typeof target !== 'object') return '';
+    for (const path of paths) {
+      const text = compactText(readPath(target, path));
+      if (text) return text;
+    }
+
+    return '';
+  };
+
+  const readFirstKey = (target, keys) => {
+    if (!target || typeof target !== 'object') return '';
+    for (const key of keys) {
+      const text = compactText(target[key]);
+      if (text) return text;
+    }
+
+    return '';
+  };
+
+  const readFirstObjectPath = (target, paths) => {
+    if (!target || typeof target !== 'object') return null;
+    for (const path of paths) {
+      const value = readPath(target, path);
+      if (value && typeof value === 'object') return value;
+    }
+
+    return null;
+  };
+
+  const readFirstArrayPath = (target, paths) => {
+    if (!target || typeof target !== 'object') return [];
+    for (const path of paths) {
+      const value = readPath(target, path);
+      if (Array.isArray(value)) return value;
+    }
+
+    return [];
+  };
+
+  const uniqueObjects = (items) => {
+    const seen = new Set();
+    return items.filter((item) => {
+      if (!item || typeof item !== 'object' || seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+  };
 
   const resolveCatalogModelValue = (model, catalog) => {
     const cleanModel = cleanTrustedModelValue(model);
@@ -231,18 +323,20 @@ public sealed class HostedUiBridge
 
   const readServerModelValue = (entry, catalog = []) => {
     if (!entry || typeof entry !== 'object') return '';
-    const model = entry.model || entry.modelOverride || entry.selectedModel || entry.chatModel || entry.modelId || '';
-    const provider = entry.modelProvider || entry.providerOverride || entry.provider || entry.modelProviderOverride || '';
-    return formatModelValue(model, provider, catalog);
+    return formatModelValue(
+      readFirstKey(entry, MODEL_FIELD_KEYS),
+      readFirstKey(entry, PROVIDER_FIELD_KEYS),
+      catalog);
   };
 
   const readOverrideModelValue = (override, catalog = []) => {
     if (!override) return '';
     if (typeof override === 'string') return resolveCatalogModelValue(override, catalog);
     if (typeof override !== 'object') return '';
-    const model = override.value || override.model || override.modelOverride || override.selectedModel || override.chatModel || override.modelId || '';
-    const provider = override.provider || override.modelProvider || override.providerOverride || override.modelProviderOverride || '';
-    return formatModelValue(model, provider, catalog);
+    return formatModelValue(
+      readFirstKey(override, OVERRIDE_MODEL_FIELD_KEYS),
+      readFirstKey(override, PROVIDER_FIELD_KEYS),
+      catalog);
   };
 
   const readSessionKeyFromUrl = () => {
@@ -253,16 +347,24 @@ public sealed class HostedUiBridge
     }
   };
 
-  const readCurrentSessionKey = (app) => {
-    return compactText(
-      app.sessionKey ||
-      app.activeSessionKey ||
-      app.currentSessionKey ||
-      app.chatSessionKey ||
-      app.session?.key ||
-      app.settings?.sessionKey ||
-      readSessionKeyFromUrl() ||
-      '');
+  const readOpenClawStateCandidates = () => {
+    const app = document.querySelector('openclaw-app');
+    if (!app) return [];
+    return uniqueObjects([
+      app,
+      ...APP_STATE_PATHS
+        .map((path) => readPath(app, path))
+        .filter((value) => value && typeof value === 'object')
+    ]);
+  };
+
+  const readCurrentSessionKey = (states) => {
+    for (const state of states) {
+      const key = readFirstPath(state, SESSION_KEY_PATHS);
+      if (key) return key;
+    }
+
+    return readSessionKeyFromUrl();
   };
 
   const hasOverrideForSession = (overrides, sessionKey) => {
@@ -276,29 +378,131 @@ public sealed class HostedUiBridge
     return overrides instanceof Map ? overrides.get(sessionKey) : overrides[sessionKey];
   };
 
+  const readSessionIdentifier = (session) => readFirstKey(session, SESSION_ID_KEYS);
+
   const readOpenClawAppStateModel = () => {
-    const app = document.querySelector('openclaw-app');
-    if (!app) return '';
+    const states = readOpenClawStateCandidates();
+    if (states.length === 0) return emptyModelResult();
 
-    const sessionKey = readCurrentSessionKey(app);
-    const sessionsResult = app.sessionsResult || null;
-    const chatModelCatalog = Array.isArray(app.chatModelCatalog) ? app.chatModelCatalog : [];
-    const defaultsModel = readServerModelValue(sessionsResult?.defaults, chatModelCatalog);
-    const overrides = app.chatModelOverrides && typeof app.chatModelOverrides === 'object'
-      ? app.chatModelOverrides
-      : {};
+    const sessionKey = readCurrentSessionKey(states);
+    for (const state of states) {
+      const sessionsResult = readFirstObjectPath(state, SESSIONS_RESULT_PATHS);
+      const chatModelCatalog = readFirstArrayPath(state, MODEL_CATALOG_PATHS);
+      const defaultsModel = readServerModelValue(sessionsResult?.defaults, chatModelCatalog);
+      const overrides = readFirstObjectPath(state, MODEL_OVERRIDES_PATHS) || {};
 
-    if (hasOverrideForSession(overrides, sessionKey)) {
-      const override = readOverrideForSession(overrides, sessionKey);
-      if (override === null) return defaultsModel;
-      const overrideModel = readOverrideModelValue(override, chatModelCatalog);
-      if (overrideModel) return overrideModel;
+      if (hasOverrideForSession(overrides, sessionKey)) {
+        const override = readOverrideForSession(overrides, sessionKey);
+        if (override === null && defaultsModel) return modelResult(defaultsModel, 'app-state:default');
+        const overrideModel = readOverrideModelValue(override, chatModelCatalog);
+        if (overrideModel) return modelResult(overrideModel, 'app-state:override');
+      }
+
+      const sessions = Array.isArray(sessionsResult?.sessions) ? sessionsResult.sessions : [];
+      const activeSession = sessions.find((row) => compactText(readSessionIdentifier(row)) === sessionKey);
+      const activeModel = readServerModelValue(activeSession, chatModelCatalog);
+      if (activeModel) return modelResult(activeModel, 'app-state:session');
+      if (defaultsModel) return modelResult(defaultsModel, 'app-state:default');
     }
 
-    const sessions = Array.isArray(sessionsResult?.sessions) ? sessionsResult.sessions : [];
-    const activeSession = sessions.find((row) => compactText(row?.key || row?.sessionKey || row?.id) === sessionKey);
-    const activeModel = readServerModelValue(activeSession, chatModelCatalog);
-    return activeModel || defaultsModel;
+    return emptyModelResult();
+  };
+
+  const readOpenClawModelSelect = () => {
+    const select = document.querySelector('select[data-chat-model-select="true"], select[data-chat-model-select]');
+    if (!(select instanceof HTMLSelectElement) || !isVisible(select)) return emptyModelResult();
+
+    const selectedOption = select.selectedOptions?.[0] || null;
+    const selectedModelOptionValue = compactText(selectedOption?.value || '');
+    const selectedModelValue = compactText(select.value || '');
+    const selectedModelTitle = compactText(select.getAttribute('title') || '');
+    const selectedModelText = compactText(selectedOption?.textContent || '');
+
+    for (const value of [
+      selectedModelOptionValue,
+      selectedModelValue,
+      selectedModelTitle,
+      selectedModelText
+    ]) {
+      const label = sanitizeModelLabel(value);
+      if (label) return modelResult(label, 'model-select');
+    }
+
+    return emptyModelResult();
+  };
+
+  const readModelFromDomCandidates = () => {
+    const candidates = [];
+    const selectionBoostOf = (el) => {
+      const selected = [
+        el?.getAttribute?.('aria-selected'),
+        el?.getAttribute?.('aria-checked'),
+        el?.getAttribute?.('aria-pressed'),
+        el?.getAttribute?.('data-selected'),
+        el?.getAttribute?.('data-state')
+      ].filter(Boolean).join(' ').toLowerCase();
+      return /true|selected|checked|active|current/.test(selected) ? 18 : 0;
+    };
+
+    const viewportBoostOf = (el) => {
+      if (!el || typeof el.getBoundingClientRect !== 'function') return 0;
+      const top = el.getBoundingClientRect().top;
+      return Number.isFinite(top) && top >= 0 && top <= 260 ? 8 : 0;
+    };
+
+    const pushCandidate = (text, score, el, source) => {
+      const label = sanitizeModelLabel(text);
+      if (!label) return;
+      candidates.push({ label, source, score: score + selectionBoostOf(el) + viewportBoostOf(el) });
+    };
+
+    Array.from(document.querySelectorAll('[data-current-model], [data-selected-model], [data-model-name]'))
+      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
+      .forEach((el) => pushCandidate(textOf(el), 120, el, 'dom:data-model'));
+
+    Array.from(document.querySelectorAll('select'))
+      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
+      .forEach((el) => {
+        const selectedText = Array.from(el.selectedOptions || [])
+          .map((option) => option.textContent || '')
+          .join(' ');
+        const combined = `${labelOf(el)} ${selectedText}`.trim();
+        if (/\bmodel\b/i.test(combined) || modelPattern.test(selectedText)) {
+          pushCandidate(selectedText || combined, /\bmodel\b/i.test(combined) ? 115 : 90, el, 'dom:select');
+        }
+      });
+
+    Array.from(document.querySelectorAll('[role="combobox"], button[aria-haspopup="listbox"], button, [role="button"], input[type="text"], input:not([type])'))
+      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
+      .forEach((el) => {
+        const rawValue = 'value' in el && typeof el.value === 'string' ? el.value : '';
+        const combined = [labelOf(el), rawValue, el.getAttribute?.('placeholder')].filter(Boolean).join(' ').trim();
+        if (!/\bmodel\b/i.test(combined) && !modelPattern.test(rawValue) && !modelPattern.test(textOf(el))) return;
+        const score = /\bmodel\b/i.test(combined) ? 105 : 80;
+        pushCandidate(rawValue || textOf(el) || combined, score, el, 'dom:control');
+      });
+
+    if (candidates.length === 0) return emptyModelResult();
+    candidates.sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      return left.label.length - right.label.length;
+    });
+    return modelResult(candidates[0].label, candidates[0].source);
+  };
+
+  const MODEL_SOURCE_READERS = [
+    readOpenClawAppStateModel,
+    readOpenClawModelSelect,
+    readModelFromDomCandidates
+  ];
+
+  const readCurrentModel = () => {
+    for (const readModel of MODEL_SOURCE_READERS) {
+      const result = readModel();
+      if (result?.value) return result;
+    }
+
+    return emptyModelResult();
   };
 
   const readMessageText = (message) => {
@@ -372,94 +576,6 @@ public sealed class HostedUiBridge
       isBusy,
       activitySignature: readChatActivitySignature(app)
     };
-  };
-
-  const readOpenClawModelSelect = () => {
-    const select = document.querySelector('select[data-chat-model-select="true"], select[data-chat-model-select]');
-    if (!(select instanceof HTMLSelectElement) || !isVisible(select)) return '';
-
-    const selectedOption = select.selectedOptions?.[0] || null;
-    const selectedModelOptionValue = compactText(selectedOption?.value || '');
-    const selectedModelValue = compactText(select.value || '');
-    const selectedModelTitle = compactText(select.getAttribute('title') || '');
-    const selectedModelText = compactText(selectedOption?.textContent || '');
-
-    for (const value of [
-      selectedModelOptionValue,
-      selectedModelValue,
-      selectedModelTitle,
-      selectedModelText
-    ]) {
-      const label = sanitizeModelLabel(value);
-      if (label) return label;
-    }
-
-    return '';
-  };
-
-  const readCurrentModel = () => {
-    const openClawStateModel = readOpenClawAppStateModel();
-    if (openClawStateModel) return openClawStateModel;
-
-    const openClawModel = readOpenClawModelSelect();
-    if (openClawModel) return openClawModel;
-
-    const candidates = [];
-    const selectionBoostOf = (el) => {
-      const selected = [
-        el?.getAttribute?.('aria-selected'),
-        el?.getAttribute?.('aria-checked'),
-        el?.getAttribute?.('aria-pressed'),
-        el?.getAttribute?.('data-selected'),
-        el?.getAttribute?.('data-state')
-      ].filter(Boolean).join(' ').toLowerCase();
-      return /true|selected|checked|active|current/.test(selected) ? 18 : 0;
-    };
-
-    const viewportBoostOf = (el) => {
-      if (!el || typeof el.getBoundingClientRect !== 'function') return 0;
-      const top = el.getBoundingClientRect().top;
-      return Number.isFinite(top) && top >= 0 && top <= 260 ? 8 : 0;
-    };
-
-    const pushCandidate = (text, score, el) => {
-      const label = sanitizeModelLabel(text);
-      if (!label) return;
-      candidates.push({ label, score: score + selectionBoostOf(el) + viewportBoostOf(el) });
-    };
-
-    Array.from(document.querySelectorAll('[data-current-model], [data-selected-model], [data-model-name]'))
-      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
-      .forEach((el) => pushCandidate(textOf(el), 120, el));
-
-    Array.from(document.querySelectorAll('select'))
-      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
-      .forEach((el) => {
-        const selectedText = Array.from(el.selectedOptions || [])
-          .map((option) => option.textContent || '')
-          .join(' ');
-        const combined = `${labelOf(el)} ${selectedText}`.trim();
-        if (/\bmodel\b/i.test(combined) || modelPattern.test(selectedText)) {
-          pushCandidate(selectedText || combined, /\bmodel\b/i.test(combined) ? 115 : 90, el);
-        }
-      });
-
-    Array.from(document.querySelectorAll('[role="combobox"], button[aria-haspopup="listbox"], button, [role="button"], input[type="text"], input:not([type])'))
-      .filter((el) => !isStatusProbeExcludedElement(el) && isVisible(el))
-      .forEach((el) => {
-        const rawValue = 'value' in el && typeof el.value === 'string' ? el.value : '';
-        const combined = [labelOf(el), rawValue, el.getAttribute?.('placeholder')].filter(Boolean).join(' ').trim();
-        if (!/\bmodel\b/i.test(combined) && !modelPattern.test(rawValue) && !modelPattern.test(textOf(el))) return;
-        const score = /\bmodel\b/i.test(combined) ? 105 : 80;
-        pushCandidate(rawValue || textOf(el) || combined, score, el);
-      });
-
-    if (candidates.length === 0) return '';
-    candidates.sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score;
-      return left.label.length - right.label.length;
-    });
-    return candidates[0].label;
   };
 
   const detectBusyFromApi = () => {
@@ -629,6 +745,7 @@ public sealed class HostedUiBridge
       appState?.activitySignature,
       isBusy ? collectDomActivitySignature() : ''
     ].filter(Boolean).join('|').slice(0, 512);
+    const modelSnapshot = readCurrentModel();
 
     let phase = 'page_loaded';
     let summary = STRINGS.bridgeGatewayUiLoaded;
@@ -701,7 +818,8 @@ public sealed class HostedUiBridge
     return applyBusyStaleness({
       kind: KIND, phase, summary, detail, url, shellDetected, isBusy, inputFocused, focusedInputHasText, workState,
       activitySignature,
-      currentModel: readCurrentModel()
+      currentModel: modelSnapshot.value,
+      currentModelSource: modelSnapshot.source
     });
   };
 

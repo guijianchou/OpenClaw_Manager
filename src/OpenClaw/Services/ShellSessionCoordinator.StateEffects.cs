@@ -26,7 +26,8 @@ public sealed partial class ShellSessionCoordinator
             phase = snapshot.Phase,
             summary = snapshot.Summary,
             shellDetected = snapshot.ShellDetected,
-            currentModel = string.IsNullOrWhiteSpace(snapshot.CurrentModel) ? null : snapshot.CurrentModel
+            currentModel = string.IsNullOrWhiteSpace(snapshot.CurrentModel) ? null : snapshot.CurrentModel,
+            modelSource = string.IsNullOrWhiteSpace(snapshot.ModelSource) ? null : snapshot.ModelSource
         });
     }
 
