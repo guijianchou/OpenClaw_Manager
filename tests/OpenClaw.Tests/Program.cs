@@ -1622,6 +1622,7 @@ internal static class Tests
 
         Assert.Contains("let firstDefaultModel = ''", source, "App-state defaults should be retained as a fallback instead of returned before later state candidates are checked.");
         Assert.Contains("if (!firstDefaultModel && defaultsModel)", source, "The first default should be remembered once while overrides and active sessions remain higher priority.");
+        Assert.Contains("let nullOverrideDefaultModel = ''", source, "Null override defaults should also be deferred so root app-state cannot mask nested session data.");
         Assert.Contains("return firstDefaultModel", source, "Default model return should happen after every state candidate has been checked.");
         Assert.DoesNotContain("if (defaultsModel) return modelResult(defaultsModel, 'app-state:default');", source, "A root default must not mask a nested state override or active session.");
         return Task.CompletedTask;
@@ -1637,7 +1638,10 @@ internal static class Tests
             "HostedUiBridge.cs");
         var source = File.ReadAllText(sourcePath);
 
-        Assert.Contains("if (override === null && defaultsModel) return modelResult(defaultsModel, 'app-state:default');", source, "A null override means the current app-state candidate should inherit its own default model.");
+        Assert.Contains("if (override === null)", source, "A null override means the current app-state candidate should inherit its own default model.");
+        Assert.Contains("nullOverrideDefaultModel = defaultsModel;", source, "Null override default should remember the current candidate's default without returning early.");
+        Assert.Contains("modelResult(nullOverrideDefaultModel, 'app-state:default')", source, "Null override default should be returned only after later state candidates are checked.");
+        Assert.DoesNotContain("if (override === null && defaultsModel) return modelResult(defaultsModel, 'app-state:default');", source, "A null override default must not return before nested session state is inspected.");
         return Task.CompletedTask;
     }
 

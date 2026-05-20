@@ -12,6 +12,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 - Fixed the top MODEL value typography so it uses the same 12px text size as the native status bar.
 - Hardened hosted OpenClaw model detection for app-state variants, URL session keys, Map-backed model overrides, and non-string payload normalization.
+- Deferred app-state default MODEL fallbacks, including `null` session overrides, so root defaults do not mask later nested active-session models.
 - Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.3`.
 
 ### v3.3.2 (2026-05-19)
@@ -184,6 +185,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 - 修复顶部 MODEL 值的字号，使其与原生状态栏的 12px 文本字号一致。
 - 加固托管 OpenClaw 模型检测，支持 app-state 变体、URL session key、Map 形式模型 override，以及非字符串 payload 归一化。
+- 延后 app-state 默认 MODEL fallback，包括 session 的 `null` override，避免根节点默认模型盖掉后续嵌套的当前会话模型。
 - 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.3`。
 
 ### v3.3.2 (2026-05-19)

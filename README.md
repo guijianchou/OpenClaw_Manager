@@ -29,6 +29,7 @@ It is best suited for users who:
 ## Current 3.3.3 Notes
 
 - The top MODEL indicator now reads OpenClaw app state variants, URL session keys, and Map-backed model overrides, then keeps the last non-empty value during transient empty snapshots.
+- App-state default model fallbacks, including `null` per-session overrides, are deferred until nested session candidates have been checked so a root default does not mask the active session model.
 - The MODEL value typography now matches the native status bar text size for a more consistent status readout.
 - The top status pill reserves more room for provider/model labels before AUTH and Status, but very long model names may still ellipsize at narrow window widths.
 - The WebView2 bridge now avoids native status DOM scans for right-sidebar content, settings/config bodies, and Cron-heavy rerenders. This is a practical mitigation for CPU spikes in Communications and Automation/Cron pages, not a replacement for upstream Control UI performance work if those pages become heavier.

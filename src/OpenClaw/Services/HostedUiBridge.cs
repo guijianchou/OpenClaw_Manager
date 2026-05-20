@@ -411,6 +411,7 @@ public sealed class HostedUiBridge
 
     const sessionKey = readCurrentSessionKey(states);
     let firstDefaultModel = '';
+    let nullOverrideDefaultModel = '';
     for (const state of states) {
       const sessionsResult = readFirstObjectPath(state, SESSIONS_RESULT_PATHS);
       const chatModelCatalog = readFirstArrayPath(state, MODEL_CATALOG_PATHS);
@@ -423,15 +424,29 @@ public sealed class HostedUiBridge
 
       if (hasOverrideForSession(overrides, sessionKey)) {
         const override = readOverrideForSession(overrides, sessionKey);
-        if (override === null && defaultsModel) return modelResult(defaultsModel, 'app-state:default');
-        const overrideModel = readOverrideModelValue(override, chatModelCatalog);
-        if (overrideModel) return modelResult(overrideModel, 'app-state:override');
+        if (override === null) {
+          // Null means "inherit this candidate's default"; defer it so root state cannot hide later nested session data.
+          if (defaultsModel) {
+            nullOverrideDefaultModel = defaultsModel;
+          }
+        } else {
+          const overrideModel = readOverrideModelValue(override, chatModelCatalog);
+          if (overrideModel) {
+            return modelResult(overrideModel, 'app-state:override');
+          }
+        }
       }
 
       const sessions = Array.isArray(sessionsResult?.sessions) ? sessionsResult.sessions : [];
       const activeSession = sessions.find((row) => compactText(readSessionIdentifier(row)) === sessionKey);
       const activeModel = readServerModelValue(activeSession, chatModelCatalog);
-      if (activeModel) return modelResult(activeModel, 'app-state:session');
+      if (activeModel) {
+        return modelResult(activeModel, 'app-state:session');
+      }
+    }
+
+    if (nullOverrideDefaultModel) {
+      return modelResult(nullOverrideDefaultModel, 'app-state:default');
     }
 
     return firstDefaultModel
