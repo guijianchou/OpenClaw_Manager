@@ -239,6 +239,12 @@ internal static partial class Tests
             "OpenClaw",
             "Services",
             "HostedUiBridge.Script.cs");
+        var scriptAssetPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.Script.js");
         var modelResolverPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "src",
@@ -252,10 +258,23 @@ internal static partial class Tests
             "OpenClaw.csproj");
 
         Assert.True(File.Exists(scriptPath), "The hosted bridge script should be isolated in a dedicated file instead of growing the service file.");
+        Assert.True(File.Exists(scriptAssetPath), "The hosted bridge browser script should live in a runnable JS asset instead of a C# raw string.");
         Assert.True(File.Exists(modelResolverPath), "The model resolver should live in a runnable JS asset so behavior tests execute the same logic as the bridge.");
-        Assert.Contains("HostedUiBridgeScript", File.ReadAllText(scriptPath), "The bridge script file should expose a named script builder seam.");
-        Assert.Contains("HostedUiBridge.ModelResolver.js", File.ReadAllText(scriptPath), "The bridge script builder should load the model resolver asset.");
-        Assert.Contains("HostedUiBridge.ModelResolver.js", File.ReadAllText(projectPath), "The model resolver asset should be embedded in the app assembly.");
+        var scriptBuilderSource = File.ReadAllText(scriptPath);
+        var scriptAssetSource = File.ReadAllText(scriptAssetPath);
+        var projectSource = File.ReadAllText(projectPath);
+        Assert.Contains("HostedUiBridgeScript", scriptBuilderSource, "The bridge script file should expose a named script builder seam.");
+        Assert.Contains("HostedUiBridge.Script.js", scriptBuilderSource, "The bridge script builder should load the browser script asset.");
+        Assert.Contains("HostedUiBridge.ModelResolver.js", scriptBuilderSource, "The bridge script builder should load the model resolver asset.");
+        Assert.Contains("JsonSerializer.Serialize(strings)", scriptBuilderSource, "The bridge script builder should inject localized strings as JSON instead of hand-escaped JS literals.");
+        Assert.Contains("const STRINGS = __OPENCLAW_BRIDGE_STRINGS_JSON__;", scriptAssetSource, "The browser bridge asset should own a single localized-string injection point.");
+        Assert.Contains("__OPENCLAW_MODEL_RESOLVER_SCRIPT__", scriptAssetSource, "The browser bridge asset should own the model resolver injection point.");
+        Assert.Contains("window.__openClawHostBridge =", scriptAssetSource, "The browser bridge implementation should live in the JS asset.");
+        Assert.Contains("new MutationObserver", scriptAssetSource, "The DOM observer implementation should live in the JS asset.");
+        Assert.DoesNotContain("window.__openClawHostBridge =", scriptBuilderSource, "The C# script builder should not own browser bridge implementation details.");
+        Assert.DoesNotContain("new MutationObserver", scriptBuilderSource, "The C# script builder should not contain the DOM observer implementation.");
+        Assert.Contains("HostedUiBridge.Script.js", projectSource, "The hosted bridge browser script asset should be embedded in the app assembly.");
+        Assert.Contains("HostedUiBridge.ModelResolver.js", projectSource, "The model resolver asset should be embedded in the app assembly.");
         Assert.Contains("HostedUiBridgeScript.Build", File.ReadAllText(bridgePath), "HostedUiBridge should delegate script construction to the dedicated builder.");
         return Task.CompletedTask;
     }

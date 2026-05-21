@@ -78,6 +78,7 @@ internal static partial class Tests
         Assert.Contains("ShellSessionCoordinator", guide, "Guide should cover coordinator partial ownership.");
         Assert.Contains("WebViewService", guide, "Guide should warn against growing the largest WebView service further.");
         Assert.Contains("HostedUiBridge.Script.cs", guide, "Guide should keep bridge script content behind its script-builder seam.");
+        Assert.Contains("HostedUiBridge.Script.js", guide, "Guide should keep browser bridge implementation in a runnable JS asset.");
         Assert.Contains("dotnet format OpenClaw.sln --verify-no-changes --no-restore", guide, "Guide should document the format gate.");
         Assert.Contains("dotnet run --project tests\\OpenClaw.Tests\\OpenClaw.Tests.csproj -c Debug --no-restore", guide, "Guide should document the executable harness command.");
         return Task.CompletedTask;

@@ -10,13 +10,7 @@ internal static partial class Tests
 {
     public static Task HostedUiBridgeReadsCurrentModelFromOpenClawModelSelect()
     {
-        var sourcePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
-        var source = File.ReadAllText(sourcePath);
+        var source = ReadHostedBridgeScriptSource();
 
         Assert.Contains("data-chat-model-select", source, "Bridge should read OpenClaw Web UI's explicit model select before generic heuristics.");
         Assert.Contains("selectedModelOptionValue", source, "Bridge should consider the selected option value when the visible label is localized or default-only.");
@@ -26,19 +20,13 @@ internal static partial class Tests
 
     public static Task HostedUiBridgeReadsCurrentModelFromOpenClawAppState()
     {
-        var sourcePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
         var modelResolverPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "src",
             "OpenClaw",
             "Services",
             "HostedUiBridge.ModelResolver.js");
-        var source = File.ReadAllText(sourcePath);
+        var source = ReadHostedBridgeScriptSource();
         var modelResolverSource = File.ReadAllText(modelResolverPath);
 
         Assert.Contains("readOpenClawAppStateModel", source, "Bridge should read OpenClaw's app state before falling back to visible DOM controls.");
@@ -56,19 +44,13 @@ internal static partial class Tests
 
     public static Task HostedUiBridgeUsesStructuredModelSourcePipeline()
     {
-        var sourcePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
         var modelResolverPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "src",
             "OpenClaw",
             "Services",
             "HostedUiBridge.ModelResolver.js");
-        var source = File.ReadAllText(sourcePath);
+        var source = ReadHostedBridgeScriptSource();
         var modelResolverSource = File.ReadAllText(modelResolverPath);
 
         Assert.Contains("MODEL_FIELD_KEYS", modelResolverSource, "Model field aliases should be centralized instead of repeated in ad hoc OR chains.");
@@ -183,12 +165,6 @@ internal static partial class Tests
             "OpenClaw.Core",
             "Services",
             "SessionProbeModels.cs");
-        var bridgePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
         var stateEffectsPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "src",
@@ -198,7 +174,7 @@ internal static partial class Tests
 
         var modelsSource = File.ReadAllText(modelsPath);
         var webViewSource = ReadWebViewServiceSource();
-        var bridgeSource = File.ReadAllText(bridgePath);
+        var bridgeSource = ReadHostedBridgeScriptSource();
         var stateEffectsSource = File.ReadAllText(stateEffectsPath);
 
         Assert.Contains("string ModelSource", modelsSource, "Snapshots should carry where the MODEL value came from for future diagnostics.");
@@ -216,12 +192,6 @@ internal static partial class Tests
             "OpenClaw.Core",
             "Services",
             "SessionProbeModels.cs");
-        var bridgePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
         var nativeBridgePath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "src",
@@ -236,7 +206,7 @@ internal static partial class Tests
             "ShellSessionCoordinator.EventHandlers.cs");
 
         var modelsSource = File.ReadAllText(modelsPath);
-        var bridgeSource = File.ReadAllText(bridgePath);
+        var bridgeSource = ReadHostedBridgeScriptSource();
         var nativeBridgeSource = File.ReadAllText(nativeBridgePath);
         var eventHandlersSource = File.ReadAllText(eventHandlersPath);
 
@@ -249,13 +219,7 @@ internal static partial class Tests
 
     public static Task HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling()
     {
-        var sourcePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
-        var source = File.ReadAllText(sourcePath);
+        var source = ReadHostedBridgeScriptSource();
 
         Assert.Contains("isStatusProbeExcludedElement", source, "Bridge should exclude status-irrelevant content before scanning the DOM.");
         Assert.Contains(".chat-sidebar, .sidebar-panel, .sidebar-content, .chat-tool-card__preview-frame", source, "Bridge should recognize OpenClaw Web UI's right sidebar and hosted canvas frame containers.");
@@ -267,13 +231,7 @@ internal static partial class Tests
 
     public static Task HostedUiBridgeIgnoresSettingsAndCronMutationStorms()
     {
-        var sourcePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
-        var source = File.ReadAllText(sourcePath);
+        var source = ReadHostedBridgeScriptSource();
 
         Assert.Contains("readOpenClawAppStateStatus", source, "Bridge should use OpenClaw Lit app state as the connected-page status source before scanning DOM.");
         Assert.Contains("needsDomSignals", source, "Connected OpenClaw pages should not scan rendered settings/cron text for every status probe.");
@@ -288,13 +246,7 @@ internal static partial class Tests
 
     public static Task HostedUiBridgeReportsStaleBusyAndInputTextState()
     {
-        var sourcePath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "src",
-            "OpenClaw",
-            "Services",
-            "HostedUiBridge.Script.cs");
-        var source = File.ReadAllText(sourcePath);
+        var source = ReadHostedBridgeScriptSource();
 
         Assert.Contains("focusedInputHasText", source, "Bridge should distinguish focused empty editors from unsent user text.");
         Assert.Contains("activitySignature", source, "Bridge should emit a compact activity signature for stale stream detection.");
@@ -333,6 +285,19 @@ internal static partial class Tests
         Assert.Contains("ApplyModelSummary(snapshot)", statusSource, "Model update behavior should be centralized so empty snapshots preserve the last known model.");
         Assert.Contains("currentModel = string.IsNullOrWhiteSpace(snapshot.CurrentModel)", stateEffectsSource, "Hosted UI state logs should expose whether model detection reached the native layer.");
         return Task.CompletedTask;
+    }
+
+    private static string ReadHostedBridgeScriptSource()
+    {
+        var scriptPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.Script.js");
+
+        Assert.True(File.Exists(scriptPath), "The hosted bridge browser script should live in a runnable JS asset.");
+        return File.ReadAllText(scriptPath);
     }
 
     private static (string Value, string Source) ResolveHostedUiModelFromAppState(string setupScript)

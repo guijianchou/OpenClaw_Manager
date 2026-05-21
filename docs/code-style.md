@@ -51,8 +51,8 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 ## Large File Rules
 
 - Do not grow `WebViewService` with unrelated responsibilities. Existing command and profile helpers live in focused partials; add new focused partials for future WebView lifecycle, inspection, or recovery behavior.
-- Keep native bridge orchestration in `HostedUiBridge` and script content behind the `HostedUiBridge.Script.cs` script-builder seam.
-- Treat `HostedUiBridge.Script.cs` and embedded bridge JS assets as testable script surfaces. Add executable JS behavior tests before changing model detection, mutation filtering, session-ready events, or command handling.
+- Keep native bridge orchestration in `HostedUiBridge`, localized-string/resource assembly in `HostedUiBridge.Script.cs`, and browser implementation in embedded JS assets such as `HostedUiBridge.Script.js`.
+- Treat `HostedUiBridge.Script.js`, `HostedUiBridge.ModelResolver.js`, and the `HostedUiBridge.Script.cs` builder as testable script surfaces. Add executable JS behavior tests before changing model detection, mutation filtering, session-ready events, or command handling.
 - Avoid large source moves unless the move itself is the purpose of the change and the test plan proves no project-file duplication changed.
 
 ## Tests

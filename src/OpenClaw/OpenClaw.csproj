@@ -35,6 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Services\HostedUiBridge.Script.js" LogicalName="OpenClaw.Services.HostedUiBridge.Script.js" />
     <EmbeddedResource Include="Services\HostedUiBridge.ModelResolver.js" LogicalName="OpenClaw.Services.HostedUiBridge.ModelResolver.js" />
   </ItemGroup>
 
