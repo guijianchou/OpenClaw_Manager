@@ -272,6 +272,48 @@ internal static partial class Tests
         return Task.CompletedTask;
     }
 
+    public static Task HostedUiBridgeExecutableSessionReadyCarriesModelSource()
+    {
+        var engine = ExecuteHostedBridgeScript("""
+            const app = {
+              connected: true,
+              tab: 'chat',
+              sessionKey: 'chat-1',
+              sessionsResult: {
+                defaults: { provider: 'openai', model: 'gpt-default' },
+                sessions: [
+                  { id: 'chat-1', providerOverride: 'anthropic', modelOverride: 'claude-3-5-sonnet' }
+                ]
+              }
+            };
+            document.__querySelector = (selector) => selector === 'openclaw-app' ? app : null;
+            """);
+
+        engine.Execute("window.__openClawHostBridge.reportSessionReady();");
+        using var document = JsonDocument.Parse(engine.Evaluate("JSON.stringify(__openClawPostedMessages)").AsString());
+        var message = document.RootElement.EnumerateArray().Last();
+
+        Assert.Equal("openclaw-session-ready", message.GetProperty("kind").GetString() ?? string.Empty, "Session-ready executable bridge message should use the native event kind.");
+        Assert.Equal("anthropic/claude-3-5-sonnet", message.GetProperty("model").GetString() ?? string.Empty, "Session-ready executable bridge message should carry the current model.");
+        Assert.Equal("app-state:session", message.GetProperty("modelSource").GetString() ?? string.Empty, "Session-ready executable bridge message should carry the model source.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeExecutableCommandDispatchRaisesHostEvents()
+    {
+        var engine = ExecuteHostedBridgeScript(string.Empty);
+
+        engine.Execute("window.__openClawHostBridge.onCommand({ command: 'custom_action', payload: { id: '42' } });");
+        var eventsJson = engine.Evaluate("JSON.stringify(__openClawDispatchedEvents)").AsString();
+
+        Assert.Contains("\"target\":\"window\"", eventsJson, "Executable command dispatch should raise events on window.");
+        Assert.Contains("\"target\":\"document\"", eventsJson, "Executable command dispatch should raise events on document.");
+        Assert.Contains("\"type\":\"openclaw:host-command\"", eventsJson, "Executable command dispatch should raise the generic host-command event.");
+        Assert.Contains("\"type\":\"openclaw:custom_action\"", eventsJson, "Executable command dispatch should raise the command-specific event.");
+        Assert.Contains("\"payloadId\":\"42\"", eventsJson, "Executable command dispatch should preserve payload details.");
+        return Task.CompletedTask;
+    }
+
     public static Task HostedUiBridgeIgnoresSidebarOnlyMutationsDuringStatusPolling()
     {
         var source = ReadHostedBridgeScriptSource();
@@ -281,6 +323,24 @@ internal static partial class Tests
         Assert.Contains("if (mutations.length > 0 && mutations.every(isSidebarOnlyMutation))", source, "Sidebar-only mutation storms should be classified before scheduling status work.");
         Assert.Contains("return;\n    }\n\n    schedule();", source, "Sidebar-only mutations should not schedule any status inspection.");
         Assert.DoesNotContain("scheduleSlow", source, "Sidebar-only changes should be ignored, not converted into periodic expensive DOM scans.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeExecutableIgnoresSidebarOnlyMutations()
+    {
+        var engine = ExecuteHostedBridgeScript(string.Empty);
+
+        engine.Execute("""
+            const before = __openClawSetTimeoutCount;
+            const sidebarNode = {
+              nodeType: Node.ELEMENT_NODE,
+              closest: () => ({ excluded: true })
+            };
+            __openClawMutationObserverCallback([{ target: sidebarNode }]);
+            globalThis.__openClawSidebarMutationTimeoutDelta = __openClawSetTimeoutCount - before;
+            """);
+
+        Assert.Equal(0d, engine.Evaluate("__openClawSidebarMutationTimeoutDelta").AsNumber(), "Sidebar-only executable bridge mutations should not schedule another status probe.");
         return Task.CompletedTask;
     }
 
@@ -357,10 +417,7 @@ internal static partial class Tests
 
     private static (string CurrentModel, string CurrentModelSource) InspectHostedBridgeScript(string setupScript)
     {
-        var engine = new Engine(options => options.TimeoutInterval(TimeSpan.FromSeconds(3)));
-        engine.Execute(CreateHostedBridgeDomHarnessScript());
-        engine.Execute(setupScript);
-        engine.Execute(CreateExecutableHostedBridgeScript());
+        var engine = ExecuteHostedBridgeScript(setupScript);
 
         var json = engine.Evaluate("JSON.stringify(window.__openClawHostBridge.inspect())").AsString();
         using var document = JsonDocument.Parse(json);
@@ -368,6 +425,15 @@ internal static partial class Tests
         return (
             root.GetProperty("currentModel").GetString() ?? string.Empty,
             root.GetProperty("currentModelSource").GetString() ?? string.Empty);
+    }
+
+    private static Engine ExecuteHostedBridgeScript(string setupScript)
+    {
+        var engine = new Engine(options => options.TimeoutInterval(TimeSpan.FromSeconds(3)));
+        engine.Execute(CreateHostedBridgeDomHarnessScript());
+        engine.Execute(setupScript);
+        engine.Execute(CreateExecutableHostedBridgeScript());
+        return engine;
     }
 
     private static string CreateExecutableHostedBridgeScript()
@@ -423,11 +489,15 @@ internal static partial class Tests
     {
         return """
             const __openClawPostedMessages = [];
+            const __openClawDispatchedEvents = [];
+            let __openClawSetTimeoutCount = 0;
+            let __openClawMutationObserverCallback = null;
             function HTMLSelectElement() {}
             function HTMLInputElement() {}
             function HTMLTextAreaElement() {}
             const Node = { ELEMENT_NODE: 1 };
             function MutationObserver(callback) {
+              __openClawMutationObserverCallback = callback;
               this.observe = () => {};
               this.disconnect = () => {};
             }
@@ -448,10 +518,21 @@ internal static partial class Tests
                 }
               },
               getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
-              setTimeout: () => 1,
+              setTimeout: () => {
+                __openClawSetTimeoutCount++;
+                return __openClawSetTimeoutCount;
+              },
               clearTimeout: () => {},
               addEventListener: () => {},
-              dispatchEvent: () => true
+              dispatchEvent: (event) => {
+                __openClawDispatchedEvents.push({
+                  target: 'window',
+                  type: event.type,
+                  command: event.detail?.command || '',
+                  payloadId: event.detail?.payload?.id || ''
+                });
+                return true;
+              }
             };
             const document = {
               body: {},
@@ -464,7 +545,15 @@ internal static partial class Tests
               __querySelector: () => null,
               __querySelectorAll: () => [],
               addEventListener: () => {},
-              dispatchEvent: () => true
+              dispatchEvent: (event) => {
+                __openClawDispatchedEvents.push({
+                  target: 'document',
+                  type: event.type,
+                  command: event.detail?.command || '',
+                  payloadId: event.detail?.payload?.id || ''
+                });
+                return true;
+              }
             };
             globalThis.window = window;
             globalThis.document = document;
@@ -476,6 +565,8 @@ internal static partial class Tests
             globalThis.HTMLTextAreaElement = HTMLTextAreaElement;
             globalThis.MutationObserver = MutationObserver;
             globalThis.CustomEvent = CustomEvent;
+            globalThis.__openClawPostedMessages = __openClawPostedMessages;
+            globalThis.__openClawDispatchedEvents = __openClawDispatchedEvents;
             """;
     }
 
