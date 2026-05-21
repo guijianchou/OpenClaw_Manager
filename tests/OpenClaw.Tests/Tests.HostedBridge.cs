@@ -18,6 +18,35 @@ internal static partial class Tests
         return Task.CompletedTask;
     }
 
+    public static Task HostedUiBridgeExecutableScriptReadsCurrentModelFromSelect()
+    {
+        var result = InspectHostedBridgeScript("""
+            const selectedOption = {
+              value: 'gpt-4.1-mini',
+              textContent: 'gpt-4.1-mini'
+            };
+            const modelSelect = new HTMLSelectElement();
+            modelSelect.value = 'gpt-4.1-mini';
+            modelSelect.selectedOptions = [selectedOption];
+            modelSelect.textContent = 'gpt-4.1-mini';
+            modelSelect.innerText = 'gpt-4.1-mini';
+            modelSelect.getAttribute = (name) => name === 'title' ? 'gpt-4.1-mini' : '';
+            modelSelect.getBoundingClientRect = () => ({ width: 220, height: 32, top: 12 });
+            modelSelect.closest = () => null;
+            document.__querySelector = (selector) =>
+              selector === 'select[data-chat-model-select="true"], select[data-chat-model-select]' ? modelSelect : null;
+            document.__querySelectorAll = (selector) => {
+              if (selector === 'select[data-chat-model-select="true"], select[data-chat-model-select]') return [modelSelect];
+              if (selector === 'select') return [modelSelect];
+              return [];
+            };
+            """);
+
+        Assert.Equal("gpt-4.1-mini", result.CurrentModel, "Executable bridge script should inspect the selected OpenClaw model value.");
+        Assert.Equal("model-select", result.CurrentModelSource, "Executable bridge script should report the model-select source.");
+        return Task.CompletedTask;
+    }
+
     public static Task HostedUiBridgeReadsCurrentModelFromOpenClawAppState()
     {
         var modelResolverPath = Path.Combine(
@@ -39,6 +68,32 @@ internal static partial class Tests
         Assert.Contains("searchParams.get('session')", source, "Bridge should fall back to the hosted chat session query string when app.sessionKey is absent.");
         Assert.Contains("overrides instanceof Map", modelResolverSource, "Bridge should support Map-backed chatModelOverrides from Lit app state.");
         Assert.Contains("value == null ? '' : String(value)", source, "Bridge text normalization should not throw when app-state message parts contain object payloads.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeExecutableScriptReadsCurrentModelFromAppState()
+    {
+        var result = InspectHostedBridgeScript("""
+            const app = {
+              connected: true,
+              tab: 'chat',
+              sessionKey: 'chat-1',
+              chatLoading: false,
+              sessionsResult: {
+                defaults: { provider: 'openai', model: 'gpt-default' },
+                sessions: [
+                  { id: 'chat-1', providerOverride: 'anthropic', modelOverride: 'claude-3-5-sonnet' }
+                ]
+              },
+              chatModelOverrides: new Map([
+                ['chat-1', null]
+              ])
+            };
+            document.__querySelector = (selector) => selector === 'openclaw-app' ? app : null;
+            """);
+
+        Assert.Equal("anthropic/claude-3-5-sonnet", result.CurrentModel, "Executable bridge script should combine app-state session provider/model fields.");
+        Assert.Equal("app-state:session", result.CurrentModelSource, "Executable bridge script should report app-state session model source.");
         return Task.CompletedTask;
     }
 
@@ -298,6 +353,130 @@ internal static partial class Tests
 
         Assert.True(File.Exists(scriptPath), "The hosted bridge browser script should live in a runnable JS asset.");
         return File.ReadAllText(scriptPath);
+    }
+
+    private static (string CurrentModel, string CurrentModelSource) InspectHostedBridgeScript(string setupScript)
+    {
+        var engine = new Engine(options => options.TimeoutInterval(TimeSpan.FromSeconds(3)));
+        engine.Execute(CreateHostedBridgeDomHarnessScript());
+        engine.Execute(setupScript);
+        engine.Execute(CreateExecutableHostedBridgeScript());
+
+        var json = engine.Evaluate("JSON.stringify(window.__openClawHostBridge.inspect())").AsString();
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        return (
+            root.GetProperty("currentModel").GetString() ?? string.Empty,
+            root.GetProperty("currentModelSource").GetString() ?? string.Empty);
+    }
+
+    private static string CreateExecutableHostedBridgeScript()
+    {
+        var strings = new Dictionary<string, string>
+        {
+            ["bridgeGatewayUiLoaded"] = "Gateway UI loaded",
+            ["bridgePageLoading"] = "Page loading",
+            ["bridgeTokenMissingSummary"] = "Token missing",
+            ["bridgeTokenMissingDetail"] = "Token missing detail",
+            ["bridgeTokenMismatchSummary"] = "Token mismatch",
+            ["bridgeTokenMismatchDetail"] = "Token mismatch detail",
+            ["bridgeDeviceTokenMismatchSummary"] = "Device token mismatch",
+            ["bridgeDeviceTokenMismatchDetail"] = "Device token mismatch detail",
+            ["bridgeOriginRejectedSummary"] = "Origin rejected",
+            ["bridgeOriginRejectedDetail"] = "Origin rejected detail",
+            ["bridgeTrustedProxyLoopbackSummary"] = "Trusted proxy loopback",
+            ["bridgeTrustedProxyLoopbackDetail"] = "Trusted proxy loopback detail",
+            ["bridgeMixedAuthSummary"] = "Mixed auth",
+            ["bridgeMixedAuthDetail"] = "Mixed auth detail",
+            ["bridgeTrustedProxyHeaderSummary"] = "Trusted proxy header",
+            ["bridgeTrustedProxyHeaderDetail"] = "Trusted proxy header detail",
+            ["bridgeTrustedProxyOriginSummary"] = "Trusted proxy origin",
+            ["bridgeTrustedProxyOriginDetail"] = "Trusted proxy origin detail",
+            ["bridgeRateLimitedSummary"] = "Rate limited",
+            ["bridgeRateLimitedDetail"] = "Rate limited detail",
+            ["bridgeInsecureHttpSummary"] = "Insecure HTTP",
+            ["bridgeInsecureHttpDetail"] = "Insecure HTTP detail",
+            ["bridgePairingSummary"] = "Pairing required",
+            ["bridgePairingDetail"] = "Pairing required detail",
+            ["bridgeAuthRequiredSummary"] = "Auth required",
+            ["bridgeAuthRequiredDetail"] = "Auth required detail",
+            ["bridgeGatewaySessionNotConnectedSummary"] = "Gateway session not connected",
+            ["bridgeGatewaySessionNotConnectedDetail"] = "Gateway session not connected detail",
+            ["bridgeConnectingSummary"] = "Connecting",
+            ["bridgeConnectingDetail"] = "Connecting detail",
+            ["bridgeConnectedSummary"] = "Connected",
+        };
+
+        var modelResolverPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "src",
+            "OpenClaw",
+            "Services",
+            "HostedUiBridge.ModelResolver.js");
+
+        return ReadHostedBridgeScriptSource()
+            .Replace("__OPENCLAW_BRIDGE_STRINGS_JSON__", JsonSerializer.Serialize(strings), StringComparison.Ordinal)
+            .Replace("__OPENCLAW_MODEL_RESOLVER_SCRIPT__", File.ReadAllText(modelResolverPath), StringComparison.Ordinal);
+    }
+
+    private static string CreateHostedBridgeDomHarnessScript()
+    {
+        return """
+            const __openClawPostedMessages = [];
+            function HTMLSelectElement() {}
+            function HTMLInputElement() {}
+            function HTMLTextAreaElement() {}
+            const Node = { ELEMENT_NODE: 1 };
+            function MutationObserver(callback) {
+              this.observe = () => {};
+              this.disconnect = () => {};
+            }
+            function CustomEvent(type, options) {
+              this.type = type;
+              this.detail = options?.detail;
+            }
+            const location = { href: 'https://gateway.example/control?session=chat-1' };
+            const history = {
+              pushState: () => {},
+              replaceState: () => {}
+            };
+            const window = {
+              location,
+              chrome: {
+                webview: {
+                  postMessage: (message) => __openClawPostedMessages.push(message)
+                }
+              },
+              getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+              setTimeout: () => 1,
+              clearTimeout: () => {},
+              addEventListener: () => {},
+              dispatchEvent: () => true
+            };
+            const document = {
+              body: {},
+              readyState: 'complete',
+              visibilityState: 'visible',
+              activeElement: null,
+              documentElement: {},
+              querySelector: (selector) => document.__querySelector(selector),
+              querySelectorAll: (selector) => document.__querySelectorAll(selector),
+              __querySelector: () => null,
+              __querySelectorAll: () => [],
+              addEventListener: () => {},
+              dispatchEvent: () => true
+            };
+            globalThis.window = window;
+            globalThis.document = document;
+            globalThis.location = location;
+            globalThis.history = history;
+            globalThis.Node = Node;
+            globalThis.HTMLSelectElement = HTMLSelectElement;
+            globalThis.HTMLInputElement = HTMLInputElement;
+            globalThis.HTMLTextAreaElement = HTMLTextAreaElement;
+            globalThis.MutationObserver = MutationObserver;
+            globalThis.CustomEvent = CustomEvent;
+            """;
     }
 
     private static (string Value, string Source) ResolveHostedUiModelFromAppState(string setupScript)
