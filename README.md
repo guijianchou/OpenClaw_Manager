@@ -33,7 +33,9 @@ It is best suited for users who:
 - Split the executable test harness into focused `Tests.*.cs` domain files with coverage for project architecture boundaries, code-style documentation, and shared top-status XAML resources.
 - Split `WebViewService` command-injection, heartbeat, Control UI inspection, and profile-folder helpers into focused partial files.
 - Moved all Core-compatible source files, including window-bounds policy, into the physical `src/OpenClaw.Core` tree.
+- Moved the main hosted bridge browser script into embedded JS assets, with C# limited to resource loading and localized string/model resolver injection.
 - Extracted hosted MODEL app-state resolution into an embedded JS asset with executable regression coverage for defaults, null overrides, Map overrides, and object-shaped payloads.
+- Added executable bridge coverage for session-ready metadata, command-dispatch return values, mutation filtering, safe host messaging, and generation-scoped WebView inspection cache reuse.
 
 ### This project is
 

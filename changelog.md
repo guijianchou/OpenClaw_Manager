@@ -15,7 +15,9 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - Split the executable test harness into focused `Tests.*.cs` domain files and added coverage for code-style documentation, architecture boundaries, and shared top-status XAML resources.
 - Split `WebViewService` command-injection, heartbeat, Control UI inspection, and profile-folder helpers into focused partial files.
 - Moved all Core-compatible source files into the physical `src/OpenClaw.Core` tree, including the window-bounds policy that was previously linked from the WinUI project.
+- Moved the main hosted bridge browser script into embedded JS assets, leaving C# responsible only for resource loading and localized string/model resolver injection.
 - Extracted hosted MODEL app-state resolution into an embedded JS asset and added executable regression coverage for defaults, `null` overrides, Map-backed overrides, and object-shaped payloads.
+- Added executable hosted bridge event coverage for session-ready metadata, command-dispatch return values, sidebar mutation filtering, safe WebView2 host messaging, and generation-scoped WebView inspection cache reuse.
 - Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.5`.
 
 ### v3.3.4 (2026-05-20)
@@ -207,7 +209,9 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - 将可执行测试 harness 拆分为按领域组织的 `Tests.*.cs` 文件，并新增代码规范文档、架构边界和顶部状态栏 XAML 共享资源的回归测试。
 - 将 `WebViewService` 的命令注入、heartbeat、Control UI inspection 和 profile 文件夹帮助器拆分到独立 partial 文件。
 - 将所有 Core-compatible 源文件迁移到 `src/OpenClaw.Core` 物理源码树，包括此前从 WinUI 项目链接的窗口边界策略。
+- 将主托管 bridge 浏览器脚本迁移为嵌入式 JS asset，C# 侧只负责资源加载、本地化字符串注入和 MODEL resolver 注入。
 - 将托管 MODEL 的 app-state 解析抽到嵌入式 JS asset，并用可执行回归测试覆盖默认值、`null` override、Map-backed override 和对象形 payload。
+- 新增可执行 hosted bridge 事件覆盖：session-ready 元数据、命令分发返回值、侧边栏 mutation filtering、安全 WebView2 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
 - 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.5`。
 
 ### v3.3.4 (2026-05-20)

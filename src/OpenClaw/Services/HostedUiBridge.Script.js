@@ -673,14 +673,19 @@ __OPENCLAW_MODEL_RESOLVER_SCRIPT__
   let lastStateVersion = null;
   let sessionReadyEmitted = false;
 
+  const postHostMessage = (message) => {
+    if (!window.chrome?.webview?.postMessage) return false;
+    window.chrome?.webview?.postMessage?.(message);
+    return true;
+  };
+
   // Post status
   let lastSerialized = '';
   const postStatus = (snapshot = inspectControlUi()) => {
-    if (!window.chrome?.webview?.postMessage) return;
     const serialized = JSON.stringify(snapshot);
     if (serialized === lastSerialized) return;
+    if (!postHostMessage(snapshot)) return;
     lastSerialized = serialized;
-    window.chrome.webview.postMessage(snapshot);
   };
 
   // Detect session ready
@@ -688,14 +693,14 @@ __OPENCLAW_MODEL_RESOLVER_SCRIPT__
     if (sessionReadyEmitted) return;
 
     if (snapshot.phase === 'connected' && snapshot.shellDetected) {
-      sessionReadyEmitted = true;
-      window.chrome.webview.postMessage({
+      const posted = postHostMessage({
         kind: SESSION_READY_KIND,
         detectedAt: new Date().toISOString(),
         model: snapshot.currentModel,
         modelSource: snapshot.currentModelSource,
         uri: snapshot.url
       });
+      sessionReadyEmitted = posted;
     }
   };
 
@@ -776,21 +781,21 @@ __OPENCLAW_MODEL_RESOLVER_SCRIPT__
     reportSeq: (seq, stateVersion) => {
       const gap = checkForGap(seq, stateVersion);
       if (gap) {
-        window.chrome.webview.postMessage(gap);
+        postHostMessage(gap);
       }
       postStatus();
     },
     reportSessionReady: () => {
       if (!sessionReadyEmitted) {
-        sessionReadyEmitted = true;
         const snapshot = inspectControlUi();
-        window.chrome.webview.postMessage({
+        const posted = postHostMessage({
           kind: SESSION_READY_KIND,
           detectedAt: new Date().toISOString(),
           model: snapshot.currentModel,
           modelSource: snapshot.currentModelSource,
           uri: snapshot.url
         });
+        sessionReadyEmitted = posted;
       }
     }
   };

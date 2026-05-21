@@ -73,6 +73,18 @@ internal static partial class Tests
         return Task.CompletedTask;
     }
 
+    public static Task WebViewInspectionCacheIsGenerationScoped()
+    {
+        var source = ReadWebViewServiceSource();
+
+        Assert.Contains("_latestControlUiSnapshotGeneration", source, "The reusable inspection snapshot should record the WebView generation that produced it.");
+        Assert.Contains("_latestControlUiSnapshotGeneration == generation", source, "Cached inspection snapshots should only be reused for the active generation.");
+        Assert.Contains("_latestControlUiSnapshotGeneration = generation;", source, "Snapshot application should tag the cache with the producing generation.");
+        Assert.Contains("InvalidateControlUiInspectionCache()", source, "Navigation and reload paths should clear short-lived inspection cache state.");
+        Assert.Contains("_lastControlUiInspectionAt = DateTimeOffset.MinValue;", source, "Cache invalidation should disable the 350ms reuse window after navigation changes.");
+        return Task.CompletedTask;
+    }
+
     public static Task HeartbeatLoopOwnsTimerAndTaskLifetime()
     {
         var source = ReadWebViewServiceSource();

@@ -15,6 +15,7 @@ public partial class WebViewService
     private int _inFlightInspectionGeneration;
     private DateTimeOffset _lastControlUiInspectionAt = DateTimeOffset.MinValue;
     private ControlUiProbeSnapshot _latestControlUiSnapshot = ControlUiProbeSnapshot.Unknown;
+    private int _latestControlUiSnapshotGeneration;
     private string? _lastReportedIssueKey;
     private static readonly TimeSpan InspectionReuseWindow = TimeSpan.FromMilliseconds(350);
     private int _totalControlUiInspectionRequests;
@@ -77,6 +78,7 @@ public partial class WebViewService
             }
 
             if (_latestControlUiSnapshot != ControlUiProbeSnapshot.Unknown &&
+                _latestControlUiSnapshotGeneration == generation &&
                 DateTimeOffset.UtcNow - _lastControlUiInspectionAt < InspectionReuseWindow)
             {
                 var cachedCount = Interlocked.Increment(ref _cachedControlUiInspectionRequests);
@@ -96,6 +98,16 @@ public partial class WebViewService
             _inFlightInspectionGeneration = generation;
             _ = CompleteControlUiInspectionAsync(coreWebView, inspectionSource, token, generation);
             return inspectionSource.Task;
+        }
+    }
+
+    private void InvalidateControlUiInspectionCache()
+    {
+        lock (_inspectionGate)
+        {
+            _lastControlUiInspectionAt = DateTimeOffset.MinValue;
+            _latestControlUiSnapshotGeneration = 0;
+            _inFlightInspectionTask = null;
         }
     }
 
@@ -153,8 +165,14 @@ public partial class WebViewService
 
     private void ApplyControlUiSnapshot(ControlUiProbeSnapshot snapshot, bool raiseIssueEvent)
     {
+        ApplyControlUiSnapshot(snapshot, raiseIssueEvent, Volatile.Read(ref _webViewGeneration));
+    }
+
+    private void ApplyControlUiSnapshot(ControlUiProbeSnapshot snapshot, bool raiseIssueEvent, int generation)
+    {
         var notifySnapshotUpdated = !EqualityComparer<ControlUiProbeSnapshot>.Default.Equals(_latestControlUiSnapshot, snapshot);
         _latestControlUiSnapshot = snapshot;
+        _latestControlUiSnapshotGeneration = generation;
 
         if (snapshot.IsTerminal)
         {
@@ -282,13 +300,15 @@ public partial class WebViewService
             var payload = JsonSerializer.Deserialize<string>(rawResult);
             if (string.IsNullOrWhiteSpace(payload))
             {
-                return _latestControlUiSnapshot;
+                return _latestControlUiSnapshotGeneration == generation
+                    ? _latestControlUiSnapshot
+                    : ControlUiProbeSnapshot.Unknown;
             }
 
             var snapshot = ParseControlUiSnapshot(payload);
             if (IsCurrentGeneration(generation))
             {
-                ApplyControlUiSnapshot(snapshot, raiseIssueEvent: false);
+                ApplyControlUiSnapshot(snapshot, raiseIssueEvent: false, generation);
             }
 
             return snapshot;

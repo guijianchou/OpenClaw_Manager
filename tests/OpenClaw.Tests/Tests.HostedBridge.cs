@@ -299,18 +299,63 @@ internal static partial class Tests
         return Task.CompletedTask;
     }
 
-    public static Task HostedUiBridgeExecutableCommandDispatchRaisesHostEvents()
+    public static async Task HostedUiBridgeExecutableCommandDispatchRaisesHostEvents()
     {
         var engine = ExecuteHostedBridgeScript(string.Empty);
 
-        engine.Execute("window.__openClawHostBridge.onCommand({ command: 'custom_action', payload: { id: '42' } });");
+        var result = await engine.EvaluateAsync("window.__openClawHostBridge.onCommand({ command: 'custom_action', payload: { id: '42' } });");
         var eventsJson = engine.Evaluate("JSON.stringify(__openClawDispatchedEvents)").AsString();
 
+        Assert.True(result.AsBoolean(), "Executable command dispatch should return true when fallback events are raised.");
         Assert.Contains("\"target\":\"window\"", eventsJson, "Executable command dispatch should raise events on window.");
         Assert.Contains("\"target\":\"document\"", eventsJson, "Executable command dispatch should raise events on document.");
         Assert.Contains("\"type\":\"openclaw:host-command\"", eventsJson, "Executable command dispatch should raise the generic host-command event.");
         Assert.Contains("\"type\":\"openclaw:custom_action\"", eventsJson, "Executable command dispatch should raise the command-specific event.");
         Assert.Contains("\"payloadId\":\"42\"", eventsJson, "Executable command dispatch should preserve payload details.");
+    }
+
+    public static async Task HostedUiBridgeExecutableKnownCommandReturnsFallbackHandled()
+    {
+        var engine = ExecuteHostedBridgeScript(string.Empty);
+
+        var result = await engine.EvaluateAsync("window.__openClawHostBridge.onCommand({ command: 'refresh_session', payload: { id: '43' } });");
+        var eventsJson = engine.Evaluate("JSON.stringify(__openClawDispatchedEvents)").AsString();
+
+        Assert.True(result.AsBoolean(), "Known commands should return true when no page method handles them but fallback events are raised.");
+        Assert.Contains("\"type\":\"openclaw:refresh_session\"", eventsJson, "Known command fallback should raise the command-specific event.");
+        Assert.Contains("\"payloadId\":\"43\"", eventsJson, "Known command fallback should preserve payload details.");
+    }
+
+    public static Task HostedUiBridgeUsesSafeHostMessageHelper()
+    {
+        var source = ReadHostedBridgeScriptSource();
+
+        Assert.Contains("const postHostMessage", source, "Bridge host messaging should be centralized behind a safe helper.");
+        Assert.Contains("window.chrome?.webview?.postMessage?.(message)", source, "Host message helper should no-op when WebView2 host messaging is unavailable.");
+        Assert.Contains("postHostMessage(snapshot)", source, "Status snapshots should use the safe host message helper.");
+        Assert.Contains("postHostMessage(gap)", source, "Event-gap reports should use the safe host message helper.");
+        Assert.DoesNotContain("window.chrome.webview.postMessage", source, "Bridge script should not directly dereference WebView2 host messaging.");
+        return Task.CompletedTask;
+    }
+
+    public static Task HostedUiBridgeExecutableSessionReadyNoopsWithoutWebViewHost()
+    {
+        var engine = ExecuteHostedBridgeScript("""
+            window.chrome = undefined;
+            const app = {
+              connected: true,
+              tab: 'chat',
+              sessionKey: 'chat-1',
+              sessionsResult: {
+                defaults: { provider: 'openai', model: 'gpt-default' }
+              }
+            };
+            document.__querySelector = (selector) => selector === 'openclaw-app' ? app : null;
+            """);
+
+        engine.Execute("window.__openClawHostBridge.reportSessionReady();");
+
+        Assert.Equal(0, (int)engine.Evaluate("__openClawPostedMessages.length").AsNumber(), "Session-ready should no-op when the native WebView2 host is unavailable.");
         return Task.CompletedTask;
     }
 

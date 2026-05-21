@@ -33,7 +33,9 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 将可执行测试 harness 拆分为按领域组织的 `Tests.*.cs` 文件，并覆盖项目架构边界、代码规范文档和顶部状态栏 XAML 共享资源。
 - 将 `WebViewService` 的命令注入、heartbeat、Control UI inspection 和 profile 文件夹帮助器拆分到独立 partial 文件。
 - 将所有 Core-compatible 源文件迁移到 `src/OpenClaw.Core` 物理源码树，包括窗口边界策略。
+- 将主托管 bridge 浏览器脚本迁移为嵌入式 JS asset，C# 侧只负责资源加载、本地化字符串注入和 MODEL resolver 注入。
 - 将托管 MODEL 的 app-state 解析抽到嵌入式 JS asset，并用可执行回归测试覆盖默认值、`null` override、Map override 和对象形 payload。
+- 新增可执行 bridge 覆盖：session-ready 元数据、命令分发返回值、mutation filtering、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
 
 ### 本项目是
 
