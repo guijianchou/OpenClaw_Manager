@@ -6,7 +6,7 @@ using OpenClaw.Services;
 
 internal static partial class Tests
 {
-    public static Task VersionMetadataIs335()
+    public static Task VersionMetadataIs336()
     {
         var projectPath = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -35,11 +35,11 @@ internal static partial class Tests
         var appManifest = File.ReadAllText(appManifestPath);
         var about = File.ReadAllText(aboutPath);
 
-        Assert.Contains("<Version>3.3.5</Version>", project, "Project package version should be 3.3.5.");
-        Assert.Contains("<AssemblyVersion>3.3.5.0</AssemblyVersion>", project, "Assembly version should be 3.3.5.0.");
-        Assert.Contains("<FileVersion>3.3.5.0</FileVersion>", project, "File version should be 3.3.5.0.");
-        Assert.Contains("Version=\"3.3.5.0\"", packageManifest, "Package manifest version should be 3.3.5.0.");
-        Assert.Contains("version=\"3.3.5.0\"", appManifest, "Application manifest assembly identity should be 3.3.5.0.");
+        Assert.Contains("<Version>3.3.6</Version>", project, "Project package version should be 3.3.6.");
+        Assert.Contains("<AssemblyVersion>3.3.6.0</AssemblyVersion>", project, "Assembly version should be 3.3.6.0.");
+        Assert.Contains("<FileVersion>3.3.6.0</FileVersion>", project, "File version should be 3.3.6.0.");
+        Assert.Contains("Version=\"3.3.6.0\"", packageManifest, "Package manifest version should be 3.3.6.0.");
+        Assert.Contains("version=\"3.3.6.0\"", appManifest, "Application manifest assembly identity should be 3.3.6.0.");
         Assert.Contains("AppMetadata.GetDisplayVersion()", about, "About dialog should display the assembly-backed app version.");
         return Task.CompletedTask;
     }

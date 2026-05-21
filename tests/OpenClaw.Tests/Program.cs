@@ -39,7 +39,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings switch rows use compact spacing", Tests.SettingsSwitchRowsUseCompactSpacing),
     ("App startup honors multiple instance setting", Tests.AppStartupHonorsMultipleInstanceSetting),
     ("Settings navigation places General after Language", Tests.SettingsNavigationPlacesGeneralAfterLanguage),
-    ("Version metadata is 3.3.5", Tests.VersionMetadataIs335),
+    ("Version metadata is 3.3.6", Tests.VersionMetadataIs336),
     ("Repository code style is explicit", Tests.RepositoryCodeStyleIsExplicit),
     ("Code style guide documents project conventions", Tests.CodeStyleGuideDocumentsProjectConventions),
     ("Architecture guide preserves current module boundaries", Tests.ArchitectureGuidePreservesCurrentModuleBoundaries),

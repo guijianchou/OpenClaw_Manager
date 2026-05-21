@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
-**Current version:** 3.3.5
+**Current version:** 3.3.6
 
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
@@ -26,7 +26,7 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
-## Current 3.3.5 Notes
+## Current 3.3.6 Notes
 
 - Added [docs/code-style.md](docs/code-style.md) as the canonical project code-style and architecture guide.
 - Centralized top status and status-bar typography, spacing, and layout constants into focused WinUI resource dictionaries under `src/OpenClaw/Styles`.
@@ -36,6 +36,7 @@ It is best suited for users who:
 - Moved the main hosted bridge browser script into embedded JS assets, with C# limited to resource loading and localized string/model resolver injection.
 - Extracted hosted MODEL app-state resolution into an embedded JS asset with executable regression coverage for defaults, null overrides, Map overrides, and object-shaped payloads.
 - Added executable bridge coverage for session-ready metadata, command-dispatch return values, mutation filtering, safe host messaging, and generation-scoped WebView inspection cache reuse.
+- Synced release metadata to `3.3.6` after VS2026 debug validation of the architecture cleanup branch.
 
 ### This project is
 

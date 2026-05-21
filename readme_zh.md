@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 3.3.5
+**当前版本：** 3.3.6
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,7 +26,7 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 3.3.5 注意事项
+## 当前 3.3.6 注意事项
 
 - 新增 [docs/code-style.md](docs/code-style.md)，作为项目代码规范和架构边界的统一入口。
 - 将顶部状态栏和底部状态栏的字号、间距、布局常量集中到 `src/OpenClaw/Styles` 下的 WinUI 资源字典。
@@ -36,6 +36,7 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 将主托管 bridge 浏览器脚本迁移为嵌入式 JS asset，C# 侧只负责资源加载、本地化字符串注入和 MODEL resolver 注入。
 - 将托管 MODEL 的 app-state 解析抽到嵌入式 JS asset，并用可执行回归测试覆盖默认值、`null` override、Map override 和对象形 payload。
 - 新增可执行 bridge 覆盖：session-ready 元数据、命令分发返回值、mutation filtering、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
+- VS2026 debug 验证架构清理分支后，将发布元数据同步到 `3.3.6`。
 
 ### 本项目是
 

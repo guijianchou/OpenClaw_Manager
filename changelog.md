@@ -8,6 +8,12 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v3.3.6 (2026-05-21)
+
+- Promoted the v3.3.5 architecture cleanup after VS2026 debug validation.
+- Kept the bridge/WebView hardening as the current baseline: embedded hosted bridge assets, executable event/command regression coverage, safe host messaging, and generation-scoped WebView inspection cache reuse.
+- Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.6`.
+
 ### v3.3.5 (2026-05-20)
 
 - Added `docs/code-style.md` as the canonical project code-style and architecture guide.
@@ -201,6 +207,12 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v3.3.6 (2026-05-21)
+
+- VS2026 debug 验证通过后，将 v3.3.5 架构清理作为当前发布基线。
+- 保留 bridge/WebView 加固作为当前基线：嵌入式 hosted bridge asset、可执行事件/命令回归覆盖、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
+- 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.6`。
 
 ### v3.3.5 (2026-05-20)
 
