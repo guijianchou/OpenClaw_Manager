@@ -1,0 +1,14 @@
+<!-- Copyright (c) Lanstack @openclaw. All rights reserved. -->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Application-wide color resources -->
+    <SolidColorBrush x:Key="StatusConnectedBrush" Color="#FF0EA5E9" />
+    <SolidColorBrush x:Key="StatusReconnectingBrush" Color="#FFF59E0B" />
+    <SolidColorBrush x:Key="StatusErrorBrush" Color="#FFEF4444" />
+    <SolidColorBrush x:Key="StatusOfflineBrush" Color="#FF6B7280" />
+
+    <!-- Success/Accent colors -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF22C55E" />
+</ResourceDictionary>

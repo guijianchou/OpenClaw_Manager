@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 3.3.4
+**当前版本：** 3.3.5
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,13 +26,14 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 3.3.4 注意事项
+## 当前 3.3.5 注意事项
 
-- About 对话框里的 GitHub 主页链接和文案现在指向 `https://github.com/Guijianchou`。
-- Settings 保存后会立即应用 Always-on-top 和全局热键变更，不再需要重启。
-- 紧凑模式现在会折叠非必要顶栏状态段并放宽固定宽度，让 480px 小窗仍能显示模型和状态信息。
-- WebView2 状态探测现在带有 WebView/导航 generation 归属，导航、重建或进程失败后的过期脚本结果会被忽略。
-- heartbeat 和日志查看器的生命周期边界更清晰：heartbeat 独立持有 timer/task，日志 tail 会在 UI 线程之外读取。
+- 新增 [docs/code-style.md](docs/code-style.md)，作为项目代码规范和架构边界的统一入口。
+- 将顶部状态栏和底部状态栏的字号、间距、布局常量集中到 `src/OpenClaw/Styles` 下的 WinUI 资源字典。
+- 将可执行测试 harness 拆分为按领域组织的 `Tests.*.cs` 文件，并覆盖项目架构边界、代码规范文档和顶部状态栏 XAML 共享资源。
+- 将 `WebViewService` 的命令注入、heartbeat、Control UI inspection 和 profile 文件夹帮助器拆分到独立 partial 文件。
+- 将所有 Core-compatible 源文件迁移到 `src/OpenClaw.Core` 物理源码树，包括窗口边界策略。
+- 将托管 MODEL 的 app-state 解析抽到嵌入式 JS asset，并用可执行回归测试覆盖默认值、`null` override、Map override 和对象形 payload。
 
 ### 本项目是
 
@@ -136,7 +137,7 @@ Claw_winui3/
 ### 关键目录
 
 - `Services/`：配置、日志、诊断、WebView2 生命周期和恢复辅助逻辑
-- `OpenClaw.Core/`：可被测试项目复用的纯 .NET 共享代码
+- `OpenClaw.Core/`：纯 .NET 共享代码的物理源码树，可被 WinUI app 和回归测试复用
 - `tests/OpenClaw.Tests/`：覆盖恢复、设置、托盘、版本元数据和持久化行为的轻量回归测试
 - `ViewModels/`：外壳状态、命令和设置编辑
 - `Views/`：设置、关于和日志查看对话框
@@ -170,7 +171,7 @@ dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-re
 ### 代码规范
 
 - `.editorconfig` 是仓库根级代码风格契约：LF 换行、文件末尾换行、清理行尾空白、C#/XAML 四空格缩进、控制流必须加花括号，并通过 SDK 执行格式诊断。
-- 按 Linux 工程纪律写代码：控制流简单明确、后台任务有明确 owner、日志结构化、文件职责收窄。
+- 参见 [docs/code-style.md](docs/code-style.md)，了解项目架构边界、partial class 职责、XAML 资源规则、Core 物理源码规则和验证命令。
 - 提交涉及代码风格的改动前运行 `$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore`。
 
 ### 开发日志

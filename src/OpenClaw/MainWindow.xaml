@@ -95,15 +95,15 @@
             <Border x:Name="TopStatusPill"
                     Grid.Column="1"
                     Margin="16,0,12,0"
-                    Padding="12,5"
-                    MinWidth="440"
-                    MaxWidth="780"
+                    Padding="{StaticResource TopStatusPillPadding}"
+                    MinWidth="{StaticResource TopStatusPillMinWidth}"
+                    MaxWidth="{StaticResource TopStatusPillMaxWidth}"
                     HorizontalAlignment="Stretch"
                     Background="{ThemeResource ControlAltFillColorSecondaryBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="16">
-                <Grid ColumnSpacing="10"
+                <Grid ColumnSpacing="{StaticResource TopStatusPillColumnSpacing}"
                       VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -117,12 +117,10 @@
                           MinWidth="56"
                           VerticalAlignment="Center">
                         <TextBlock Text="{x:Bind ViewModel.HeartbeatSummary, Mode=OneWay}"
-                                   Foreground="{x:Bind ViewModel.HeartbeatSummaryBrush, Mode=OneWay}"
-                                   FontSize="10"
-                                   FontWeight="SemiBold"
-                                   CharacterSpacing="40"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center" />
+                                    Foreground="{x:Bind ViewModel.HeartbeatSummaryBrush, Mode=OneWay}"
+                                    Style="{StaticResource TopStatusValueTextBlockStyle}"
+                                    CharacterSpacing="{StaticResource TopStatusHeartbeatCharacterSpacing}"
+                                    HorizontalAlignment="Center" />
                     </Grid>
 
                     <Grid Grid.Column="1"
@@ -133,7 +131,7 @@
                                        HorizontalAlignment="Center">
                             <ItemsRepeater.Layout>
                                 <StackLayout Orientation="Horizontal"
-                                             Spacing="4" />
+                                             Spacing="{StaticResource TopStatusIndicatorSpacing}" />
                             </ItemsRepeater.Layout>
                             <ItemsRepeater.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:HeartbeatIndicatorViewModel">
@@ -148,9 +146,9 @@
 
                     <Grid x:Name="ModelStatusSegment"
                           Grid.Column="2"
-                          Margin="6,0,0,0"
+                          Margin="{StaticResource TopStatusModelSegmentMargin}"
                           ColumnSpacing="8"
-                          MinWidth="190"
+                          MinWidth="{StaticResource TopStatusModelSegmentMinWidth}"
                           MinHeight="24"
                           VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
@@ -160,33 +158,24 @@
 
                         <TextBlock Grid.Column="0"
                                     Text="{x:Bind helpers:StringResources.MainModelLabel}"
-                                   FontSize="10"
-                                   FontWeight="SemiBold"
-                                   CharacterSpacing="10"
-                                   VerticalAlignment="Center"
-                                   Foreground="{StaticResource SuccessBrush}" />
+                                    Style="{StaticResource TopStatusLabelTextBlockStyle}"
+                                    Foreground="{StaticResource SuccessBrush}" />
 
                         <TextBlock Grid.Column="1"
-                                   Text="{x:Bind ViewModel.ModelSummaryText, Mode=OneWay}"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   CharacterSpacing="10"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource SuccessBrush}" />
+                                    Text="{x:Bind ViewModel.ModelSummaryText, Mode=OneWay}"
+                                    Style="{StaticResource TopStatusModelValueTextBlockStyle}"
+                                    TextTrimming="CharacterEllipsis"
+                                    Foreground="{StaticResource SuccessBrush}" />
                     </Grid>
 
                     <Grid x:Name="AccessStatusSegment"
                           Grid.Column="3"
-                          Margin="18,0,0,0"
+                          Margin="{StaticResource TopStatusAccessSegmentMargin}"
                           MinWidth="76"
                           VerticalAlignment="Center">
                         <TextBlock Text="{x:Bind ViewModel.AccessSummaryText, Mode=OneWay}"
-                                   FontSize="10"
-                                   FontWeight="SemiBold"
                                    Foreground="{x:Bind ViewModel.AccessSummaryBrush, Mode=OneWay}"
-                                   CharacterSpacing="10"
-                                   VerticalAlignment="Center"
+                                   Style="{StaticResource TopStatusValueTextBlockStyle}"
                                    HorizontalAlignment="Center" />
                     </Grid>
 
@@ -201,20 +190,15 @@
 
                         <TextBlock Grid.Column="0"
                                     Text="{x:Bind helpers:StringResources.MainStatusLabel}"
-                                   FontSize="10"
-                                   FontWeight="SemiBold"
-                                   CharacterSpacing="10"
-                                   VerticalAlignment="Center"
-                                   Foreground="{x:Bind ViewModel.WorkStatusBrush, Mode=OneWay}" />
+                                    Style="{StaticResource TopStatusLabelTextBlockStyle}"
+                                    Foreground="{x:Bind ViewModel.WorkStatusBrush, Mode=OneWay}" />
 
                         <TextBlock Grid.Column="1"
-                                   Text="{x:Bind ViewModel.WorkStatusText, Mode=OneWay}"
-                                   Foreground="{x:Bind ViewModel.WorkStatusBrush, Mode=OneWay}"
-                                   FontSize="10"
-                                   FontWeight="SemiBold"
-                                   CharacterSpacing="16"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center" />
+                                    Text="{x:Bind ViewModel.WorkStatusText, Mode=OneWay}"
+                                    Foreground="{x:Bind ViewModel.WorkStatusBrush, Mode=OneWay}"
+                                    Style="{StaticResource TopStatusValueTextBlockStyle}"
+                                    CharacterSpacing="{StaticResource TopStatusWorkStateCharacterSpacing}"
+                                    HorizontalAlignment="Center" />
                     </Grid>
 
                     <Grid Grid.Column="5"
@@ -226,7 +210,7 @@
                                        HorizontalAlignment="Center">
                             <ItemsRepeater.Layout>
                                 <StackLayout Orientation="Horizontal"
-                                             Spacing="4" />
+                                             Spacing="{StaticResource TopStatusIndicatorSpacing}" />
                             </ItemsRepeater.Layout>
                             <ItemsRepeater.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:HeartbeatIndicatorViewModel">
@@ -393,16 +377,16 @@
                          VerticalAlignment="Center"
                          Fill="{x:Bind ViewModel.StatusIndicatorBrush, Mode=OneWay}" />
                 <TextBlock x:Name="StatusText"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+                            VerticalAlignment="Center"
+                            Style="{StaticResource StatusBarTextBlockStyle}"
+                            Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
             </StackPanel>
 
             <TextBlock Grid.Column="2"
-                       VerticalAlignment="Center"
-                       FontSize="12"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       Text="{x:Bind ViewModel.SelectedEnvironmentName, Mode=OneWay}" />
+                        VerticalAlignment="Center"
+                        Style="{StaticResource StatusBarTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.SelectedEnvironmentName, Mode=OneWay}" />
         </Grid>
     </Grid>
 </Window>

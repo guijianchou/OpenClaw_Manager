@@ -8,6 +8,16 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v3.3.5 (2026-05-20)
+
+- Added `docs/code-style.md` as the canonical project code-style and architecture guide.
+- Centralized top status and status-bar typography, spacing, and layout constants into focused WinUI resource dictionaries under `src/OpenClaw/Styles`.
+- Split the executable test harness into focused `Tests.*.cs` domain files and added coverage for code-style documentation, architecture boundaries, and shared top-status XAML resources.
+- Split `WebViewService` command-injection, heartbeat, Control UI inspection, and profile-folder helpers into focused partial files.
+- Moved all Core-compatible source files into the physical `src/OpenClaw.Core` tree, including the window-bounds policy that was previously linked from the WinUI project.
+- Extracted hosted MODEL app-state resolution into an embedded JS asset and added executable regression coverage for defaults, `null` overrides, Map-backed overrides, and object-shaped payloads.
+- Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.5`.
+
 ### v3.3.4 (2026-05-20)
 
 - Updated the About dialog GitHub profile links and labels to `https://github.com/Guijianchou`.
@@ -189,6 +199,16 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v3.3.5 (2026-05-20)
+
+- 新增 `docs/code-style.md`，作为项目代码规范和架构边界的统一入口。
+- 将顶部状态栏和底部状态栏的字号、间距、布局常量集中到 `src/OpenClaw/Styles` 下的 WinUI 资源字典。
+- 将可执行测试 harness 拆分为按领域组织的 `Tests.*.cs` 文件，并新增代码规范文档、架构边界和顶部状态栏 XAML 共享资源的回归测试。
+- 将 `WebViewService` 的命令注入、heartbeat、Control UI inspection 和 profile 文件夹帮助器拆分到独立 partial 文件。
+- 将所有 Core-compatible 源文件迁移到 `src/OpenClaw.Core` 物理源码树，包括此前从 WinUI 项目链接的窗口边界策略。
+- 将托管 MODEL 的 app-state 解析抽到嵌入式 JS asset，并用可执行回归测试覆盖默认值、`null` override、Map-backed override 和对象形 payload。
+- 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.5`。
 
 ### v3.3.4 (2026-05-20)
 

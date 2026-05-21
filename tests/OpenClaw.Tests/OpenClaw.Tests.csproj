@@ -12,6 +12,10 @@
     <ProjectReference Include="..\..\src\OpenClaw.Core\OpenClaw.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Jint" Version="4.9.2" />
+  </ItemGroup>
+
   <Target Name="FailDotNetTestForExecutableHarness" BeforeTargets="VSTest">
     <Error Text="OpenClaw.Tests is an executable harness. Run: dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c $(Configuration) --no-restore" />
   </Target>

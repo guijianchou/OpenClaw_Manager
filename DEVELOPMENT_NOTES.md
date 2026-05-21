@@ -2,13 +2,16 @@
 
 ## Project Code Standards
 
+Canonical checklist: [docs/code-style.md](docs/code-style.md).
+
 This project uses C# and WinUI conventions, but follows the Linux engineering bias toward small, explicit, boring code:
 
 - Keep control flow readable. Use braces on every `if`, loop, and branch even for one-line bodies.
 - Keep files focused. New service/view-model code should prefer small partials or helper types over growing `WebViewService`, `HostedUiBridge`, or the test harness further.
 - Own background work explicitly. A background loop should have a stored `Task`, a stored cancellation source, and one logging boundary for exceptions.
 - WebView/CoreWebView2 async work must carry a generation or equivalent ownership token across awaits before applying results back to app state.
-- Hosted bridge JavaScript belongs behind a dedicated script-builder seam; keep native WebView orchestration in `HostedUiBridge` and script content in `HostedUiBridge.Script.cs`.
+- Hosted bridge JavaScript belongs behind dedicated script-builder and asset seams; keep native WebView orchestration in `HostedUiBridge`, script assembly in `HostedUiBridge.Script.cs`, and executable pure JS logic in focused assets with behavior tests.
+- Pure settings, diagnostics, parser, policy, telemetry, recovery, and window-bounds code should live physically under `src/OpenClaw.Core`; there are no current linked Core source exceptions.
 - Settings that affect live shell behavior must map to a current-process apply path, not only persisted configuration.
 - Prefer structured logs with stable event keys and context objects. Avoid interpolated operational logs for state transitions.
 - Keep user-visible text in `StringResources` unless the string is diagnostic-only or a protocol/status token.

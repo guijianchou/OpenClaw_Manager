@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
-**Current version:** 3.3.4
+**Current version:** 3.3.5
 
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
@@ -26,13 +26,14 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
-## Current 3.3.4 Notes
+## Current 3.3.5 Notes
 
-- The About dialog GitHub profile links and labels now point to `https://github.com/Guijianchou`.
-- Always-on-top and global hotkey settings now apply immediately after saving Settings instead of waiting for a restart.
-- Compact mode now collapses nonessential top-bar segments and relaxes fixed status/model widths so the 480px shell keeps the model/status readout visible.
-- WebView2 status probes now carry WebView/navigation generation ownership, so stale script results are ignored after navigation, recreation, or process failure.
-- Heartbeat timers and log viewing now have explicit lifetime boundaries: heartbeat owns its loop task/timer, and the log viewer tails large files off the UI thread.
+- Added [docs/code-style.md](docs/code-style.md) as the canonical project code-style and architecture guide.
+- Centralized top status and status-bar typography, spacing, and layout constants into focused WinUI resource dictionaries under `src/OpenClaw/Styles`.
+- Split the executable test harness into focused `Tests.*.cs` domain files with coverage for project architecture boundaries, code-style documentation, and shared top-status XAML resources.
+- Split `WebViewService` command-injection, heartbeat, Control UI inspection, and profile-folder helpers into focused partial files.
+- Moved all Core-compatible source files, including window-bounds policy, into the physical `src/OpenClaw.Core` tree.
+- Extracted hosted MODEL app-state resolution into an embedded JS asset with executable regression coverage for defaults, null overrides, Map overrides, and object-shaped payloads.
 
 ### This project is
 
@@ -136,7 +137,7 @@ Claw_winui3/
 ### Key folders
 
 - `Services/`: configuration, logging, diagnostics, WebView2 lifecycle, recovery helpers
-- `OpenClaw.Core/`: pure .NET shared code linked from the WinUI app for regression coverage
+- `OpenClaw.Core/`: physical source tree for pure .NET shared code used by the WinUI app and regression harness
 - `tests/OpenClaw.Tests/`: lightweight regression harness for recovery, settings, tray, metadata, and persistence behavior
 - `ViewModels/`: shell state, commands, settings editing
 - `Views/`: settings, about, and log viewer dialogs
@@ -170,7 +171,7 @@ dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-re
 ### Code Style
 
 - `.editorconfig` is the root style contract: LF endings, final newline, trimmed trailing whitespace, four-space C#/XAML indentation, required braces, and SDK-enforced formatting diagnostics.
-- Keep code small and explicit in the Linux engineering style: simple control flow, owned background tasks, structured logging, and narrow files with one responsibility.
+- See [docs/code-style.md](docs/code-style.md) for project-specific architecture boundaries, partial-class ownership, XAML resource rules, Core physical-source rules, and verification commands.
 - Run `$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore` before committing style-sensitive changes.
 
 ### Development Notes

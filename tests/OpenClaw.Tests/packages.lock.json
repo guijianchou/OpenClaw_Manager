@@ -2,6 +2,20 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "Jint": {
+        "type": "Direct",
+        "requested": "[4.9.2, )",
+        "resolved": "4.9.2",
+        "contentHash": "dEBge1IXsWrNefhc9mwYKQPmvzGhO9n/L7aMHobiXVkkvmeyPVYuthZ0i0hXy+JXJSP3K75hu/F51y5fXjtLzg==",
+        "dependencies": {
+          "Acornima": "1.6.2"
+        }
+      },
+      "Acornima": {
+        "type": "Transitive",
+        "resolved": "1.6.2",
+        "contentHash": "laakpDHzMwHr5C8+q5RlRf0XJJshUvghNeo4xDerICrYR3iEuGvwfpauCmXuU3RE437XDaQO5ZxieWDpADuD+w=="
+      },
       "openclaw.core": {
         "type": "Project"
       }

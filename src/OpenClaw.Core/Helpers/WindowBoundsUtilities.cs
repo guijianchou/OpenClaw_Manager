@@ -2,7 +2,7 @@
 
 namespace OpenClaw.Helpers;
 
-internal static class WindowBoundsUtilities
+public static class WindowBoundsUtilities
 {
     public const int DefaultWindowWidth = 1280;
     public const int DefaultWindowHeight = 800;
@@ -98,4 +98,4 @@ internal static class WindowBoundsUtilities
         !double.IsNaN(value) && !double.IsInfinity(value);
 }
 
-internal readonly record struct WindowWorkArea(int Left, int Top, int Width, int Height);
+public readonly record struct WindowWorkArea(int Left, int Top, int Width, int Height);
