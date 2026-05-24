@@ -170,6 +170,21 @@ dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 - 参见 [docs/code-style.md](docs/code-style.md)，了解项目架构边界、partial class 职责、XAML 资源规则、Core 物理源码规则和验证命令。
 - 提交涉及代码风格的改动前运行 `$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore`。
 
+### 当前验证方式
+
+当前 checkpoint 有意不保留本地 `tests/` harness。现行验证由 restore、x64 build、format、仓库结构 guardrail、bridge 脚本检查和空白差异检查组成：
+
+```powershell
+dotnet restore OpenClaw.sln --locked-mode
+dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
+$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
+powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
+powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
+git diff --check
+```
+
+`tools\verify-bridge-scripts.ps1` 会在可用时使用 Node.js；如果当前环境没有可执行的 Node，会干净跳过。默认 `PATH` 上的 `node` 被阻止或不可用时，可以用 `OPENCLAW_NODE` 指定 Node 可执行文件。
+
 ### 开发日志
 
 参见 [DEVELOPMENT_NOTES.md](DEVELOPMENT_NOTES.md)，了解原生窗口 chrome、主题同步和其他维护敏感区域的经验记录。

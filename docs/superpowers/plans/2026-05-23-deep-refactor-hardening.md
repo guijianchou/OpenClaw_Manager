@@ -43,6 +43,30 @@ This pass reviewed:
 19. Status brushes are static `Brush` instances in the ViewModel rather than theme-aware resources. Runtime theme switching can bypass those static instances.
 20. `MainViewModel.Core.Properties.cs` exposes service instances publicly (`WebViewService`, `HostedUiBridge`, `Coordinator`), which makes it easy for the view layer to bypass orchestration.
 21. `ShowCircuitBreakerError()` still has a hardcoded English user-facing string. User-facing strings belong in `StringResources` and `.resw`.
+22. `HostedUiBridge.cs` still logs through `App.Logger`. After script extraction, the bridge should follow the same constructor-injected logger pattern as `WebViewService` so service code does not keep spreading static `App` dependencies.
+
+### Current Branch Snapshot
+
+This plan was rechecked on 2026-05-23 against the active refactor branch:
+
+```text
+branch: codex/deep-refactor-hardening
+baseline checkpoint: 443e9a5 chore: establish deep refactor baseline
+dirty files: docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md, tools/verify-bridge-scripts.ps1, tools/verify-repo-structure.ps1
+```
+
+The repository already has the approved `tests/` removal and `src/OpenClaw.Core` retention committed. Task 1 is partially present in the working tree as new verification scripts, and this plan file has been amended with the second-pass review. It still needs documentation alignment, verification, and a checkpoint commit before deeper refactor work starts.
+
+Quick review measurements from the active branch:
+
+| Surface | Current shape | Refactor implication |
+| --- | --- | --- |
+| `WebViewService*.cs` | 1,609 lines across lifecycle, inspection, heartbeat, commands, profile helpers | Partial split is not enough; Tasks 2, 3, 3A, 3B, and 3C must move ownership into services/assets. |
+| `HostedUiBridge.Script.js` | 921 lines | Task 6 must turn it into a composition shell with focused browser assets. |
+| `HostedUiBridge.ModelResolver.js` | 191 lines | Keep as a focused asset and extend `tools/verify-bridge-scripts.ps1` around it instead of restoring `tests/`. |
+| `MainViewModel*.cs` | 17 partial files, about 1,259 lines in this branch | Tasks 7B, 7C1, and 7C2 should reduce UI dispatch, presentation formatting, and public service exposure. |
+| README architecture diagram | still shows only `MainWindow -> MainViewModel -> WebViewService` | Task 9 must update README/readme_zh to the real runtime graph. |
+| Development notes | historical lines still say "Regression coverage now checks" | Task 9 must mark those lines as historical after harness removal. |
 
 ## Traceability Matrix
 
@@ -60,12 +84,13 @@ This pass reviewed:
 | Development notes say log viewer must not block the UI thread. | Log tailing runs via `Task.Run`, but refresh/close cancellation is not owned. | Task 8 adds cancellation and refresh ownership. |
 | Development notes define Core as WinUI/WebView2-free. | Core has no direct reference, but `DiagnosticBundleService` uses WebView2 type-name reflection. | Task 7 moves WebView2 runtime discovery to WinUI and passes plain runtime info into Core. |
 | Development notes cover title-bar/DWM, tray Win32, single-instance, and window bounds lessons. | These areas are not the main refactor target but are regression-prone during shell changes. | Task 1 structure guardrails and Task 10 manual VS2026 checklist keep these behaviors in scope. |
-| Code-style notes say large browser scripts should live as assets and remain verifiable. | Stop/abort WebView command scripts are still large inline strings in C#. | Task 3A moves command scripts into embedded resources and adds inline-JS guardrails. |
-| Development notes say WebView recovery should be deliberate and observable. | WebView recreation scheduling still lives in `MainWindow.WebView.cs`. | Task 3B extracts `WebViewRecreationService` so the Window partial stays thin. |
-| Code-style notes say static App coupling should not spread into services/ViewModels. | `MainViewModel.Status.cs`, `ShellSessionCoordinator.Adapters.cs`, `WebViewService`, and heartbeat code still read global App state. | Tasks 7A, 7B, 7C, and 8A remove the main static-coupling hot spots. |
+| Code-style notes say large browser scripts should live as assets and remain verifiable. | Stop/abort WebView command scripts are still large inline strings in C#. | Task 3B moves command scripts into embedded resources and adds inline-JS guardrails. |
+| Development notes say WebView recovery should be deliberate and observable. | WebView recreation scheduling still lives in `MainWindow.WebView.cs`. | Task 3C extracts `WebViewRecreationService` so the Window partial stays thin. |
+| Code-style notes say static App coupling should not spread into services/ViewModels. | `MainViewModel.Status.cs`, `ShellSessionCoordinator.Adapters.cs`, `WebViewService`, heartbeat code, and `HostedUiBridge` still read global App state. | Tasks 3A, 7A, 7B, and 7D remove the main static-coupling hot spots. |
 | README/changelog emphasize long-running hosted sessions and stale busy recovery. | Bridge polling uses recursive timeout scheduling without drift correction. | Task 6A adds self-correcting bridge polling. |
-| Code-style notes call for centralized resources and localizable user strings. | Status brushes are static ViewModel objects, and circuit-breaker text is hardcoded English. | Tasks 8C and 7D move visual/text presentation to resources. |
-| The goal of this refactor is to stop patch stacking. | `MainViewModel` and public service properties still expose broad mutable runtime surface. | Tasks 8B, 8D, and 8E reduce presentation and service-surface sprawl. |
+| Code-style notes call for centralized resources and localizable user strings. | Status brushes are static ViewModel objects, and circuit-breaker text is hardcoded English. | Tasks 7C1 and 7C3 move visual/text presentation to resources. |
+| The goal of this refactor is to stop patch stacking. | `MainViewModel` and public service properties still expose broad mutable runtime surface. | Tasks 7B, 7C1, and 7C2 reduce dispatch, presentation, and service-surface sprawl. |
+| Static `App` dependencies should stay at application edges. | `HostedUiBridge.cs` still logs through `App.Logger` even though it is a service with a clear lifetime. | Task 7D injects `IAppLogger` into `HostedUiBridge` and adds a guardrail. |
 
 ## Current Ground Rules
 
@@ -74,7 +99,7 @@ This pass reviewed:
 - Keep Release output folders unless a later explicit cleanup request says otherwise.
 - Do not rewrite historical `docs/superpowers/plans/*` and `docs/superpowers/progress/*` records except to add a short archival note if needed.
 - Every task ends with a commit-sized checkpoint and verification command list.
-- Start implementation from a clean checkpoint. The current uncommitted test-harness removal and docs updates should be committed or intentionally carried before Task 1 starts.
+- Start implementation from the current `codex/deep-refactor-hardening` checkpoint. The baseline cleanup is already committed; only the Task 1 verification scripts should be carried into the next checkpoint.
 - Do not bump the app version inside this plan unless the user explicitly asks for the implementation branch to become a release.
 - New service types default to `internal sealed` unless a public contract is required.
 - New async methods accept `CancellationToken` when there is a realistic owner that can cancel the work.
@@ -126,9 +151,9 @@ These are review targets, not hard build failures unless the guardrail script ex
 ### Task 0: Preflight And Checkpoint
 
 **Files:**
-- Inspect only unless committing the already pending cleanup.
+- Inspect only unless committing the pending Task 1 verification scripts.
 
-- [ ] **Step 1: Confirm working tree state**
+- [x] **Step 1: Confirm working tree state**
 
 Run:
 
@@ -136,44 +161,26 @@ Run:
 git status --short --branch -uall
 ```
 
-Expected current state before starting implementation is a dirty working tree containing the already-approved harness removal plus this plan. The branch header should show `main` tracking `origin/main`; the exact `ahead` count may vary:
+Expected current state before continuing implementation is the dedicated refactor branch with this amended plan plus Task 1 verification scripts uncommitted:
 
 ```text
-## main [tracks origin/main, ahead count varies]
- M README.md
- M readme_zh.md
- M DEVELOPMENT_NOTES.md
- M changelog.md
- M docs/code-style.md
- M OpenClaw.sln
- D src/OpenClaw/Properties/AssemblyInfo.cs
- D tests/OpenClaw.Tests/OpenClaw.Tests.csproj
- D tests/OpenClaw.Tests/Program.cs
- D tests/OpenClaw.Tests/Tests.HostedBridge.cs
- D tests/OpenClaw.Tests/Tests.Platform.cs
- D tests/OpenClaw.Tests/Tests.Recovery.cs
- D tests/OpenClaw.Tests/Tests.Settings.cs
- D tests/OpenClaw.Tests/Tests.ShellAndWebView.cs
- D tests/OpenClaw.Tests/Tests.StyleArchitecture.cs
- D tests/OpenClaw.Tests/Tests.Support.cs
- D tests/OpenClaw.Tests/Tests.TrayAndDiagnostics.cs
- D tests/OpenClaw.Tests/packages.lock.json
-?? docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md
+## codex/deep-refactor-hardening
+ M docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md
+?? tools/verify-bridge-scripts.ps1
+?? tools/verify-repo-structure.ps1
 ```
 
-- [ ] **Step 2: Decide checkpoint handling**
+- [x] **Step 2: Decide checkpoint handling**
 
-If the user wants a clean base before refactor execution, commit the already-approved `tests/` removal and this plan:
+The baseline cleanup is already committed as:
 
-```powershell
-git add README.md readme_zh.md DEVELOPMENT_NOTES.md changelog.md docs/code-style.md OpenClaw.sln src/OpenClaw/Properties/AssemblyInfo.cs docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md
-git add -u tests
-git commit -m "chore: remove inactive regression harness"
+```text
+443e9a5 chore: establish deep refactor baseline
 ```
 
-If the user wants to keep the cleanup uncommitted, continue but do not mix unrelated refactor edits into the same final commit.
+Do not recommit the removed harness. Finish Task 1 by updating docs, running verification, and committing only the verification scripts plus related current documentation.
 
-- [ ] **Step 3: Confirm Release output policy**
+- [x] **Step 3: Confirm Release output policy**
 
 Run:
 
@@ -195,7 +202,7 @@ Expected: Release directories may exist and must not be deleted by this plan. De
 - Modify: `DEVELOPMENT_NOTES.md`
 - Modify: `docs/code-style.md`
 
-- [ ] **Step 1: Create `tools/verify-bridge-scripts.ps1`**
+- [x] **Step 1: Create `tools/verify-bridge-scripts.ps1`**
 
 Add a PowerShell script that executes the embedded MODEL resolver with Node.js when available. It must not create `tests/`.
 
@@ -206,8 +213,29 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $resolverPath = Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.ModelResolver.js'
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+function Resolve-NodeCommand {
+    if (-not [string]::IsNullOrWhiteSpace($env:OPENCLAW_NODE)) {
+        return $env:OPENCLAW_NODE
+    }
+
+    $command = Get-Command node -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    return $null
+}
+
+$nodeCommand = Resolve-NodeCommand
+if (-not $nodeCommand) {
     Write-Host 'SKIP: node is not available; bridge model resolver script verification skipped.'
+    exit 0
+}
+
+try {
+    & $nodeCommand --version | Out-Null
+} catch {
+    Write-Host "SKIP: node is not executable; bridge model resolver script verification skipped. $($_.Exception.Message)"
     exit 0
 }
 
@@ -254,13 +282,13 @@ process.exit(failed === 0 ? 0 : 1);
 $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) ('openclaw-model-resolver-' + [System.Guid]::NewGuid() + '.js')
 try {
     Set-Content -LiteralPath $tempFile -Value $runner -Encoding UTF8
-    node $tempFile
+    & $nodeCommand $tempFile
 } finally {
     Remove-Item -LiteralPath $tempFile -ErrorAction SilentlyContinue
 }
 ```
 
-- [ ] **Step 2: Create `tools/verify-repo-structure.ps1`**
+- [x] **Step 2: Create `tools/verify-repo-structure.ps1`**
 
 Add guardrails for the current architecture decision: no active `tests/`, Core stays WinUI-free, embedded script resources exist, and historical docs are not treated as active verification.
 
@@ -299,7 +327,7 @@ foreach ($resource in @('HostedUiBridge.Script.js', 'HostedUiBridge.ModelResolve
 Write-Host 'PASS: repository structure guardrails'
 ```
 
-- [ ] **Step 3: Document the new verification commands**
+- [x] **Step 3: Document the new verification commands**
 
 Update current docs to include:
 
@@ -318,7 +346,7 @@ In `DEVELOPMENT_NOTES.md`, replace current active wording that implies executabl
 Historical notes may mention regression coverage from removed harness versions. The active v3.3.6+ verification surface is solution restore/build/format, repo-structure guardrails, bridge MODEL script checks, whitespace checks, and VS2026 manual debug.
 ```
 
-- [ ] **Step 4: Run verification**
+- [x] **Step 4: Run verification**
 
 Run:
 
@@ -341,7 +369,7 @@ PASS: null override falls back after session lookup
 PASS: object override
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add README.md readme_zh.md DEVELOPMENT_NOTES.md docs/code-style.md tools/verify-bridge-scripts.ps1 tools/verify-repo-structure.ps1
@@ -424,7 +452,7 @@ internal sealed class WebViewStatusInspector : IDisposable
     public int CachedRequests { get; }
     public int CoalescedRequests { get; }
 
-    public Task<ControlUiProbeSnapshot> InspectAsync();
+    public Task<ControlUiProbeSnapshot> InspectAsync(CancellationToken cancellationToken = default);
     public void StartProbeLoop();
     public void CancelProbeLoop();
     public void InvalidateCache();
@@ -487,14 +515,14 @@ This keeps the App-bound logger at the application edge while removing it from `
 Every await in `WebViewStatusInspector` that can apply a snapshot must check:
 
 ```csharp
-token.ThrowIfCancellationRequested();
+cancellationToken.ThrowIfCancellationRequested();
 if (!_generations.IsCurrent(generation))
 {
     return ControlUiProbeSnapshot.Unknown;
 }
 ```
 
-No caller should be able to apply an inspection result without a generation.
+No caller should be able to apply an inspection result without both a generation and the currently owned cancellation token. Fire-and-forget probe loops must pass their probe-loop token into `InspectAsync`.
 
 - [ ] **Step 5: Reduce `WebViewService.ControlUiInspection.cs` to a compatibility wrapper**
 
@@ -506,9 +534,9 @@ public int TotalControlUiInspectionRequests => _statusInspector.TotalRequests;
 public int CachedControlUiInspectionRequests => _statusInspector.CachedRequests;
 public int CoalescedControlUiInspectionRequests => _statusInspector.CoalescedRequests;
 
-public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync()
+public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(CancellationToken cancellationToken = default)
 {
-    return _statusInspector.InspectAsync();
+    return _statusInspector.InspectAsync(cancellationToken);
 }
 ```
 
@@ -600,7 +628,7 @@ internal sealed class HeartbeatRuntime : IDisposable
         Stop();
         _key = key;
         _cancellation = new CancellationTokenSource();
-        _task = RunObservedAsync(loop, _cancellation.Token);
+        _task = RunObservedAsync(key, loop, _cancellation);
     }
 
     public void Stop()
@@ -626,9 +654,23 @@ internal sealed class HeartbeatRuntime : IDisposable
         Stop();
     }
 
-    private async Task RunObservedAsync(Func<CancellationToken, Task> loop, CancellationToken token)
+    private async Task RunObservedAsync(
+        string key,
+        Func<CancellationToken, Task> loop,
+        CancellationTokenSource cancellation)
     {
-        await loop(token);
+        try
+        {
+            await loop(cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // Expected during Stop().
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Heartbeat loop error for run '{key}': {ex.Message}");
+        }
     }
 
     private async Task ObserveStopAsync(Task task, CancellationTokenSource? cancellation)
@@ -2162,28 +2204,43 @@ This removes static brush instances while preserving the existing formatting cal
 
 - [ ] **Step 3: Extract pure formatting into `StatusPresenter`**
 
-Create `StatusPresenter` for formatting methods that do not need to mutate ViewModel fields:
+Create `StatusPresenter` for formatting methods that do not need to mutate ViewModel fields. Keep brush lookup in `MainViewModel` and pass the current brushes into the presenter so `StatusPresenter` does not need to reach into private ViewModel members.
 
 ```csharp
+internal readonly record struct StatusBrushes(
+    Brush Neutral,
+    Brush Success,
+    Brush Warning,
+    Brush Error);
+
+internal readonly record struct StatusPresentation(string Text, Brush Brush);
+
 internal sealed class StatusPresenter
 {
-    public StatusPresentation FormatConnectionState(ConnectionState state, string recoveryMessage)
+    public StatusPresentation FormatConnectionState(ConnectionState state, StatusBrushes brushes)
     {
         return state switch
         {
-            ConnectionState.Connected => new StatusPresentation(StringResources.StatusConnected, MainViewModel.SuccessBrush),
-            ConnectionState.Loading => new StatusPresentation(StringResources.StatusLoading, MainViewModel.WarningBrush),
-            ConnectionState.GatewayConnecting => new StatusPresentation(StringResources.StatusGatewayConnecting, MainViewModel.WarningBrush),
-            ConnectionState.Reconnecting => new StatusPresentation(StringResources.StatusReconnecting, MainViewModel.WarningBrush),
-            ConnectionState.AuthFailed => new StatusPresentation(StringResources.StatusAuthFailed, MainViewModel.ErrorBrush),
-            ConnectionState.Error => new StatusPresentation(StringResources.StatusError, MainViewModel.ErrorBrush),
-            _ => new StatusPresentation(StringResources.StatusOffline, MainViewModel.NeutralBrush),
+            ConnectionState.Connected => new StatusPresentation(StringResources.StatusConnected, brushes.Success),
+            ConnectionState.Loading => new StatusPresentation(StringResources.StatusLoading, brushes.Warning),
+            ConnectionState.GatewayConnecting => new StatusPresentation(StringResources.StatusGatewayConnecting, brushes.Warning),
+            ConnectionState.Reconnecting => new StatusPresentation(StringResources.StatusReconnecting, brushes.Warning),
+            ConnectionState.AuthFailed => new StatusPresentation(StringResources.StatusAuthFailed, brushes.Error),
+            ConnectionState.Error => new StatusPresentation(StringResources.StatusError, brushes.Error),
+            _ => new StatusPresentation(StringResources.StatusOffline, brushes.Neutral),
         };
     }
 }
 ```
 
-During implementation, move the existing pure methods from `MainViewModel.Formatting.cs` and `MainViewModel.StatusFormatting.cs` into `StatusPresenter`. Keep methods that set bindable properties in `MainViewModel`.
+In `MainViewModel`, provide the brushes at the call site:
+
+```csharp
+private StatusBrushes CurrentStatusBrushes =>
+    new(NeutralBrush, SuccessBrush, WarningBrush, ErrorBrush);
+```
+
+During implementation, move the existing pure methods from `MainViewModel.Formatting.cs` and `MainViewModel.StatusFormatting.cs` into `StatusPresenter`. Keep methods that set bindable properties in `MainViewModel`. Remove the private nested `StatusPresentation` record from `MainViewModel.StatusFormatting.cs` after the new shared record compiles.
 
 - [ ] **Step 4: Keep mutation in MainViewModel**
 
@@ -2313,7 +2370,7 @@ git commit -m "refactor: narrow MainViewModel service surface"
 
 ---
 
-### Task 7C: Localize Circuit Breaker Error Text
+### Task 7C3: Localize Circuit Breaker Error Text
 
 **Files:**
 - Modify: `src/OpenClaw/ViewModels/MainViewModel.Commands.cs`
@@ -2369,6 +2426,72 @@ Commit:
 ```powershell
 git add src/OpenClaw/ViewModels/MainViewModel.Commands.cs src/OpenClaw/Strings/en-us/Resources.resw src/OpenClaw/Strings/zh-cn/Resources.resw tools/verify-repo-structure.ps1
 git commit -m "fix: localize circuit breaker recovery message"
+```
+
+---
+
+### Task 7D: Inject Logger Into HostedUiBridge
+
+**Files:**
+- Modify: `src/OpenClaw/Services/HostedUiBridge.cs`
+- Modify: `src/OpenClaw/ViewModels/MainViewModel.Fields.cs`
+- Modify: `tools/verify-repo-structure.ps1`
+
+- [ ] **Step 1: Add constructor logger dependency**
+
+In `HostedUiBridge.cs`, add a constructor and logger field:
+
+```csharp
+private readonly IAppLogger _logger;
+
+public HostedUiBridge(IAppLogger logger)
+{
+    _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+}
+```
+
+Replace every `App.Logger.Info`, `App.Logger.Warning`, and `App.Logger.Error` inside `HostedUiBridge.cs` with `_logger.Info`, `_logger.Warning`, and `_logger.Error`.
+
+- [ ] **Step 2: Construct the bridge from the ViewModel logger**
+
+In `MainViewModel.Fields.cs`, replace the field initializer:
+
+```csharp
+private readonly HostedUiBridge _hostedUiBridge = new();
+```
+
+with:
+
+```csharp
+private readonly HostedUiBridge _hostedUiBridge;
+```
+
+Then initialize it in the `MainViewModel(IAppLogger logger, Action<Action>? dispatchToUi = null)` constructor that Task 7B owns:
+
+```csharp
+_hostedUiBridge = new HostedUiBridge(logger);
+```
+
+- [ ] **Step 3: Add guardrail**
+
+Extend `tools/verify-repo-structure.ps1`:
+
+```powershell
+$hostedBridge = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.cs') -Raw
+if ($hostedBridge -match 'App\.Logger') {
+    throw 'HostedUiBridge must use injected IAppLogger, not App.Logger.'
+}
+```
+
+- [ ] **Step 4: Run verification and commit**
+
+Run full verification from Task 1.
+
+Commit:
+
+```powershell
+git add src/OpenClaw/Services/HostedUiBridge.cs src/OpenClaw/ViewModels/MainViewModel.Fields.cs tools/verify-repo-structure.ps1
+git commit -m "refactor: inject hosted bridge logger"
 ```
 
 ---
@@ -2696,6 +2819,7 @@ git commit -m "refactor: complete second-pass architecture hardening"
 - `OpenClaw.Core` remains in the solution and has no WinUI/WebView2 direct dependency.
 - `WebViewService` no longer owns status inspection internals or heartbeat loop lifetime directly.
 - `HostedUiBridge.Script.js` becomes a composition shell under 250 lines, with focused embedded JS assets for MODEL, status inspection, command dispatch, mutation filtering, and host messaging.
+- `WebViewService` and `HostedUiBridge` use injected `IAppLogger` instead of static `App.Logger`.
 - Settings live behavior is applied from a typed change pipeline instead of re-reading global config in multiple places.
 - Compact mode uses XAML visual states for top-bar layout.
 - Documentation clearly distinguishes historical removed harness coverage from active verification.

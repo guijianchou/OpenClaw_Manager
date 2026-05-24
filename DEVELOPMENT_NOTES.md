@@ -23,9 +23,24 @@ Canonical local verification:
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
+powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
+powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
+git diff --check
 ```
 
-The local regression harness is not part of the active solution at this checkpoint; validate with restore, x64 build, format, and whitespace checks.
+The local regression harness is not part of the active solution at this checkpoint; validate with restore, x64 build, format, repository guardrails, bridge script checks, and whitespace checks. `tools\verify-bridge-scripts.ps1` uses Node.js when available, skips when Node is unavailable, and honors `OPENCLAW_NODE` when a specific Node executable is required.
+
+## Active Verification After Test Harness Removal
+
+Older notes mention regression tests that existed in previous checkpoints. Current active verification is:
+
+- solution restore/build/format
+- repository structure guardrails
+- bridge script behavior checks
+- whitespace diff checks
+- VS2026 manual debug on real WebView2/Gateway behavior
+
+When a note says "Regression coverage now checks", read it as historical context unless the current verification section lists an active command for it.
 
 ## WinUI 3 Window Chrome And Theme Sync
 

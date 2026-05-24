@@ -52,7 +52,7 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 
 - Do not grow `WebViewService` with unrelated responsibilities. Existing command and profile helpers live in focused partials; add new focused partials for future WebView lifecycle, inspection, or recovery behavior.
 - Keep native bridge orchestration in `HostedUiBridge`, localized-string/resource assembly in `HostedUiBridge.Script.cs`, and browser implementation in embedded JS assets such as `HostedUiBridge.Script.js`.
-- Treat `HostedUiBridge.Script.js`, `HostedUiBridge.ModelResolver.js`, and the `HostedUiBridge.Script.cs` builder as testable script surfaces. Add executable JS behavior tests before changing model detection, mutation filtering, session-ready events, or command handling.
+- Treat `HostedUiBridge.Script.js`, `HostedUiBridge.ModelResolver.js`, and the `HostedUiBridge.Script.cs` builder as testable script surfaces. Add executable JS behavior checks before changing model detection, mutation filtering, session-ready events, or command handling.
 - Avoid large source moves unless the move itself is the purpose of the change and the test plan proves no project-file duplication changed.
 
 ## Tests
@@ -76,5 +76,11 @@ Run these commands before handing off code:
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
+powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
+powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
 git diff --check
 ```
+
+`tools\verify-repo-structure.ps1` is the active guardrail for the no-`tests/` checkpoint, solution references, Core boundary rules, and embedded bridge assets.
+
+`tools\verify-bridge-scripts.ps1` executes focused browser-script behavior checks with Node.js when available. If the default `node` command is missing or blocked, set `OPENCLAW_NODE` to a specific executable; if no executable Node is available, the script skips instead of failing unrelated code changes.

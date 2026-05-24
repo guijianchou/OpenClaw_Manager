@@ -170,6 +170,21 @@ dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 - See [docs/code-style.md](docs/code-style.md) for project-specific architecture boundaries, partial-class ownership, XAML resource rules, Core physical-source rules, and verification commands.
 - Run `$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore` before committing style-sensitive changes.
 
+### Active Verification
+
+The local `tests/` harness is intentionally absent at this checkpoint. Current verification is restore, x64 build, format, repository guardrails, bridge script checks, and whitespace checks:
+
+```powershell
+dotnet restore OpenClaw.sln --locked-mode
+dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
+$env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
+powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
+powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
+git diff --check
+```
+
+`tools\verify-bridge-scripts.ps1` uses Node.js when available and skips cleanly when no executable Node is present. Set `OPENCLAW_NODE` to a specific Node executable when the default `node` on `PATH` is blocked or unavailable.
+
 ### Development Notes
 
 See [DEVELOPMENT_NOTES.md](DEVELOPMENT_NOTES.md) for lessons learned from native window chrome, theme synchronization, and other maintenance-sensitive areas.
