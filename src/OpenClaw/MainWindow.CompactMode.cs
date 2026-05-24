@@ -9,8 +9,6 @@ public sealed partial class MainWindow
 {
     private const int CompactWidth = 480;
     private const int CompactHeight = 120;
-    private const double FullTopStatusPillMinWidth = 440;
-    private const double FullModelStatusSegmentMinWidth = 190;
 
     private bool _isCompactMode;
     private SizeInt32 _normalSize;
@@ -121,26 +119,9 @@ public sealed partial class MainWindow
 
     private void ApplyCompactTopBarState(bool isCompact)
     {
-        if (isCompact)
-        {
-            CommandBarSurface.Padding = new Thickness(8, 6, 8, 6);
-            EnvironmentSummaryGroup.Visibility = Visibility.Collapsed;
-            LatencyBadge.Visibility = Visibility.Collapsed;
-            TopStatusPill.MinWidth = 0;
-            TopStatusPill.Margin = new Thickness(0, 0, 8, 0);
-            TopStatusPill.Padding = new Thickness(8, 5, 8, 5);
-            ModelStatusSegment.MinWidth = 0;
-            ModelStatusSegment.Margin = new Thickness(4, 0, 0, 0);
-            return;
-        }
-
-        CommandBarSurface.Padding = new Thickness(12, 8, 12, 8);
-        EnvironmentSummaryGroup.Visibility = Visibility.Visible;
-        LatencyBadge.Visibility = Visibility.Visible;
-        TopStatusPill.MinWidth = FullTopStatusPillMinWidth;
-        TopStatusPill.Margin = new Thickness(16, 0, 12, 0);
-        TopStatusPill.Padding = new Thickness(12, 5, 12, 5);
-        ModelStatusSegment.MinWidth = FullModelStatusSegmentMinWidth;
-        ModelStatusSegment.Margin = new Thickness(6, 0, 0, 0);
+        VisualStateManager.GoToState(
+            RootLayout,
+            isCompact ? "CompactMode" : "FullMode",
+            useTransitions: false);
     }
 }

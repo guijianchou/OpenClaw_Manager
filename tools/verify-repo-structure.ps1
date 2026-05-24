@@ -83,4 +83,23 @@ if ($settingsDialogShared -match 'record struct SettingsSaveResult') {
     throw 'SettingsSaveResult must live in OpenClaw.Core models, not SettingsDialog.Shared.cs.'
 }
 
+$compact = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.CompactMode.cs') -Raw
+if ($compact -match 'TopStatusPill\.MinWidth|ModelStatusSegment\.MinWidth|EnvironmentSummaryGroup\.Visibility|LatencyBadge\.Visibility') {
+    throw 'Compact top-bar layout should be driven by XAML visual states, not code-behind property patching.'
+}
+
+$windowStatePattern = 'VisualStateManager\.GoToState\(\s*this'
+if ($compact -match $windowStatePattern) {
+    throw 'MainWindow compact mode must switch RootLayout, not the Window instance.'
+}
+
+if ($compact -notmatch 'VisualStateManager\.GoToState\(\s*RootLayout') {
+    throw 'MainWindow compact mode must switch the RootLayout visual state owner.'
+}
+
+$mainWindowXaml = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.xaml') -Raw
+if ($mainWindowXaml -notmatch 'x:Name="RootLayout"[\s\S]*VisualStateManager\.VisualStateGroups') {
+    throw 'Compact visual states must be attached to RootLayout.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

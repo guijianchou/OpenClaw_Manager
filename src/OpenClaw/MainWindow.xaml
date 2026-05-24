@@ -11,16 +11,35 @@
     mc:Ignorable="d"
     Title="OpenClaw">
 
-    <Grid x:Name="RootLayout"
-          Background="Transparent">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="37" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <UserControl x:Name="RootLayout"
+                 Background="Transparent">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="ShellModeStates">
+                <VisualState x:Name="FullMode" />
+                <VisualState x:Name="CompactMode">
+                    <VisualState.Setters>
+                        <Setter Target="CommandBarSurface.Padding" Value="{StaticResource CompactTopBarPadding}" />
+                        <Setter Target="EnvironmentSummaryGroup.Visibility" Value="Collapsed" />
+                        <Setter Target="LatencyBadge.Visibility" Value="Collapsed" />
+                        <Setter Target="TopStatusPill.MinWidth" Value="{StaticResource CompactTopStatusPillMinWidth}" />
+                        <Setter Target="TopStatusPill.Margin" Value="{StaticResource CompactTopStatusPillMargin}" />
+                        <Setter Target="TopStatusPill.Padding" Value="{StaticResource CompactTopStatusPillPadding}" />
+                        <Setter Target="ModelStatusSegment.MinWidth" Value="{StaticResource CompactTopStatusModelSegmentMinWidth}" />
+                        <Setter Target="ModelStatusSegment.Margin" Value="{StaticResource CompactTopStatusModelSegmentMargin}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <Grid x:Name="ShellLayout">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="37" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
         <Grid x:Name="AppTitleBar"
               Grid.Row="0"
@@ -388,5 +407,6 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="{x:Bind ViewModel.SelectedEnvironmentName, Mode=OneWay}" />
         </Grid>
-    </Grid>
+        </Grid>
+    </UserControl>
 </Window>

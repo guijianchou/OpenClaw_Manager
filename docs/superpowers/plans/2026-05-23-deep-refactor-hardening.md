@@ -1409,7 +1409,7 @@ git commit -m "refactor: centralize live shell settings application"
 - Modify: `src/OpenClaw/Styles/StatusResources.xaml`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Add compact resources**
+- [x] **Step 1: Add compact resources**
 
 In `StatusResources.xaml`, add:
 
@@ -1417,12 +1417,14 @@ In `StatusResources.xaml`, add:
 <x:Double x:Key="CompactTopStatusPillMinWidth">0</x:Double>
 <Thickness x:Key="CompactTopStatusPillPadding">8,5</Thickness>
 <Thickness x:Key="CompactTopStatusPillMargin">0,0,8,0</Thickness>
+<x:Double x:Key="CompactTopStatusModelSegmentMinWidth">0</x:Double>
+<Thickness x:Key="CompactTopStatusModelSegmentMargin">4,0,0,0</Thickness>
 <Thickness x:Key="CompactTopBarPadding">8,6</Thickness>
 ```
 
-- [ ] **Step 2: Add visual states to `RootLayout`**
+- [x] **Step 2: Add visual states to `RootLayout`**
 
-`MainWindow` derives from `Window`, not `Control`, so avoid the Window-as-Control visual-state pattern. Attach the visual-state group to the existing root `Grid x:Name="RootLayout"` and switch it with `VisualStateManager.GoToElementState(RootLayout, stateName, useTransitions: false)`.
+`MainWindow` derives from `Window`, not `Control`, so avoid the Window-as-Control visual-state pattern. Wrap the existing shell layout in a root `UserControl x:Name="RootLayout"` with an inner layout grid, attach the visual-state group to `RootLayout`, and switch it with `VisualStateManager.GoToState(RootLayout, stateName, useTransitions: false)`.
 
 Add this block as the first child inside `RootLayout`:
 
@@ -1438,22 +1440,22 @@ Add this block as the first child inside `RootLayout`:
                 <Setter Target="TopStatusPill.MinWidth" Value="{StaticResource CompactTopStatusPillMinWidth}" />
                 <Setter Target="TopStatusPill.Margin" Value="{StaticResource CompactTopStatusPillMargin}" />
                 <Setter Target="TopStatusPill.Padding" Value="{StaticResource CompactTopStatusPillPadding}" />
-                <Setter Target="ModelStatusSegment.MinWidth" Value="0" />
-                <Setter Target="ModelStatusSegment.Margin" Value="4,0,0,0" />
+                <Setter Target="ModelStatusSegment.MinWidth" Value="{StaticResource CompactTopStatusModelSegmentMinWidth}" />
+                <Setter Target="ModelStatusSegment.Margin" Value="{StaticResource CompactTopStatusModelSegmentMargin}" />
             </VisualState.Setters>
         </VisualState>
     </VisualStateGroup>
 </VisualStateManager.VisualStateGroups>
 ```
 
-- [ ] **Step 3: Simplify code-behind**
+- [x] **Step 3: Simplify code-behind**
 
 Replace `ApplyCompactTopBarState(bool isCompact)` body:
 
 ```csharp
 private void ApplyCompactTopBarState(bool isCompact)
 {
-    VisualStateManager.GoToElementState(RootLayout, isCompact ? "CompactMode" : "FullMode", useTransitions: false);
+    VisualStateManager.GoToState(RootLayout, isCompact ? "CompactMode" : "FullMode", useTransitions: false);
 }
 ```
 
@@ -1466,7 +1468,7 @@ private const double FullTopStatusPillMinWidth = 440;
 private const double FullModelStatusSegmentMinWidth = 190;
 ```
 
-- [ ] **Step 4: Add guardrail**
+- [x] **Step 4: Add guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -1475,9 +1477,12 @@ $compact = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindo
 if ($compact -match 'TopStatusPill\.MinWidth|ModelStatusSegment\.MinWidth|EnvironmentSummaryGroup\.Visibility|LatencyBadge\.Visibility') {
     throw 'Compact top-bar layout should be driven by XAML visual states, not code-behind property patching.'
 }
-$windowStatePattern = 'VisualStateManager\.GoToState\(' + 'this'
+$windowStatePattern = 'VisualStateManager\.GoToState\(\s*this'
 if ($compact -match $windowStatePattern) {
-    throw 'MainWindow compact mode must switch RootLayout with GoToElementState.'
+    throw 'MainWindow compact mode must switch RootLayout, not the Window instance.'
+}
+if ($compact -notmatch 'VisualStateManager\.GoToState\(\s*RootLayout') {
+    throw 'MainWindow compact mode must switch the RootLayout visual state owner.'
 }
 
 $mainWindowXaml = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.xaml') -Raw
@@ -1486,11 +1491,11 @@ if ($mainWindowXaml -notmatch 'x:Name="RootLayout"[\s\S]*VisualStateManager\.Vis
 }
 ```
 
-- [ ] **Step 5: Run verification and manual UI check**
+- [x] **Step 5: Run automated verification and queue manual UI check**
 
 Run full verification from Task 1.
 
-Manual VS2026 debug checklist:
+Manual VS2026 debug checklist to carry into Task 10 final integration:
 
 ```text
 1. Launch app.
@@ -1500,7 +1505,7 @@ Manual VS2026 debug checklist:
 5. Exit compact mode and confirm full top bar restores.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/OpenClaw/MainWindow.xaml src/OpenClaw/MainWindow.CompactMode.cs src/OpenClaw/Styles/StatusResources.xaml tools/verify-repo-structure.ps1
