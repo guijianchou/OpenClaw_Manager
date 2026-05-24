@@ -7,8 +7,7 @@ public partial class WebViewService
     private const int DefaultHeartbeatFailureThreshold = 3;
     private const int DefaultHeartbeatConnectingThreshold = 3;
 
-    private CancellationTokenSource? _heartbeatCts;
-    private Task? _heartbeatTask;
+    private readonly HeartbeatRuntime _heartbeatRuntime;
     private int _heartbeatFailureCount;
     private int _heartbeatConnectingCount;
     private string? _lastHeartbeatObservationKey;
@@ -55,10 +54,8 @@ public partial class WebViewService
             return;
         }
 
-        if (_heartbeatCts is not null &&
-            _heartbeatTask is not null &&
-            string.Equals(_heartbeatGatewayUrl, gatewayUrl, StringComparison.OrdinalIgnoreCase) &&
-            _heartbeatIntervalSeconds == intervalSeconds)
+        var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{Math.Max(1, heartbeatSettings.FailureThreshold)}|{Math.Max(1, heartbeatSettings.ConnectingThreshold)}";
+        if (_heartbeatRuntime.IsSameRun(heartbeatStartKey))
         {
             return;
         }
@@ -72,16 +69,15 @@ public partial class WebViewService
         _heartbeatIntervalSeconds = intervalSeconds;
         _heartbeatFailureThreshold = Math.Max(1, heartbeatSettings.FailureThreshold);
         _heartbeatConnectingThreshold = Math.Max(1, heartbeatSettings.ConnectingThreshold);
-        _heartbeatCts = new CancellationTokenSource();
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
 
-        var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{_heartbeatFailureThreshold}|{_heartbeatConnectingThreshold}";
         if (!string.Equals(_lastStartHeartbeatKey, heartbeatStartKey, StringComparison.Ordinal))
         {
             _lastStartHeartbeatKey = heartbeatStartKey;
             App.Logger.Info($"Heartbeat started: interval={intervalSeconds}s, failureThreshold={_heartbeatFailureThreshold}, connectingThreshold={_heartbeatConnectingThreshold}, url={gatewayUrl}");
         }
-        _heartbeatTask = RunSessionAwareHeartbeatLoopAsync(gatewayUrl, timer, _heartbeatCts.Token);
+        _heartbeatRuntime.Start(
+            heartbeatStartKey,
+            token => RunSessionAwareHeartbeatLoopAsync(gatewayUrl, TimeSpan.FromSeconds(intervalSeconds), token));
     }
 
     /// <summary>
@@ -89,21 +85,7 @@ public partial class WebViewService
     /// </summary>
     public void StopHeartbeat()
     {
-        var heartbeatCts = _heartbeatCts;
-        var heartbeatTask = _heartbeatTask;
-        _heartbeatCts = null;
-        _heartbeatTask = null;
-
-        heartbeatCts?.Cancel();
-        if (heartbeatTask is not null)
-        {
-            _ = ObserveHeartbeatShutdownAsync(heartbeatTask, heartbeatCts);
-        }
-        else
-        {
-            heartbeatCts?.Dispose();
-        }
-
+        _heartbeatRuntime.Stop();
         _heartbeatFailureCount = 0;
         _heartbeatConnectingCount = 0;
         _lastHeartbeatObservationKey = null;
@@ -114,11 +96,73 @@ public partial class WebViewService
         _lastStartHeartbeatKey = null;
     }
 
-    private async Task ObserveHeartbeatShutdownAsync(Task heartbeatTask, CancellationTokenSource? heartbeatCts)
+    private async Task RunSessionAwareHeartbeatLoopAsync(string gatewayUrl, TimeSpan interval, CancellationToken token)
     {
+        using var timer = new PeriodicTimer(interval);
         try
         {
-            await heartbeatTask;
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                var probe = await ProbeGatewayHealthAsync(gatewayUrl, token);
+                LogHeartbeatObservation(probe);
+
+                if (probe.Status == HeartbeatProbeStatus.Healthy)
+                {
+                    if (_heartbeatFailureCount > 0)
+                    {
+                        App.Logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
+                    }
+
+                    _heartbeatFailureCount = 0;
+                    _heartbeatConnectingCount = 0;
+                    continue;
+                }
+
+                if (probe.Status == HeartbeatProbeStatus.SessionBlocked)
+                {
+                    if (_heartbeatFailureCount > 0)
+                    {
+                        App.Logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
+                    }
+
+                    _heartbeatFailureCount = 0;
+                    _heartbeatConnectingCount = 0;
+                    continue;
+                }
+
+                if (probe.Status == HeartbeatProbeStatus.Connecting)
+                {
+                    _heartbeatFailureCount = 0;
+                    _heartbeatConnectingCount++;
+
+                    if (_heartbeatConnectingCount < _heartbeatConnectingThreshold)
+                    {
+                        continue;
+                    }
+
+                    if (TryScheduleHeartbeatReload(probe.Message, preserveConnectingCounter: true))
+                    {
+                        return;
+                    }
+
+                    continue;
+                }
+
+                _heartbeatConnectingCount = 0;
+                _heartbeatFailureCount++;
+                App.Logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
+
+                if (_heartbeatFailureCount >= _heartbeatFailureThreshold &&
+                    TryScheduleHeartbeatReload(probe.Message))
+                {
+                    return;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -126,93 +170,7 @@ public partial class WebViewService
         }
         catch (Exception ex)
         {
-            App.Logger.Error($"Heartbeat loop shutdown error: {ex.Message}");
-        }
-        finally
-        {
-            heartbeatCts?.Dispose();
-        }
-    }
-
-    private async Task RunSessionAwareHeartbeatLoopAsync(string gatewayUrl, PeriodicTimer timer, CancellationToken token)
-    {
-        using (timer)
-        {
-            try
-            {
-                while (await timer.WaitForNextTickAsync(token))
-                {
-                    if (token.IsCancellationRequested)
-                    {
-                        break;
-                    }
-
-                    var probe = await ProbeGatewayHealthAsync(gatewayUrl, token);
-                    LogHeartbeatObservation(probe);
-
-                    if (probe.Status == HeartbeatProbeStatus.Healthy)
-                    {
-                        if (_heartbeatFailureCount > 0)
-                        {
-                            App.Logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
-                        }
-
-                        _heartbeatFailureCount = 0;
-                        _heartbeatConnectingCount = 0;
-                        continue;
-                    }
-
-                    if (probe.Status == HeartbeatProbeStatus.SessionBlocked)
-                    {
-                        if (_heartbeatFailureCount > 0)
-                        {
-                            App.Logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
-                        }
-
-                        _heartbeatFailureCount = 0;
-                        _heartbeatConnectingCount = 0;
-                        continue;
-                    }
-
-                    if (probe.Status == HeartbeatProbeStatus.Connecting)
-                    {
-                        _heartbeatFailureCount = 0;
-                        _heartbeatConnectingCount++;
-
-                        if (_heartbeatConnectingCount < _heartbeatConnectingThreshold)
-                        {
-                            continue;
-                        }
-
-                        if (TryScheduleHeartbeatReload(probe.Message, preserveConnectingCounter: true))
-                        {
-                            return;
-                        }
-
-                        continue;
-                    }
-
-                    _heartbeatConnectingCount = 0;
-                    _heartbeatFailureCount++;
-                    App.Logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
-
-                    if (_heartbeatFailureCount >= _heartbeatFailureThreshold)
-                    {
-                        if (TryScheduleHeartbeatReload(probe.Message))
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected when StopHeartbeat() is called.
-            }
-            catch (Exception ex)
-            {
-                App.Logger.Error($"Heartbeat loop error: {ex.Message}");
-            }
+            App.Logger.Error($"Heartbeat loop error: {ex.Message}");
         }
     }
 

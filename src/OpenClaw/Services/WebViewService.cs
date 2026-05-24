@@ -29,6 +29,7 @@ public partial class WebViewService : IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _generations = new WebViewGenerationTracker();
         _statusInspector = new WebViewStatusInspector(GetCoreWebView, _generations, _logger);
+        _heartbeatRuntime = new HeartbeatRuntime(_logger);
         _statusInspector.SnapshotUpdated += snapshot => ApplyControlUiSnapshot(snapshot, raiseIssueEvent: false);
     }
 
@@ -446,6 +447,7 @@ public partial class WebViewService : IDisposable
         _retryCts?.Dispose();
         _retryCts = null;
         _statusInspector.Dispose();
+        _heartbeatRuntime.Dispose();
     }
 
     private static CoreWebView2? TryGetCoreWebView2(WebView2? webView)

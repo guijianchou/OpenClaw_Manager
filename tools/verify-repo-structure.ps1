@@ -34,4 +34,9 @@ if ($webViewService -match 'ParseControlUiSnapshot|ExecuteControlUiInspectionAsy
     throw 'WebViewService.cs must not own Control UI inspection internals.'
 }
 
+$heartbeat = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Heartbeat.cs') -Raw
+if ($heartbeat -match 'CancellationTokenSource\? _heartbeatCts|Task\? _heartbeatTask|ObserveHeartbeatShutdownAsync') {
+    throw 'Heartbeat loop ownership must live in HeartbeatRuntime.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

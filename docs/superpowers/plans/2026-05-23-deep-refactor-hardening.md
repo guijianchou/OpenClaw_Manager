@@ -595,7 +595,7 @@ git commit -m "refactor: isolate WebView status inspection ownership"
 - Modify: `src/OpenClaw/Services/WebViewService.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Create `HeartbeatRuntime`**
+- [x] **Step 1: Create `HeartbeatRuntime`**
 
 Move timer/task/cancellation ownership out of `WebViewService.Heartbeat.cs`.
 
@@ -695,7 +695,7 @@ internal sealed class HeartbeatRuntime : IDisposable
 }
 ```
 
-- [ ] **Step 2: Remove direct `_heartbeatCts` and `_heartbeatTask` fields**
+- [x] **Step 2: Remove direct `_heartbeatCts` and `_heartbeatTask` fields**
 
 In `WebViewService.Heartbeat.cs`, replace:
 
@@ -723,7 +723,7 @@ public WebViewService(IAppLogger logger)
 }
 ```
 
-- [ ] **Step 3: Change start/stop logic**
+- [x] **Step 3: Change start/stop logic**
 
 `StartHeartbeat` should compute a complete key including URL, interval, thresholds, and enabled state:
 
@@ -755,7 +755,7 @@ while (await timer.WaitForNextTickAsync(token))
 }
 ```
 
-- [ ] **Step 4: Simplify `StopHeartbeat`**
+- [x] **Step 4: Simplify `StopHeartbeat`**
 
 ```csharp
 public void StopHeartbeat()
@@ -772,7 +772,7 @@ public void StopHeartbeat()
 }
 ```
 
-- [ ] **Step 5: Add structure guardrail**
+- [x] **Step 5: Add structure guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -783,7 +783,7 @@ if ($heartbeat -match 'CancellationTokenSource\? _heartbeatCts|Task\? _heartbeat
 }
 ```
 
-- [ ] **Step 6: Run verification and commit**
+- [x] **Step 6: Run verification and commit**
 
 Run full verification from Task 1.
 
