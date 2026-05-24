@@ -56,39 +56,24 @@ public sealed partial class MainWindow
         if (ViewModel.Coordinator is not null)
         {
             ViewModel.Coordinator.UpdateInstrumentation(
-                totalWebViewRecreations: _webViewRecreationCount,
-                mergedWebViewRecreationRequests: _webViewRecreationMergedCount,
+                totalWebViewRecreations: _webViewRecreationService.TotalRecreations,
+                mergedWebViewRecreationRequests: _webViewRecreationService.MergedRequests,
                 lastInstrumentationEvent: _lastInstrumentationEvent);
         }
     }
 
     private void ScheduleWebViewRecreation(string reason)
     {
-        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? "unspecified" : reason;
-
-        // Reset circuit breaker for user-initiated or settings-triggered recreations
-        if (normalizedReason.Contains("settings", StringComparison.OrdinalIgnoreCase) ||
-            normalizedReason.Contains("initial", StringComparison.OrdinalIgnoreCase))
-        {
-            _webViewCircuitBreaker.Reset();
-        }
-
-        if (_pendingWebViewRecreationReason is not null)
-        {
-            _webViewRecreationMergedCount++;
-        }
-
-        _pendingWebViewRecreationReason = normalizedReason;
-        _lastWebViewRecreationRequestedAt = DateTimeOffset.UtcNow;
+        var scheduled = _webViewRecreationService.Schedule(reason);
 
         RecordInstrumentationEvent("webview.recreation.queued", new
         {
-            reason = normalizedReason,
-            isRecreating = _isRecreatingWebView,
-            merged = _webViewRecreationMergedCount
+            reason = scheduled.Reason,
+            isRecreating = scheduled.IsRecreating,
+            merged = scheduled.MergedRequests
         });
 
-        if (_isRecreatingWebView)
+        if (!scheduled.ShouldStartTimer)
         {
             return;
         }
@@ -103,55 +88,44 @@ public sealed partial class MainWindow
 
     private async Task RecreateWebViewAsync()
     {
-        if (_isRecreatingWebView)
-        {
-            return;
-        }
-
-        if (!_webViewCircuitBreaker.CanAttempt())
+        var begin = _webViewRecreationService.TryBegin(WebViewHost.Children.Count > 0);
+        if (begin.IsCircuitBreakerTripped)
         {
             RecordInstrumentationEvent("webview.recreation.circuit_breaker_tripped", new
             {
-                lastReason = _lastWebViewRecreationReason,
-                total = _webViewRecreationCount
+                lastReason = begin.LastReason,
+                total = begin.TotalRecreations
             });
             ViewModel.ShowCircuitBreakerError();
             return;
         }
 
-        var pendingReason = _pendingWebViewRecreationReason;
-        _pendingWebViewRecreationReason = null;
-        if (pendingReason is null)
+        if (!begin.ShouldBegin || begin.Reason is null)
         {
-            if (WebViewHost.Children.Count == 0)
-            {
-                pendingReason = "implicit_initial_load";
-                RecordInstrumentationEvent("webview.recreation.recovered_missing_reason", new
-                {
-                    reason = pendingReason,
-                    lastReason = _lastWebViewRecreationReason
-                });
-            }
-            else
-            {
-                return;
-            }
+            return;
         }
 
-        _isRecreatingWebView = true;
-        _lastWebViewRecreationReason = pendingReason;
-        RecordInstrumentationEvent("webview.recreation.started", new { reason = pendingReason });
+        if (string.Equals(begin.Reason, "implicit_initial_load", StringComparison.Ordinal))
+        {
+            RecordInstrumentationEvent("webview.recreation.recovered_missing_reason", new
+            {
+                reason = begin.Reason,
+                lastReason = begin.LastReason
+            });
+        }
+
+        RecordInstrumentationEvent("webview.recreation.started", new { reason = begin.Reason });
 
         try
         {
             do
             {
-                if (!_webViewCircuitBreaker.CanAttempt())
+                if (!_webViewRecreationService.CanAttemptInLoop())
                 {
                     RecordInstrumentationEvent("webview.recreation.circuit_breaker_tripped_in_loop", new
                     {
-                        lastReason = _lastWebViewRecreationReason,
-                        total = _webViewRecreationCount
+                        lastReason = _webViewRecreationService.LastReason,
+                        total = _webViewRecreationService.TotalRecreations
                     });
                     break;
                 }
@@ -170,16 +144,15 @@ public sealed partial class MainWindow
                 WebViewHost.Children.Clear();
                 WebViewHost.Children.Add(nextWebView);
 
-                _webViewRecreationCount++;
-                _webViewCircuitBreaker.RecordAttempt();
+                _webViewRecreationService.RecordAttempt();
                 RecordInstrumentationEvent("webview.recreation.initializing", new
                 {
-                    reason = _lastWebViewRecreationReason,
-                    total = _webViewRecreationCount
+                    reason = _webViewRecreationService.LastReason,
+                    total = _webViewRecreationService.TotalRecreations
                 });
                 await ViewModel.InitializeWebViewAsync(nextWebView);
             }
-            while (TryConsumeQueuedWebViewRecreation());
+            while (_webViewRecreationService.TryConsumeQueued(out _));
         }
         catch (Exception ex)
         {
@@ -187,32 +160,20 @@ public sealed partial class MainWindow
         }
         finally
         {
-            _isRecreatingWebView = false;
+            var finished = _webViewRecreationService.Finish();
 
-            if (_pendingWebViewRecreationReason is not null)
+            if (finished.PendingReason is not null)
             {
-                ScheduleWebViewRecreation(_pendingWebViewRecreationReason);
+                ScheduleWebViewRecreation(finished.PendingReason);
             }
 
             RecordInstrumentationEvent("webview.recreation.finished", new
             {
-                lastReason = _lastWebViewRecreationReason,
-                pendingReason = _pendingWebViewRecreationReason,
-                total = _webViewRecreationCount,
-                merged = _webViewRecreationMergedCount
+                lastReason = finished.LastReason,
+                pendingReason = finished.PendingReason,
+                total = finished.TotalRecreations,
+                merged = finished.MergedRequests
             });
         }
-    }
-
-    private bool TryConsumeQueuedWebViewRecreation()
-    {
-        if (_pendingWebViewRecreationReason is null)
-        {
-            return false;
-        }
-
-        _lastWebViewRecreationReason = _pendingWebViewRecreationReason;
-        _pendingWebViewRecreationReason = null;
-        return true;
     }
 }

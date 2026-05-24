@@ -68,4 +68,9 @@ foreach ($asset in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortR
     }
 }
 
+$mainWindowWebView = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.WebView.cs') -Raw
+if ($mainWindowWebView -match '_webViewRecreationMergedCount|_pendingWebViewRecreationReason|_isRecreatingWebView') {
+    throw 'WebView recreation scheduling state must live in WebViewRecreationService.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

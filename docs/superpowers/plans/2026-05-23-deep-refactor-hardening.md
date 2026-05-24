@@ -1030,7 +1030,7 @@ git commit -m "refactor: move WebView command scripts to embedded assets"
 - Modify: `src/OpenClaw/MainWindow.Shared.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Create scheduling service**
+- [x] **Step 1: Create scheduling service**
 
 Create `WebViewRecreationService` to own merged recreation requests, cooldown/circuit-breaker checks, and scheduling telemetry:
 
@@ -1103,7 +1103,7 @@ internal enum WebViewRecreationDecisionKind
 }
 ```
 
-- [ ] **Step 2: Move policy out of `MainWindow.WebView.cs`**
+- [x] **Step 2: Move policy out of `MainWindow.WebView.cs`**
 
 Keep `MainWindow.WebView.cs` responsible for:
 
@@ -1124,7 +1124,7 @@ Move these responsibilities into `WebViewRecreationService`:
 - recreation instrumentation messages
 ```
 
-- [ ] **Step 3: Wire service into `MainWindow`**
+- [x] **Step 3: Wire service into `MainWindow`**
 
 Add a field in `MainWindow.Shared.cs`:
 
@@ -1150,7 +1150,7 @@ if (decision.Kind == WebViewRecreationDecisionKind.Merged)
 StartWebViewRecreationTimer(decision.Reason);
 ```
 
-- [ ] **Step 4: Preserve existing platform behavior**
+- [x] **Step 4: Preserve existing platform behavior**
 
 Do not move or rewrite:
 
@@ -1164,7 +1164,7 @@ Do not move or rewrite:
 
 Those are historical high-risk areas documented in `DEVELOPMENT_NOTES.md`.
 
-- [ ] **Step 5: Add guardrail**
+- [x] **Step 5: Add guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -1175,7 +1175,7 @@ if ($mainWindowWebView -match '_mergedRecreationRequests|_queuedRecreationReason
 }
 ```
 
-- [ ] **Step 6: Run verification and commit**
+- [x] **Step 6: Run verification and commit**
 
 Run full verification from Task 1.
 

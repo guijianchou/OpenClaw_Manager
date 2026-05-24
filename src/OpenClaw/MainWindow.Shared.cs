@@ -12,11 +12,7 @@ public sealed partial class MainWindow
     private bool _hasPerformedInitialTitleBarRefresh;
     private bool _isDarkThemeActive;
     private bool _hasInitializedWebViewHost;
-    private bool _isRecreatingWebView;
     private bool _isWindowActive = true;
-    private string? _pendingWebViewRecreationReason;
-    private string? _lastWebViewRecreationReason;
-    private DateTimeOffset _lastWebViewRecreationRequestedAt = DateTimeOffset.MinValue;
     private readonly DispatcherQueueTimer _runIndicatorTimer;
     private readonly DispatcherQueueTimer _webViewRecreationTimer;
     private bool _isWindowHidden;
@@ -24,9 +20,7 @@ public sealed partial class MainWindow
     private TrayIconService? _trayIconService;
     private GlobalHotkeyService? _globalHotkeyService;
     private readonly TrayClosePolicy _trayClosePolicy = new();
-    private readonly WebViewCircuitBreaker _webViewCircuitBreaker = new();
-    private int _webViewRecreationCount;
-    private int _webViewRecreationMergedCount;
+    private readonly WebViewRecreationService _webViewRecreationService = new();
     private string _lastInstrumentationEvent = string.Empty;
 
     public MainViewModel ViewModel { get; } = new(App.Logger);
