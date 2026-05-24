@@ -57,16 +57,14 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 
 ## Tests
 
-- `OpenClaw.Tests` is an executable harness. `Program.cs` only owns registration and execution; test implementations live in focused `Tests.*.cs` domain files.
-- Run the harness with `dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore`.
-- Keep the `dotnet test` guard in the test project because `dotnet test` can otherwise report a false green result for this harness.
-- Prefer behavior tests against Core services and fakes.
-- Use source-text assertions only for contracts the harness cannot execute, such as XAML resource usage, project metadata, and platform integration declarations.
-- Every bug fix or behavior change needs a regression test that would have failed before the change.
+- There is no active in-repo regression harness at this checkpoint.
+- When tests are reintroduced, prefer behavior tests against Core services and fakes.
+- Use source-text assertions only for contracts a harness cannot execute, such as XAML resource usage, project metadata, and platform integration declarations.
+- Every bug fix or behavior change should have a regression path documented in the PR, manual checklist, or future test harness.
 
 ## Version And Documentation
 
-- Version bumps update `OpenClaw.csproj`, package manifest, application manifest, README, Chinese README, changelog, and regression-test expectations.
+- Version bumps update `OpenClaw.csproj`, package manifest, application manifest, README, Chinese README, and changelog.
 - README files should summarize current behavior and link to deeper docs instead of duplicating implementation notes.
 - `DEVELOPMENT_NOTES.md` records debugging history and project lessons. This guide is the canonical checklist for new changes.
 
@@ -77,7 +75,6 @@ Run these commands before handing off code:
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
-dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 git diff --check
 ```

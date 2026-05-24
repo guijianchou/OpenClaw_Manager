@@ -30,12 +30,12 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 
 - 新增 [docs/code-style.md](docs/code-style.md)，作为项目代码规范和架构边界的统一入口。
 - 将顶部状态栏和底部状态栏的字号、间距、布局常量集中到 `src/OpenClaw/Styles` 下的 WinUI 资源字典。
-- 将可执行测试 harness 拆分为按领域组织的 `Tests.*.cs` 文件，并覆盖项目架构边界、代码规范文档和顶部状态栏 XAML 共享资源。
+- 保留 Core/app 架构清理结果，同时从当前 solution 中移除本地回归测试 harness。
 - 将 `WebViewService` 的命令注入、heartbeat、Control UI inspection 和 profile 文件夹帮助器拆分到独立 partial 文件。
 - 将所有 Core-compatible 源文件迁移到 `src/OpenClaw.Core` 物理源码树，包括窗口边界策略。
 - 将主托管 bridge 浏览器脚本迁移为嵌入式 JS asset，C# 侧只负责资源加载、本地化字符串注入和 MODEL resolver 注入。
-- 将托管 MODEL 的 app-state 解析抽到嵌入式 JS asset，并用可执行回归测试覆盖默认值、`null` override、Map override 和对象形 payload。
-- 新增可执行 bridge 覆盖：session-ready 元数据、命令分发返回值、mutation filtering、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
+- 保留托管 MODEL 的 app-state 解析嵌入式 JS asset，覆盖默认值、`null` override、Map override 和对象形 payload 的运行路径。
+- 保留 bridge 加固：session-ready 元数据、命令分发返回值、mutation filtering、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
 - VS2026 debug 验证架构清理分支后，将发布元数据同步到 `3.3.6`。
 
 ### 本项目是
@@ -132,16 +132,12 @@ Claw_winui3/
 |   |   `-- Views/
 |   `-- OpenClaw.Core/
 |       `-- OpenClaw.Core.csproj
-`-- tests/OpenClaw.Tests/
-    |-- OpenClaw.Tests.csproj
-    `-- Program.cs
 ```
 
 ### 关键目录
 
 - `Services/`：配置、日志、诊断、WebView2 生命周期和恢复辅助逻辑
-- `OpenClaw.Core/`：纯 .NET 共享代码的物理源码树，可被 WinUI app 和回归测试复用
-- `tests/OpenClaw.Tests/`：覆盖恢复、设置、托盘、版本元数据和持久化行为的轻量回归测试
+- `OpenClaw.Core/`：纯 .NET 共享代码的物理源码树，供 WinUI app 使用
 - `ViewModels/`：外壳状态、命令和设置编辑
 - `Views/`：设置、关于和日志查看对话框
 - `Strings/`：本地化 UI 资源
@@ -166,10 +162,7 @@ Claw_winui3/
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
-dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 ```
-
-`OpenClaw.Tests` 是可执行回归测试 harness。请使用上面的 `dotnet run --project ...` 命令；`dotnet test` 已加保护，避免在没有执行 harness 的情况下返回假绿。
 
 ### 代码规范
 

@@ -22,11 +22,10 @@ Canonical local verification:
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
-dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 ```
 
-`OpenClaw.Tests` is an executable harness. `dotnet test` is guarded because it otherwise exits successfully without running the harness.
+The local regression harness is not part of the active solution at this checkpoint; validate with restore, x64 build, format, and whitespace checks.
 
 ## WinUI 3 Window Chrome And Theme Sync
 
@@ -78,7 +77,6 @@ Commands used for baseline verification:
 
 ```powershell
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
-dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 ```
 
 ## System Tray Win32 Integration

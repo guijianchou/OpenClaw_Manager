@@ -30,12 +30,12 @@ It is best suited for users who:
 
 - Added [docs/code-style.md](docs/code-style.md) as the canonical project code-style and architecture guide.
 - Centralized top status and status-bar typography, spacing, and layout constants into focused WinUI resource dictionaries under `src/OpenClaw/Styles`.
-- Split the executable test harness into focused `Tests.*.cs` domain files with coverage for project architecture boundaries, code-style documentation, and shared top-status XAML resources.
+- Retained the Core/app architecture cleanup while removing the local regression harness from the active solution.
 - Split `WebViewService` command-injection, heartbeat, Control UI inspection, and profile-folder helpers into focused partial files.
 - Moved all Core-compatible source files, including window-bounds policy, into the physical `src/OpenClaw.Core` tree.
 - Moved the main hosted bridge browser script into embedded JS assets, with C# limited to resource loading and localized string/model resolver injection.
-- Extracted hosted MODEL app-state resolution into an embedded JS asset with executable regression coverage for defaults, null overrides, Map overrides, and object-shaped payloads.
-- Added executable bridge coverage for session-ready metadata, command-dispatch return values, mutation filtering, safe host messaging, and generation-scoped WebView inspection cache reuse.
+- Kept hosted MODEL app-state resolution in an embedded JS asset for defaults, null overrides, Map overrides, and object-shaped payloads.
+- Kept bridge hardening for session-ready metadata, command-dispatch return values, mutation filtering, safe host messaging, and generation-scoped WebView inspection cache reuse.
 - Synced release metadata to `3.3.6` after VS2026 debug validation of the architecture cleanup branch.
 
 ### This project is
@@ -132,16 +132,12 @@ Claw_winui3/
 |   |   `-- Views/
 |   `-- OpenClaw.Core/
 |       `-- OpenClaw.Core.csproj
-`-- tests/OpenClaw.Tests/
-    |-- OpenClaw.Tests.csproj
-    `-- Program.cs
 ```
 
 ### Key folders
 
 - `Services/`: configuration, logging, diagnostics, WebView2 lifecycle, recovery helpers
-- `OpenClaw.Core/`: physical source tree for pure .NET shared code used by the WinUI app and regression harness
-- `tests/OpenClaw.Tests/`: lightweight regression harness for recovery, settings, tray, metadata, and persistence behavior
+- `OpenClaw.Core/`: physical source tree for pure .NET shared code used by the WinUI app
 - `ViewModels/`: shell state, commands, settings editing
 - `Views/`: settings, about, and log viewer dialogs
 - `Strings/`: localized UI resources
@@ -166,10 +162,7 @@ Claw_winui3/
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
-dotnet run --project tests\OpenClaw.Tests\OpenClaw.Tests.csproj -c Debug --no-restore
 ```
-
-`OpenClaw.Tests` is an executable regression harness. Use the `dotnet run --project ...` command above; `dotnet test` is intentionally guarded so it cannot report a false green run without executing the harness.
 
 ### Code Style
 

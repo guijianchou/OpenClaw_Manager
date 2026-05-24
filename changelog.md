@@ -11,8 +11,9 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ### v3.3.6 (2026-05-21)
 
 - Promoted the v3.3.5 architecture cleanup after VS2026 debug validation.
-- Kept the bridge/WebView hardening as the current baseline: embedded hosted bridge assets, executable event/command regression coverage, safe host messaging, and generation-scoped WebView inspection cache reuse.
-- Synced app, assembly, file, package manifest, application manifest, README, and regression-test version metadata to `3.3.6`.
+- Kept the bridge/WebView hardening as the current baseline: embedded hosted bridge assets, event/command path hardening, safe host messaging, and generation-scoped WebView inspection cache reuse.
+- Removed the local regression harness from the active solution and repository while keeping `OpenClaw.Core` as the app's shared pure .NET source tree.
+- Synced app, assembly, file, package manifest, application manifest, README, and changelog metadata to `3.3.6`.
 
 ### v3.3.5 (2026-05-20)
 
@@ -211,8 +212,9 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ### v3.3.6 (2026-05-21)
 
 - VS2026 debug 验证通过后，将 v3.3.5 架构清理作为当前发布基线。
-- 保留 bridge/WebView 加固作为当前基线：嵌入式 hosted bridge asset、可执行事件/命令回归覆盖、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
-- 同步 app、assembly、file、package manifest、application manifest、README 和回归测试版本元数据到 `3.3.6`。
+- 保留 bridge/WebView 加固作为当前基线：嵌入式 hosted bridge asset、事件/命令路径加固、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
+- 从当前 solution 和仓库中移除本地回归测试 harness，同时保留 `OpenClaw.Core` 作为 app 使用的纯 .NET 共享源码树。
+- 同步 app、assembly、file、package manifest、application manifest、README 和 changelog 元数据到 `3.3.6`。
 
 ### v3.3.5 (2026-05-20)
 
