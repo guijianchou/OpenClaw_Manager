@@ -29,6 +29,12 @@ foreach ($resource in @('HostedUiBridge.Script.js', 'HostedUiBridge.ModelResolve
     }
 }
 
+foreach ($resource in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortRun.js')) {
+    if ($project -notmatch [regex]::Escape($resource)) {
+        throw "Missing embedded WebView command resource entry: $resource"
+    }
+}
+
 $webViewService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.cs') -Raw
 if ($webViewService -match 'ParseControlUiSnapshot|ExecuteControlUiInspectionAsync|_latestControlUiSnapshot') {
     throw 'WebViewService.cs must not own Control UI inspection internals.'
@@ -49,6 +55,17 @@ foreach ($file in $webViewServiceFiles) {
 
 if ($heartbeat -match 'App\.Configuration\.Settings\.Heartbeat|App\.Configuration\.Settings\.RecoveryPolicy') {
     throw 'Heartbeat must capture settings at start time instead of reading App.Configuration mid-loop.'
+}
+
+$commandFile = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Commands.cs') -Raw
+if ($commandFile -match 'ExecuteScriptAsync\(@"|ExecuteScriptAsync\(\$@"|const string script = """') {
+    throw 'WebViewService.Commands.cs must load browser scripts from embedded JS assets, not large inline strings.'
+}
+
+foreach ($asset in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortRun.js')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "src/OpenClaw/Services/$asset"))) {
+        throw "Missing WebView command script asset: $asset"
+    }
 }
 
 Write-Host 'PASS: repository structure guardrails'

@@ -37,6 +37,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Services\HostedUiBridge.Script.js" LogicalName="OpenClaw.Services.HostedUiBridge.Script.js" />
     <EmbeddedResource Include="Services\HostedUiBridge.ModelResolver.js" LogicalName="OpenClaw.Services.HostedUiBridge.ModelResolver.js" />
+    <EmbeddedResource Include="Services\WebViewCommands.StopInjection.js" LogicalName="OpenClaw.Services.WebViewCommands.StopInjection.js" />
+    <EmbeddedResource Include="Services\WebViewCommands.AbortRun.js" LogicalName="OpenClaw.Services.WebViewCommands.AbortRun.js" />
   </ItemGroup>
 
 </Project>

@@ -903,7 +903,7 @@ git commit -m "refactor: inject WebViewService logger and capture heartbeat conf
 - Modify: `src/OpenClaw/OpenClaw.csproj`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Extract `/stop` injection script**
+- [x] **Step 1: Extract `/stop` injection script**
 
 Move the JavaScript currently embedded inside `TryInjectStopCommandAsync()` to `WebViewCommands.StopInjection.js` without changing selectors, input handling, event dispatch, or `/stop` text.
 
@@ -930,7 +930,7 @@ private async Task<bool> TryInjectStopCommandAsync()
 }
 ```
 
-- [ ] **Step 2: Extract abort-run script**
+- [x] **Step 2: Extract abort-run script**
 
 Move the JavaScript currently embedded inside `TryAbortActiveRunAsync()` to `WebViewCommands.AbortRun.js` without changing stop/abort button detection or hosted API targets.
 
@@ -957,7 +957,7 @@ private async Task<bool> TryAbortActiveRunAsync()
 }
 ```
 
-- [ ] **Step 3: Add command script loader**
+- [x] **Step 3: Add command script loader**
 
 Add a small internal helper in `WebViewService.Commands.cs` or a new `WebViewCommandScripts.cs`:
 
@@ -984,7 +984,7 @@ internal static class WebViewCommandScripts
 }
 ```
 
-- [ ] **Step 4: Add embedded resources**
+- [x] **Step 4: Add embedded resources**
 
 Add to `OpenClaw.csproj`:
 
@@ -993,7 +993,7 @@ Add to `OpenClaw.csproj`:
 <EmbeddedResource Include="Services\WebViewCommands.AbortRun.js" LogicalName="OpenClaw.Services.WebViewCommands.AbortRun.js" />
 ```
 
-- [ ] **Step 5: Add inline JavaScript guardrail**
+- [x] **Step 5: Add inline JavaScript guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -1009,7 +1009,7 @@ foreach ($asset in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortR
 }
 ```
 
-- [ ] **Step 6: Run verification and commit**
+- [x] **Step 6: Run verification and commit**
 
 Run full verification from Task 1.
 
