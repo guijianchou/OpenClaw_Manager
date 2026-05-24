@@ -391,7 +391,7 @@ git commit -m "chore: add active refactor verification scripts"
 - Modify: `src/OpenClaw/MainWindow.Shared.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Create `WebViewGenerationTracker`**
+- [x] **Step 1: Create `WebViewGenerationTracker`**
 
 ```csharp
 // Copyright (c) Lanstack @openclaw. All rights reserved.
@@ -416,7 +416,7 @@ internal sealed class WebViewGenerationTracker
 }
 ```
 
-- [ ] **Step 2: Create `WebViewStatusInspector`**
+- [x] **Step 2: Create `WebViewStatusInspector`**
 
 Move these fields and methods out of the `WebViewService` partial into the new class:
 
@@ -464,7 +464,7 @@ internal sealed class WebViewStatusInspector : IDisposable
 }
 ```
 
-- [ ] **Step 3: Add explicit `WebViewService` logger/generation wiring**
+- [x] **Step 3: Add explicit `WebViewService` logger/generation wiring**
 
 Add constructor-owned dependencies to `WebViewService`. Do not use a nullable logger fallback inside the service.
 
@@ -510,7 +510,7 @@ public MainViewModel ViewModel { get; } = new(App.Logger);
 
 This keeps the App-bound logger at the application edge while removing it from `WebViewService`.
 
-- [ ] **Step 4: Keep generation checks inside inspector**
+- [x] **Step 4: Keep generation checks inside inspector**
 
 Every await in `WebViewStatusInspector` that can apply a snapshot must check:
 
@@ -524,7 +524,7 @@ if (!_generations.IsCurrent(generation))
 
 No caller should be able to apply an inspection result without both a generation and the currently owned cancellation token. Fire-and-forget probe loops must pass their probe-loop token into `InspectAsync`.
 
-- [ ] **Step 5: Reduce `WebViewService.ControlUiInspection.cs` to a compatibility wrapper**
+- [x] **Step 5: Reduce `WebViewService.ControlUiInspection.cs` to a compatibility wrapper**
 
 After the move, this partial should only expose the existing public members and delegate to `_statusInspector`:
 
@@ -540,7 +540,7 @@ public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(CancellationToken
 }
 ```
 
-- [ ] **Step 6: Update `WebViewService` lifecycle calls**
+- [x] **Step 6: Update `WebViewService` lifecycle calls**
 
 Replace direct field manipulation with explicit inspector calls:
 
@@ -553,7 +553,7 @@ _statusInspector.SetPageLoadedSnapshot(sender.Source);
 _statusInspector.StartProbeLoop();
 ```
 
-- [ ] **Step 7: Update heartbeat hosted-session probe**
+- [x] **Step 7: Update heartbeat hosted-session probe**
 
 In `WebViewService.Heartbeat.cs`, replace direct inspection call with the wrapper:
 
@@ -563,7 +563,7 @@ var snapshot = await InspectControlUiStateAsync();
 
 Keep this line only if it now delegates to `WebViewStatusInspector`. Do not let heartbeat own inspection state.
 
-- [ ] **Step 8: Add structure guardrails**
+- [x] **Step 8: Add structure guardrails**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -574,7 +574,7 @@ if ($webViewService -match 'ParseControlUiSnapshot|ExecuteControlUiInspectionAsy
 }
 ```
 
-- [ ] **Step 9: Run verification and commit**
+- [x] **Step 9: Run verification and commit**
 
 Run the full command set from Task 1.
 

@@ -23,7 +23,7 @@ public partial class MainViewModel
     private static readonly Brush WarningBrush = CreateBrush(245, 158, 11);
     private static readonly Brush ErrorBrush = CreateBrush(239, 68, 68);
 
-    private readonly WebViewService _webViewService = new();
+    private readonly WebViewService _webViewService;
     private readonly HostedUiBridge _hostedUiBridge = new();
     private readonly ControlUiLatencyService _latencyService = new();
     private readonly LatencyHistory _latencyHistory = new(LatencyHistoryCapacity);

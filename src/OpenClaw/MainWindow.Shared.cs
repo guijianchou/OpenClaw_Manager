@@ -29,5 +29,5 @@ public sealed partial class MainWindow
     private int _webViewRecreationMergedCount;
     private string _lastInstrumentationEvent = string.Empty;
 
-    public MainViewModel ViewModel { get; } = new();
+    public MainViewModel ViewModel { get; } = new(App.Logger);
 }

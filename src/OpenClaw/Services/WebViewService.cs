@@ -17,10 +17,20 @@ public partial class WebViewService : IDisposable
     private string? _lastNavigatedUrl;
     private int _retryCount;
     private CancellationTokenSource? _retryCts;
-    private int _webViewGeneration;
     private string? _lastLifecycleLogKey;
     private const int MaxRetries = 3;
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
+    private readonly IAppLogger _logger;
+    private readonly WebViewGenerationTracker _generations;
+    private readonly WebViewStatusInspector _statusInspector;
+
+    public WebViewService(IAppLogger logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _generations = new WebViewGenerationTracker();
+        _statusInspector = new WebViewStatusInspector(GetCoreWebView, _generations, _logger);
+        _statusInspector.SnapshotUpdated += snapshot => ApplyControlUiSnapshot(snapshot, raiseIssueEvent: false);
+    }
 
     /// <summary>
     /// Raised when the connection/loading state changes.
@@ -60,7 +70,7 @@ public partial class WebViewService : IDisposable
         DetachCurrentWebView();
         _webView = webView;
         _coreWebView = null;
-        NextWebViewGeneration();
+        _generations.Next();
         CurrentEnvironmentName = environmentName;
         _isInitialized = false;
 
@@ -136,7 +146,7 @@ public partial class WebViewService : IDisposable
         _retryCount = 0;
         CancelStatusProbeLoop();
         InvalidateControlUiInspectionCache();
-        NextWebViewGeneration();
+        _generations.Next();
         _retryCts?.Cancel();
         _retryCts = new CancellationTokenSource();
         SetState(ConnectionState.Loading);
@@ -167,7 +177,7 @@ public partial class WebViewService : IDisposable
         App.Logger.Info("Reloading page.");
         CancelStatusProbeLoop();
         InvalidateControlUiInspectionCache();
-        NextWebViewGeneration();
+        _generations.Next();
         SetState(ConnectionState.Loading);
         try
         {
@@ -295,8 +305,7 @@ public partial class WebViewService : IDisposable
     {
         try
         {
-            var snapshot = ParseControlUiSnapshot(args.WebMessageAsJson);
-            if (snapshot.Phase == ControlUiPhase.Unknown)
+            if (!_statusInspector.TryApplyHostMessage(args.WebMessageAsJson, out var snapshot))
             {
                 return;
             }
@@ -315,12 +324,11 @@ public partial class WebViewService : IDisposable
     {
         CancelStatusProbeLoop();
         InvalidateControlUiInspectionCache();
-        NextWebViewGeneration();
+        _generations.Next();
         _lastReportedIssueKey = null;
         _heartbeatConnectingCount = 0;
         _lastHeartbeatObservationKey = null;
-        _latestControlUiSnapshot = ControlUiProbeSnapshot.Loading(args.Uri);
-        _latestControlUiSnapshotGeneration = Volatile.Read(ref _webViewGeneration);
+        _statusInspector.SetLoadingSnapshot(args.Uri);
         SetState(ConnectionState.Loading);
         LogLifecycleEventOnce("navigation.starting", new { uri = args.Uri });
     }
@@ -330,7 +338,7 @@ public partial class WebViewService : IDisposable
         if (args.IsSuccess)
         {
             _retryCount = 0;
-            ApplyControlUiSnapshot(ControlUiProbeSnapshot.PageLoaded(sender.Source), raiseIssueEvent: false);
+            _statusInspector.SetPageLoadedSnapshot(sender.Source);
             StartStatusProbeLoop();
             LogLifecycleEventOnce("navigation.completed", new { uri = sender.Source });
             NavigationCompleted?.Invoke(sender.Source);
@@ -400,9 +408,8 @@ public partial class WebViewService : IDisposable
     {
         CancelStatusProbeLoop();
         InvalidateControlUiInspectionCache();
-        NextWebViewGeneration();
-        _latestControlUiSnapshot = ControlUiProbeSnapshot.Unavailable("Browser process failed.");
-        _latestControlUiSnapshotGeneration = Volatile.Read(ref _webViewGeneration);
+        _generations.Next();
+        _statusInspector.SetUnavailableSnapshot("Browser process failed.");
         App.Logger.Error($"WebView2 process failed: {args.Reason} ({args.ProcessFailedKind})");
         SetState(ConnectionState.Error);
         NavigationErrorOccurred?.Invoke($"Browser process failed: {args.Reason}");
@@ -412,7 +419,7 @@ public partial class WebViewService : IDisposable
     {
         CancelStatusProbeLoop();
         StopHeartbeat();
-        NextWebViewGeneration();
+        _generations.Next();
         InvalidateControlUiInspectionCache();
         _retryCts?.Cancel();
 
@@ -428,7 +435,8 @@ public partial class WebViewService : IDisposable
         _webView = null;
         _coreWebView = null;
         _isInitialized = false;
-        _latestControlUiSnapshot = ControlUiProbeSnapshot.Unknown;
+        _statusInspector.SetUnknownSnapshot();
+        _lastPublishedControlUiSnapshot = ControlUiProbeSnapshot.Unknown;
         _lastLifecycleLogKey = null;
     }
 
@@ -437,6 +445,7 @@ public partial class WebViewService : IDisposable
         DetachCurrentWebView();
         _retryCts?.Dispose();
         _retryCts = null;
+        _statusInspector.Dispose();
     }
 
     private static CoreWebView2? TryGetCoreWebView2(WebView2? webView)
@@ -465,16 +474,6 @@ public partial class WebViewService : IDisposable
 
         _coreWebView = TryGetCoreWebView2(_webView);
         return _coreWebView;
-    }
-
-    private int NextWebViewGeneration()
-    {
-        return Interlocked.Increment(ref _webViewGeneration);
-    }
-
-    private bool IsCurrentGeneration(int generation)
-    {
-        return Volatile.Read(ref _webViewGeneration) == generation;
     }
 
     private void LogLifecycleEventOnce(string eventName, object? context = null)

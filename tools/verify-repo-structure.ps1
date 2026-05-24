@@ -29,4 +29,9 @@ foreach ($resource in @('HostedUiBridge.Script.js', 'HostedUiBridge.ModelResolve
     }
 }
 
+$webViewService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.cs') -Raw
+if ($webViewService -match 'ParseControlUiSnapshot|ExecuteControlUiInspectionAsync|_latestControlUiSnapshot') {
+    throw 'WebViewService.cs must not own Control UI inspection internals.'
+}
+
 Write-Host 'PASS: repository structure guardrails'
