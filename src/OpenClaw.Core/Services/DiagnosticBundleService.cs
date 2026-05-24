@@ -6,6 +6,15 @@ using System.Text.RegularExpressions;
 
 namespace OpenClaw.Services;
 
+public sealed record DiagnosticRuntimeInfo(
+    string? WebView2RuntimeVersion,
+    string OsVersion,
+    string DotNetVersion,
+    string AppVersion,
+    string ProcessArchitecture,
+    int ProcessorCount,
+    string MachineHash);
+
 /// <summary>
 /// Collects diagnostic data (logs, redacted settings, runtime info) and exports as a zip bundle.
 /// </summary>
@@ -43,34 +52,36 @@ public static partial class DiagnosticBundleService
     }
 
     /// <summary>
-    /// Collects runtime environment information as a human-readable string.
+    /// Collects runtime environment information from platform-neutral inputs.
     /// </summary>
-    public static string CollectRuntimeInfo()
+    public static DiagnosticRuntimeInfo CollectRuntimeInfo(string? webView2RuntimeVersion)
     {
-        var lines = new List<string>
-        {
-            $"OS: {Environment.OSVersion}",
-            $".NET: {Environment.Version}",
-            $"App: {GetAppVersion()}",
-            $"Architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}",
-            $"Machine: {HashMachineName(Environment.MachineName)}",
-            $"Processors: {Environment.ProcessorCount}",
-        };
+        return new DiagnosticRuntimeInfo(
+            WebView2RuntimeVersion: webView2RuntimeVersion,
+            OsVersion: Environment.OSVersion.ToString(),
+            DotNetVersion: Environment.Version.ToString(),
+            AppVersion: GetAppVersion(),
+            ProcessArchitecture: System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+            ProcessorCount: Environment.ProcessorCount,
+            MachineHash: HashMachineName(Environment.MachineName));
+    }
 
-        // Try to get WebView2 version via reflection (avoids hard dependency on WebView2 in Core)
-        try
-        {
-            var envType = Type.GetType("Microsoft.Web.WebView2.Core.CoreWebView2Environment, Microsoft.Web.WebView2.Core");
-            var method = envType?.GetMethod("GetAvailableBrowserVersionString", Type.EmptyTypes);
-            var version = method?.Invoke(null, null) as string;
-            lines.Add($"WebView2: {version ?? "unknown"}");
-        }
-        catch
-        {
-            lines.Add("WebView2: unavailable");
-        }
+    public static string FormatRuntimeInfo(DiagnosticRuntimeInfo runtimeInfo)
+    {
+        var webView2 = string.IsNullOrWhiteSpace(runtimeInfo.WebView2RuntimeVersion)
+            ? "unavailable"
+            : runtimeInfo.WebView2RuntimeVersion;
 
-        return string.Join(Environment.NewLine, lines);
+        return string.Join(Environment.NewLine, new[]
+        {
+            $"OS: {runtimeInfo.OsVersion}",
+            $".NET: {runtimeInfo.DotNetVersion}",
+            $"App: {runtimeInfo.AppVersion}",
+            $"Architecture: {runtimeInfo.ProcessArchitecture}",
+            $"Machine: {runtimeInfo.MachineHash}",
+            $"Processors: {runtimeInfo.ProcessorCount}",
+            $"WebView2: {webView2}",
+        });
     }
 
     /// <summary>
@@ -99,7 +110,8 @@ public static partial class DiagnosticBundleService
         string settingsJson,
         string logsDirectory,
         string diagnosticSummary,
-        string outputDirectory)
+        string outputDirectory,
+        DiagnosticRuntimeInfo runtimeInfo)
     {
         var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmm");
         var fileName = $"openclaw-diagnostics-{timestamp}.zip";
@@ -115,8 +127,7 @@ public static partial class DiagnosticBundleService
         await AddTextEntryAsync(archive, "settings-redacted.json", redactedSettings);
 
         // 2. Runtime info
-        var runtimeInfo = CollectRuntimeInfo();
-        await AddTextEntryAsync(archive, "runtime-info.txt", runtimeInfo);
+        await AddTextEntryAsync(archive, "runtime-info.txt", FormatRuntimeInfo(runtimeInfo));
 
         // 3. Diagnostic summary
         if (!string.IsNullOrWhiteSpace(diagnosticSummary))

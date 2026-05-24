@@ -1840,7 +1840,7 @@ git commit -m "fix: correct hosted bridge polling drift"
 - Modify: `src/OpenClaw/ViewModels/MainViewModel.Commands.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Remove WebView2 type-name reflection from Core**
+- [x] **Step 1: Remove WebView2 type-name reflection from Core**
 
 In `DiagnosticBundleService`, remove this Core-layer WebView2 lookup:
 
@@ -1919,7 +1919,7 @@ with:
 await AddTextEntryAsync(archive, "runtime-info.txt", FormatRuntimeInfo(runtimeInfo));
 ```
 
-- [ ] **Step 2: Collect WebView2 runtime version in WinUI layer**
+- [x] **Step 2: Collect WebView2 runtime version in WinUI layer**
 
 In `DiagnosticService`, use direct WebView2 API:
 
@@ -1955,7 +1955,7 @@ public static DiagnosticResult CheckWebView2Runtime()
 }
 ```
 
-- [ ] **Step 3: Pass runtime info from export command**
+- [x] **Step 3: Pass runtime info from export command**
 
 In `MainViewModel.Commands.cs`, update `OnExportDiagnosticBundleAsync()` before calling Core:
 
@@ -1975,7 +1975,7 @@ var outputPath = await DiagnosticBundleService.ExportBundleAsync(
     runtimeInfo);
 ```
 
-- [ ] **Step 4: Strengthen Core guardrail**
+- [x] **Step 4: Strengthen Core guardrail**
 
 Update `tools/verify-repo-structure.ps1` to reject:
 
@@ -1985,7 +1985,7 @@ $forbiddenCorePattern = 'using Microsoft\.UI|using Microsoft\.Web\.WebView2|usin
 
 inside `src/OpenClaw.Core`.
 
-- [ ] **Step 5: Run verification and commit**
+- [x] **Step 5: Run verification and commit**
 
 Run full verification from Task 1.
 

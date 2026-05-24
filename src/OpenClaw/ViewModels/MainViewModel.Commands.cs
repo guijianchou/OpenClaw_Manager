@@ -100,12 +100,15 @@ public partial class MainViewModel
         var diagnosticSummary = DiagnosticSummary;
         var logsDirectory = App.Configuration.LogsDirectory;
         var outputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var runtimeInfo = DiagnosticBundleService.CollectRuntimeInfo(
+            DiagnosticService.GetWebView2RuntimeVersion());
 
         var outputPath = await DiagnosticBundleService.ExportBundleAsync(
             settingsJson,
             logsDirectory,
             diagnosticSummary,
-            outputDirectory);
+            outputDirectory,
+            runtimeInfo);
 
         App.Logger.Info($"Diagnostic bundle exported to: {outputPath}");
         DiagnosticSummary = $"Diagnostic bundle exported to Desktop:\n{System.IO.Path.GetFileName(outputPath)}";

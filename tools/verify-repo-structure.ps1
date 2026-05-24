@@ -14,7 +14,7 @@ if ($solution -match 'OpenClaw\.Tests|tests\\OpenClaw\.Tests') {
 }
 
 $coreFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core') -Recurse -File -Include *.cs
-$forbiddenCorePattern = 'using Microsoft\.UI|using Microsoft\.Web\.WebView2|using Windows\.Graphics|using Windows\.UI|using WinRT|App\.Configuration|App\.Logger|App\.MainWindow'
+$forbiddenCorePattern = 'using Microsoft\.UI|using Microsoft\.Web\.WebView2|using Windows\.Graphics|using Windows\.UI|using WinRT|Microsoft\.Web\.WebView2|Type\.GetType\("Microsoft\.Web\.WebView2|App\.Configuration|App\.Logger|App\.MainWindow'
 foreach ($file in $coreFiles) {
     $content = Get-Content -LiteralPath $file.FullName -Raw
     if ($content -match $forbiddenCorePattern) {

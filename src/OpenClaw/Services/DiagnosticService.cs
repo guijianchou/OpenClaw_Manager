@@ -18,23 +18,27 @@ public class DiagnosticService
     /// </summary>
     public static DiagnosticResult CheckWebView2Runtime()
     {
+        var version = GetWebView2RuntimeVersion();
+        if (string.IsNullOrEmpty(version))
+        {
+            return DiagnosticResult.Fail(
+                StringResources.DiagnosticWebViewRuntimeNotFound,
+                StringResources.DiagnosticWebViewRuntimeNotFoundDetail);
+        }
+
+        return DiagnosticResult.Pass($"{StringResources.DiagnosticWebView2RuntimeLabel} v{version}");
+    }
+
+    public static string? GetWebView2RuntimeVersion()
+    {
         try
         {
-            var version = CoreWebView2Environment.GetAvailableBrowserVersionString();
-            if (string.IsNullOrEmpty(version))
-            {
-                return DiagnosticResult.Fail(
-                    StringResources.DiagnosticWebViewRuntimeNotFound,
-                    StringResources.DiagnosticWebViewRuntimeNotFoundDetail);
-            }
-
-            return DiagnosticResult.Pass($"{StringResources.DiagnosticWebView2RuntimeLabel} v{version}");
+            return CoreWebView2Environment.GetAvailableBrowserVersionString();
         }
         catch (Exception ex)
         {
-            return DiagnosticResult.Fail(
-                StringResources.DiagnosticWebViewRuntimeCheckFailed,
-                string.Format(StringResources.DiagnosticWebViewRuntimeCheckFailedDetailFormat, ex.Message));
+            App.Logger.Warning($"WebView2 runtime version lookup failed: {ex.Message}");
+            return null;
         }
     }
 
