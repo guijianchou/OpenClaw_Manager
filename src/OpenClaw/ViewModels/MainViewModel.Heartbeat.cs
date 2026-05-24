@@ -34,10 +34,10 @@ public partial class MainViewModel
             return;
         }
 
-        var interval = App.Configuration.Settings.Heartbeat.EnableHeartbeat
-            ? App.Configuration.Settings.Heartbeat.IntervalSeconds
-            : 0;
-        _webViewService.StartHeartbeat(_selectedEnvironment.GatewayUrl, interval);
+        _webViewService.StartHeartbeat(
+            _selectedEnvironment.GatewayUrl,
+            App.Configuration.Settings.Heartbeat,
+            App.Configuration.Settings.RecoveryPolicy);
     }
 
     private void OnHeartbeatObserved(HeartbeatProbeResult result)

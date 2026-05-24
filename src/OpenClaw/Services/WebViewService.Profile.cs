@@ -17,7 +17,7 @@ public partial class WebViewService
         return Path.Combine(root, BuildEnvironmentFolderName(environmentName));
     }
 
-    public static void DeleteUserDataFolderForEnvironment(string environmentName)
+    public static void DeleteUserDataFolderForEnvironment(string environmentName, IAppLogger? logger = null)
     {
         try
         {
@@ -28,15 +28,18 @@ public partial class WebViewService
             }
 
             Directory.Delete(folder, recursive: true);
-            App.Logger.Info($"Deleted WebView2 profile folder for environment '{environmentName}'.");
+            logger?.Info($"Deleted WebView2 profile folder for environment '{environmentName}'.");
         }
         catch (Exception ex)
         {
-            App.Logger.Warning($"Failed to delete WebView2 profile folder for environment '{environmentName}': {ex.Message}");
+            logger?.Warning($"Failed to delete WebView2 profile folder for environment '{environmentName}': {ex.Message}");
         }
     }
 
-    public static void TryMoveUserDataFolderToRenamedEnvironment(string originalEnvironmentName, string renamedEnvironmentName)
+    public static void TryMoveUserDataFolderToRenamedEnvironment(
+        string originalEnvironmentName,
+        string renamedEnvironmentName,
+        IAppLogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(originalEnvironmentName) ||
             string.IsNullOrWhiteSpace(renamedEnvironmentName) ||
@@ -57,11 +60,11 @@ public partial class WebViewService
 
             Directory.CreateDirectory(Path.GetDirectoryName(targetFolder)!);
             Directory.Move(sourceFolder, targetFolder);
-            App.Logger.Info($"Moved WebView2 profile folder from '{originalEnvironmentName}' to '{renamedEnvironmentName}'.");
+            logger?.Info($"Moved WebView2 profile folder from '{originalEnvironmentName}' to '{renamedEnvironmentName}'.");
         }
         catch (Exception ex)
         {
-            App.Logger.Warning($"Failed to move WebView2 profile folder from '{originalEnvironmentName}' to '{renamedEnvironmentName}': {ex.Message}");
+            logger?.Warning($"Failed to move WebView2 profile folder from '{originalEnvironmentName}' to '{renamedEnvironmentName}': {ex.Message}");
         }
     }
 

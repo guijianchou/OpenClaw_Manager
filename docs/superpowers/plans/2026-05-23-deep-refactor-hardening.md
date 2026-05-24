@@ -806,7 +806,7 @@ git commit -m "refactor: isolate heartbeat loop ownership"
 - Modify: `src/OpenClaw/Services/WebViewService.Profile.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Replace static logger reads inside `WebViewService` partials**
+- [x] **Step 1: Replace static logger reads inside `WebViewService` partials**
 
 In these files, replace every `App.Logger.Info`, `App.Logger.Warning`, and `App.Logger.Error` call with `_logger.Info`, `_logger.Warning`, and `_logger.Error`:
 
@@ -820,7 +820,7 @@ src/OpenClaw/Services/WebViewService.Profile.cs
 
 Do not change logger usage in `MainWindow`, `MainViewModel`, `DiagnosticService`, or `HostedUiBridge` during this task.
 
-- [ ] **Step 2: Capture heartbeat runtime options at start time**
+- [x] **Step 2: Capture heartbeat runtime options at start time**
 
 Add fields in `WebViewService.Heartbeat.cs`:
 
@@ -849,7 +849,7 @@ Then replace the mid-loop `App.Configuration.Settings.RecoveryPolicy.HardRefresh
 var seconds = _heartbeatHardRefreshCooldownSeconds;
 ```
 
-- [ ] **Step 3: Update callers**
+- [x] **Step 3: Update callers**
 
 Update callers that start heartbeat work to pass both settings explicitly:
 
@@ -862,7 +862,7 @@ webViewService.StartHeartbeat(
 
 If the call flows through `ShellSessionCoordinatorAdapters`, Task 7A will remove the adapter's fallback global reads and keep this explicit configuration flow.
 
-- [ ] **Step 4: Add guardrails**
+- [x] **Step 4: Add guardrails**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -881,7 +881,7 @@ if ($heartbeat -match 'App\.Configuration\.Settings\.Heartbeat|App\.Configuratio
 }
 ```
 
-- [ ] **Step 5: Run verification and commit**
+- [x] **Step 5: Run verification and commit**
 
 Run full verification from Task 1.
 

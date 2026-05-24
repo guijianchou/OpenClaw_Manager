@@ -20,25 +20,25 @@ public partial class WebViewService
         var aborted = await TryAbortActiveRunAsync();
         if (aborted)
         {
-            App.Logger.Info("Triggered the hosted UI stop action.");
+            _logger.Info("Triggered the hosted UI stop action.");
             return;
         }
 
         var injected = await InjectStopCommandAsync();
         if (injected)
         {
-            App.Logger.Info("Injected /stop command into the web UI.");
+            _logger.Info("Injected /stop command into the web UI.");
             return;
         }
 
-        App.Logger.Info("Stop command injection unavailable, stopping navigation instead.");
+        _logger.Info("Stop command injection unavailable, stopping navigation instead.");
         try
         {
             coreWebView.Stop();
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
-            App.Logger.Warning($"Stop skipped because CoreWebView2 became unavailable: {ex.Message}");
+            _logger.Warning($"Stop skipped because CoreWebView2 became unavailable: {ex.Message}");
             return;
         }
 
@@ -164,7 +164,7 @@ public partial class WebViewService
         }
         catch (Exception ex)
         {
-            App.Logger.Warning($"Failed to inject /stop command: {ex.Message}");
+            _logger.Warning($"Failed to inject /stop command: {ex.Message}");
             return false;
         }
     }
@@ -231,7 +231,7 @@ public partial class WebViewService
         }
         catch (Exception ex)
         {
-            App.Logger.Warning($"Failed to trigger hosted UI stop action: {ex.Message}");
+            _logger.Warning($"Failed to trigger hosted UI stop action: {ex.Message}");
             return false;
         }
     }

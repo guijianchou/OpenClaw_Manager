@@ -39,4 +39,16 @@ if ($heartbeat -match 'CancellationTokenSource\? _heartbeatCts|Task\? _heartbeat
     throw 'Heartbeat loop ownership must live in HeartbeatRuntime.'
 }
 
+$webViewServiceFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services') -File -Filter 'WebViewService*.cs'
+foreach ($file in $webViewServiceFiles) {
+    $content = Get-Content -LiteralPath $file.FullName -Raw
+    if ($content -match 'App\.Logger') {
+        throw "WebViewService partial must use injected logger, not App.Logger: $($file.Name)"
+    }
+}
+
+if ($heartbeat -match 'App\.Configuration\.Settings\.Heartbeat|App\.Configuration\.Settings\.RecoveryPolicy') {
+    throw 'Heartbeat must capture settings at start time instead of reading App.Configuration mid-loop.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

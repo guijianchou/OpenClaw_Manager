@@ -113,11 +113,11 @@ public partial class WebViewService : IDisposable
             coreWebView.Settings.IsGeneralAutofillEnabled = true;
 
             _isInitialized = true;
-            App.Logger.Info("WebView2 initialized successfully.");
+            _logger.Info("WebView2 initialized successfully.");
         }
         catch (Exception ex)
         {
-            App.Logger.Error($"WebView2 initialization failed: {ex}");
+            _logger.Error($"WebView2 initialization failed: {ex}");
             SetState(ConnectionState.Error);
             NavigationErrorOccurred?.Invoke($"WebView2 initialization failed: {ex.Message}");
         }
@@ -131,18 +131,18 @@ public partial class WebViewService : IDisposable
         var coreWebView = GetCoreWebView();
         if (!_isInitialized || coreWebView is null)
         {
-            App.Logger.Warning("Cannot navigate: WebView2 not initialized.");
+            _logger.Warning("Cannot navigate: WebView2 not initialized.");
             return;
         }
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out _))
         {
-            App.Logger.Warning($"Invalid URL: {url}");
+            _logger.Warning($"Invalid URL: {url}");
             NavigationErrorOccurred?.Invoke($"Invalid URL: {url}");
             return;
         }
 
-        App.Logger.Info($"Navigating to: {url}");
+        _logger.Info($"Navigating to: {url}");
         _lastNavigatedUrl = url;
         _retryCount = 0;
         CancelStatusProbeLoop();
@@ -158,7 +158,7 @@ public partial class WebViewService : IDisposable
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
-            App.Logger.Warning($"Navigate skipped because CoreWebView2 became unavailable: {ex.Message}");
+            _logger.Warning($"Navigate skipped because CoreWebView2 became unavailable: {ex.Message}");
             SetState(ConnectionState.Error);
             NavigationErrorOccurred?.Invoke($"Navigation failed before WebView2 was ready: {ex.Message}");
         }
@@ -175,7 +175,7 @@ public partial class WebViewService : IDisposable
             return;
         }
 
-        App.Logger.Info("Reloading page.");
+        _logger.Info("Reloading page.");
         CancelStatusProbeLoop();
         InvalidateControlUiInspectionCache();
         _generations.Next();
@@ -186,7 +186,7 @@ public partial class WebViewService : IDisposable
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
-            App.Logger.Warning($"Reload skipped because CoreWebView2 became unavailable: {ex.Message}");
+            _logger.Warning($"Reload skipped because CoreWebView2 became unavailable: {ex.Message}");
         }
     }
 
@@ -203,13 +203,13 @@ public partial class WebViewService : IDisposable
 
         try
         {
-            App.Logger.Info("Clearing browsing data.");
+            _logger.Info("Clearing browsing data.");
             await coreWebView.Profile.ClearBrowsingDataAsync();
-            App.Logger.Info("Browsing data cleared.");
+            _logger.Info("Browsing data cleared.");
         }
         catch (Exception ex)
         {
-            App.Logger.Error($"Failed to clear browsing data: {ex.Message}");
+            _logger.Error($"Failed to clear browsing data: {ex.Message}");
         }
     }
 
@@ -230,7 +230,7 @@ public partial class WebViewService : IDisposable
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
-            App.Logger.Warning($"OpenDevTools skipped because CoreWebView2 became unavailable: {ex.Message}");
+            _logger.Warning($"OpenDevTools skipped because CoreWebView2 became unavailable: {ex.Message}");
         }
     }
 
@@ -249,12 +249,12 @@ public partial class WebViewService : IDisposable
             _isInitialized &&
             string.Equals(CurrentEnvironmentName, environmentName, StringComparison.Ordinal))
         {
-            App.Logger.Info($"Clearing active browsing data for environment '{environmentName}'.");
+            _logger.Info($"Clearing active browsing data for environment '{environmentName}'.");
             await coreWebView.Profile.ClearBrowsingDataAsync();
             return;
         }
 
-        DeleteUserDataFolderForEnvironment(environmentName);
+        DeleteUserDataFolderForEnvironment(environmentName, _logger);
     }
 
     /// <summary>
@@ -270,7 +270,7 @@ public partial class WebViewService : IDisposable
         }
 
         _retryCount = 0; // manual retry resets counter
-        App.Logger.Info($"Manual retry navigation to: {_lastNavigatedUrl}");
+        _logger.Info($"Manual retry navigation to: {_lastNavigatedUrl}");
         SetState(ConnectionState.Loading);
         try
         {
@@ -278,7 +278,7 @@ public partial class WebViewService : IDisposable
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
-            App.Logger.Warning($"Manual retry skipped because CoreWebView2 became unavailable: {ex.Message}");
+            _logger.Warning($"Manual retry skipped because CoreWebView2 became unavailable: {ex.Message}");
             return false;
         }
         return true;
@@ -315,7 +315,7 @@ public partial class WebViewService : IDisposable
         }
         catch (Exception ex)
         {
-            App.Logger.Warning($"Failed to process Control UI status message: {ex.Message}");
+            _logger.Warning($"Failed to process Control UI status message: {ex.Message}");
         }
     }
 
@@ -347,7 +347,7 @@ public partial class WebViewService : IDisposable
         else
         {
             CancelStatusProbeLoop();
-            App.Logger.Warning($"Navigation failed: {args.WebErrorStatus}");
+            _logger.Warning($"Navigation failed: {args.WebErrorStatus}");
 
             var isConnectionError = args.WebErrorStatus is
                 CoreWebView2WebErrorStatus.ConnectionAborted or
@@ -366,14 +366,14 @@ public partial class WebViewService : IDisposable
                 {
                     _retryCount++;
                     var token = _retryCts?.Token ?? CancellationToken.None;
-                    App.Logger.Info($"Auto-retry {_retryCount}/{MaxRetries} in {RetryDelay.TotalSeconds}s...");
+                    _logger.Info($"Auto-retry {_retryCount}/{MaxRetries} in {RetryDelay.TotalSeconds}s...");
                     try
                     {
                         await Task.Delay(RetryDelay, token);
                     }
                     catch (TaskCanceledException)
                     {
-                        App.Logger.Info("Auto-retry cancelled (new navigation started).");
+                        _logger.Info("Auto-retry cancelled (new navigation started).");
                         return;
                     }
                     var coreWebView = GetCoreWebView();
@@ -385,7 +385,7 @@ public partial class WebViewService : IDisposable
                         }
                         catch (Exception ex) when (ex is COMException or InvalidOperationException)
                         {
-                            App.Logger.Warning($"Auto-retry skipped because CoreWebView2 became unavailable: {ex.Message}");
+                            _logger.Warning($"Auto-retry skipped because CoreWebView2 became unavailable: {ex.Message}");
                         }
                         return; // don't fire error event for auto-retries
                     }
@@ -411,7 +411,7 @@ public partial class WebViewService : IDisposable
         InvalidateControlUiInspectionCache();
         _generations.Next();
         _statusInspector.SetUnavailableSnapshot("Browser process failed.");
-        App.Logger.Error($"WebView2 process failed: {args.Reason} ({args.ProcessFailedKind})");
+        _logger.Error($"WebView2 process failed: {args.Reason} ({args.ProcessFailedKind})");
         SetState(ConnectionState.Error);
         NavigationErrorOccurred?.Invoke($"Browser process failed: {args.Reason}");
     }
@@ -490,7 +490,7 @@ public partial class WebViewService : IDisposable
         }
 
         _lastLifecycleLogKey = logKey;
-        App.Logger.Info(eventName, context);
+        _logger.Info(eventName, context);
     }
 
     private void SetState(ConnectionState newState)

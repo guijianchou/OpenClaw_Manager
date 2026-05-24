@@ -1,5 +1,7 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
+using OpenClaw.Models;
+
 namespace OpenClaw.Services;
 
 public partial class WebViewService
@@ -16,6 +18,7 @@ public partial class WebViewService
     private int _heartbeatFailureThreshold = DefaultHeartbeatFailureThreshold;
     private int _heartbeatConnectingThreshold = DefaultHeartbeatConnectingThreshold;
     private static readonly TimeSpan DefaultHeartbeatReloadCooldown = TimeSpan.FromSeconds(75);
+    private int _heartbeatHardRefreshCooldownSeconds = (int)DefaultHeartbeatReloadCooldown.TotalSeconds;
     private static readonly HttpClient HeartbeatHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
     private DateTimeOffset _lastHeartbeatReloadAt = DateTimeOffset.MinValue;
     private string? _lastStartHeartbeatKey;
@@ -37,24 +40,27 @@ public partial class WebViewService
     /// Starts the periodic heartbeat probe against the given gateway URL.
     /// If the interval is 0 or negative, the heartbeat is disabled.
     /// </summary>
-    public void StartHeartbeat(string gatewayUrl, int intervalSeconds)
+    public void StartHeartbeat(
+        string gatewayUrl,
+        HeartbeatOptions heartbeatSettings,
+        RecoveryPolicyOptions recoveryPolicyOptions)
     {
-        var heartbeatSettings = App.Configuration.Settings.Heartbeat;
         if (!heartbeatSettings.EnableHeartbeat)
         {
             StopHeartbeat();
-            App.Logger.Info("Heartbeat disabled in settings.");
+            _logger.Info("Heartbeat disabled in settings.");
             return;
         }
 
+        var intervalSeconds = heartbeatSettings.IntervalSeconds;
         if (intervalSeconds <= 0 || string.IsNullOrEmpty(gatewayUrl))
         {
             StopHeartbeat();
-            App.Logger.Info("Heartbeat disabled (interval=0 or no URL).");
+            _logger.Info("Heartbeat disabled (interval=0 or no URL).");
             return;
         }
 
-        var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{Math.Max(1, heartbeatSettings.FailureThreshold)}|{Math.Max(1, heartbeatSettings.ConnectingThreshold)}";
+        var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{Math.Max(1, heartbeatSettings.FailureThreshold)}|{Math.Max(1, heartbeatSettings.ConnectingThreshold)}|{Math.Max(0, recoveryPolicyOptions.HardRefreshCooldownSeconds)}";
         if (_heartbeatRuntime.IsSameRun(heartbeatStartKey))
         {
             return;
@@ -69,11 +75,12 @@ public partial class WebViewService
         _heartbeatIntervalSeconds = intervalSeconds;
         _heartbeatFailureThreshold = Math.Max(1, heartbeatSettings.FailureThreshold);
         _heartbeatConnectingThreshold = Math.Max(1, heartbeatSettings.ConnectingThreshold);
+        _heartbeatHardRefreshCooldownSeconds = Math.Max(0, recoveryPolicyOptions.HardRefreshCooldownSeconds);
 
         if (!string.Equals(_lastStartHeartbeatKey, heartbeatStartKey, StringComparison.Ordinal))
         {
             _lastStartHeartbeatKey = heartbeatStartKey;
-            App.Logger.Info($"Heartbeat started: interval={intervalSeconds}s, failureThreshold={_heartbeatFailureThreshold}, connectingThreshold={_heartbeatConnectingThreshold}, url={gatewayUrl}");
+            _logger.Info($"Heartbeat started: interval={intervalSeconds}s, failureThreshold={_heartbeatFailureThreshold}, connectingThreshold={_heartbeatConnectingThreshold}, url={gatewayUrl}");
         }
         _heartbeatRuntime.Start(
             heartbeatStartKey,
@@ -93,6 +100,7 @@ public partial class WebViewService
         _heartbeatIntervalSeconds = 0;
         _heartbeatFailureThreshold = DefaultHeartbeatFailureThreshold;
         _heartbeatConnectingThreshold = DefaultHeartbeatConnectingThreshold;
+        _heartbeatHardRefreshCooldownSeconds = (int)DefaultHeartbeatReloadCooldown.TotalSeconds;
         _lastStartHeartbeatKey = null;
     }
 
@@ -115,7 +123,7 @@ public partial class WebViewService
                 {
                     if (_heartbeatFailureCount > 0)
                     {
-                        App.Logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
+                        _logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
                     }
 
                     _heartbeatFailureCount = 0;
@@ -127,7 +135,7 @@ public partial class WebViewService
                 {
                     if (_heartbeatFailureCount > 0)
                     {
-                        App.Logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
+                        _logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
                     }
 
                     _heartbeatFailureCount = 0;
@@ -155,7 +163,7 @@ public partial class WebViewService
 
                 _heartbeatConnectingCount = 0;
                 _heartbeatFailureCount++;
-                App.Logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
+                _logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
 
                 if (_heartbeatFailureCount >= _heartbeatFailureThreshold &&
                     TryScheduleHeartbeatReload(probe.Message))
@@ -170,7 +178,7 @@ public partial class WebViewService
         }
         catch (Exception ex)
         {
-            App.Logger.Error($"Heartbeat loop error: {ex.Message}");
+            _logger.Error($"Heartbeat loop error: {ex.Message}");
         }
     }
 
@@ -264,7 +272,7 @@ public partial class WebViewService
         if (elapsed < heartbeatReloadCooldown)
         {
             var remaining = heartbeatReloadCooldown - elapsed;
-            App.Logger.Warning($"Heartbeat auto-refresh suppressed for another {Math.Ceiling(remaining.TotalSeconds)}s to avoid reverse-proxy thrash.");
+            _logger.Warning($"Heartbeat auto-refresh suppressed for another {Math.Ceiling(remaining.TotalSeconds)}s to avoid reverse-proxy thrash.");
             _heartbeatFailureCount = _heartbeatFailureThreshold - 1;
 
             if (preserveConnectingCounter)
@@ -277,8 +285,8 @@ public partial class WebViewService
 
         _lastHeartbeatReloadAt = DateTimeOffset.UtcNow;
         Interlocked.Increment(ref _heartbeatRecoveryRequests);
-        App.Logger.Warning($"Heartbeat threshold reached, requesting session recovery. Reason: {message}");
-        App.Logger.Info("heartbeat.recovery.count", new { total = HeartbeatRecoveryRequests, message });
+        _logger.Warning($"Heartbeat threshold reached, requesting session recovery. Reason: {message}");
+        _logger.Info("heartbeat.recovery.count", new { total = HeartbeatRecoveryRequests, message });
         HeartbeatFailed?.Invoke(message);
 
         // Stop heartbeat; coordinator-driven recovery will restart it after the session stabilizes.
@@ -286,9 +294,9 @@ public partial class WebViewService
         return true;
     }
 
-    private static TimeSpan GetHeartbeatReloadCooldown()
+    private TimeSpan GetHeartbeatReloadCooldown()
     {
-        var seconds = App.Configuration.Settings.RecoveryPolicy.HardRefreshCooldownSeconds;
+        var seconds = _heartbeatHardRefreshCooldownSeconds;
         return TimeSpan.FromSeconds(Math.Max(0, seconds));
     }
 
@@ -307,16 +315,16 @@ public partial class WebViewService
         switch (result.Status)
         {
             case HeartbeatProbeStatus.Healthy:
-                App.Logger.Info(result.Message);
+                _logger.Info(result.Message);
                 break;
             case HeartbeatProbeStatus.SessionBlocked:
-                App.Logger.Warning($"Heartbeat detected a session issue that requires user action: {result.Message}");
+                _logger.Warning($"Heartbeat detected a session issue that requires user action: {result.Message}");
                 break;
             case HeartbeatProbeStatus.Connecting:
-                App.Logger.Info(result.Message);
+                _logger.Info(result.Message);
                 break;
             case HeartbeatProbeStatus.Failure:
-                App.Logger.Warning(result.Message);
+                _logger.Warning(result.Message);
                 break;
         }
     }
