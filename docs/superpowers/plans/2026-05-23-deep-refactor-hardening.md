@@ -1527,7 +1527,7 @@ git commit -m "refactor: drive compact top bar through visual states"
 - Modify: `tools/verify-bridge-scripts.ps1`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Extract host messaging**
+- [x] **Step 1: Extract host messaging**
 
 Move `postHostMessage`, host message kind constants, and safe `chrome.webview.postMessage` handling into `HostedUiBridge.HostMessaging.js`.
 
@@ -1549,7 +1549,7 @@ const openClawHostMessaging = (() => {
 })();
 ```
 
-- [ ] **Step 2: Extract command dispatch**
+- [x] **Step 2: Extract command dispatch**
 
 Move `invokeBridgeMethod`, `dispatchBridgeEvent`, and `onCommand` into `HostedUiBridge.CommandDispatch.js`.
 
@@ -1599,7 +1599,7 @@ const openClawCommandDispatch = (() => {
 
 The helper `runCommand` should call `invokeBridgeMethod`, then post a fresh status snapshot and session-ready check when provided, then return `handled || dispatchBridgeEvent(command, payload)`.
 
-- [ ] **Step 3: Extract mutation filtering**
+- [x] **Step 3: Extract mutation filtering**
 
 Move excluded selectors and mutation relevance checks into `HostedUiBridge.MutationFilter.js`.
 
@@ -1627,7 +1627,7 @@ const openClawMutationFilter = (() => {
 })();
 ```
 
-- [ ] **Step 4: Extract status inspection**
+- [x] **Step 4: Extract status inspection**
 
 Move `inspectControlUi`, app-state status reading, DOM fallback status reading, stale busy activity signature, and current model reader wiring into `HostedUiBridge.StatusInspection.js`.
 
@@ -1652,7 +1652,7 @@ const openClawStatusInspection = (() => {
 
 Keep the current stale-busy behavior together with status inspection: `readChatActivitySignature`, `collectDomActivitySignature`, `applyBusyStaleness`, `BUSY_STALE_THRESHOLD_MS`, `inputFocused`, and `focusedInputHasText` move into this asset.
 
-- [ ] **Step 5: Make `HostedUiBridge.Script.js` a composition file**
+- [x] **Step 5: Make `HostedUiBridge.Script.js` a composition file**
 
 After extraction, `HostedUiBridge.Script.js` should only:
 
@@ -1664,7 +1664,7 @@ After extraction, `HostedUiBridge.Script.js` should only:
 
 Target size: under 250 lines.
 
-- [ ] **Step 6: Update script builder**
+- [x] **Step 6: Update script builder**
 
 In `HostedUiBridge.Script.cs`, add placeholders:
 
@@ -1684,7 +1684,7 @@ Load and replace each embedded resource in stable dependency order:
 5. Command dispatch
 6. Main script
 
-- [ ] **Step 7: Update project embedded resources**
+- [x] **Step 7: Update project embedded resources**
 
 Add to `OpenClaw.csproj`:
 
@@ -1695,7 +1695,7 @@ Add to `OpenClaw.csproj`:
 <EmbeddedResource Include="Services\HostedUiBridge.HostMessaging.js" LogicalName="OpenClaw.Services.HostedUiBridge.HostMessaging.js" />
 ```
 
-- [ ] **Step 8: Extend bridge script verification**
+- [x] **Step 8: Extend bridge script verification**
 
 Extend the existing `tools/verify-bridge-scripts.ps1` from Task 1 with checks for:
 
@@ -1711,7 +1711,7 @@ PASS: mutation filter ignores settings/config/cron/sidebar mutations
 
 Do this with Node.js only; skip cleanly when Node is missing.
 
-- [ ] **Step 9: Add structure guardrails**
+- [x] **Step 9: Add structure guardrails**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -1733,7 +1733,7 @@ foreach ($asset in @(
 }
 ```
 
-- [ ] **Step 10: Run verification and commit**
+- [x] **Step 10: Run verification and commit**
 
 Run full verification from Task 1, using the renamed `tools\verify-bridge-scripts.ps1` if renamed.
 
@@ -1752,7 +1752,7 @@ git commit -m "refactor: split hosted bridge browser assets"
 - Modify: `src/OpenClaw/Services/HostedUiBridge.Script.js`
 - Modify: `tools/verify-bridge-scripts.ps1`
 
-- [ ] **Step 1: Replace recursive timeout scheduling with drift-aware scheduling**
+- [x] **Step 1: Replace recursive timeout scheduling with drift-aware scheduling**
 
 After Task 6 has reduced `HostedUiBridge.Script.js` to a composition shell, keep the polling owner in that shell but make it self-correcting.
 
@@ -1786,7 +1786,7 @@ const scheduleNextPoll = (interval, now = Date.now()) => {
 
 Then make `tick` compute the next interval from the snapshot and call `scheduleNextPoll(nextInterval)` after the current inspection work completes. Do not schedule the next tick before the current status snapshot is posted.
 
-- [ ] **Step 2: Preserve restart semantics**
+- [x] **Step 2: Preserve restart semantics**
 
 Keep the existing restart entry point but reset `nextPollAt` when an external event requests immediate polling:
 
@@ -1801,7 +1801,7 @@ const restartPolling = (interval = pollInterval) => {
 };
 ```
 
-- [ ] **Step 3: Add bridge script verification for drift helper**
+- [x] **Step 3: Add bridge script verification for drift helper**
 
 Extend `tools/verify-bridge-scripts.ps1` to load the composition shell and assert these strings exist after Task 6A:
 
@@ -1819,7 +1819,7 @@ if ($bridgeScript -notmatch 'nextPollAt' -or $bridgeScript -notmatch 'scheduleNe
 }
 ```
 
-- [ ] **Step 4: Run verification and commit**
+- [x] **Step 4: Run verification and commit**
 
 Run full verification from Task 1.
 

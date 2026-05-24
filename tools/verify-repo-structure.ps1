@@ -23,7 +23,14 @@ foreach ($file in $coreFiles) {
 }
 
 $project = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/OpenClaw.csproj') -Raw
-foreach ($resource in @('HostedUiBridge.Script.js', 'HostedUiBridge.ModelResolver.js')) {
+foreach ($resource in @(
+    'HostedUiBridge.Script.js',
+    'HostedUiBridge.HostMessaging.js',
+    'HostedUiBridge.MutationFilter.js',
+    'HostedUiBridge.ModelResolver.js',
+    'HostedUiBridge.StatusInspection.js',
+    'HostedUiBridge.CommandDispatch.js'
+)) {
     if ($project -notmatch [regex]::Escape($resource)) {
         throw "Missing embedded bridge resource entry: $resource"
     }
@@ -100,6 +107,35 @@ if ($compact -notmatch 'VisualStateManager\.GoToState\(\s*RootLayout') {
 $mainWindowXaml = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.xaml') -Raw
 if ($mainWindowXaml -notmatch 'x:Name="RootLayout"[\s\S]*VisualStateManager\.VisualStateGroups') {
     throw 'Compact visual states must be attached to RootLayout.'
+}
+
+$mainBridgeScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.Script.js') -Raw
+$mainBridgeLines = ($mainBridgeScript -split "`n").Count
+if ($mainBridgeLines -gt 250) {
+    throw "HostedUiBridge.Script.js should be a composition file under 250 lines; found $mainBridgeLines."
+}
+
+foreach ($asset in @(
+    'HostedUiBridge.StatusInspection.js',
+    'HostedUiBridge.CommandDispatch.js',
+    'HostedUiBridge.MutationFilter.js',
+    'HostedUiBridge.HostMessaging.js'
+)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "src/OpenClaw/Services/$asset"))) {
+        throw "Missing focused bridge asset: $asset"
+    }
+}
+
+foreach ($placeholder in @(
+    '__OPENCLAW_HOST_MESSAGING_SCRIPT__',
+    '__OPENCLAW_MUTATION_FILTER_SCRIPT__',
+    '__OPENCLAW_MODEL_RESOLVER_SCRIPT__',
+    '__OPENCLAW_STATUS_INSPECTION_SCRIPT__',
+    '__OPENCLAW_COMMAND_DISPATCH_SCRIPT__'
+)) {
+    if ($mainBridgeScript -notmatch [regex]::Escape($placeholder)) {
+        throw "HostedUiBridge.Script.js is missing composition placeholder: $placeholder"
+    }
 }
 
 Write-Host 'PASS: repository structure guardrails'

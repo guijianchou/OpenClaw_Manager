@@ -36,7 +36,11 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Services\HostedUiBridge.Script.js" LogicalName="OpenClaw.Services.HostedUiBridge.Script.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.HostMessaging.js" LogicalName="OpenClaw.Services.HostedUiBridge.HostMessaging.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.MutationFilter.js" LogicalName="OpenClaw.Services.HostedUiBridge.MutationFilter.js" />
     <EmbeddedResource Include="Services\HostedUiBridge.ModelResolver.js" LogicalName="OpenClaw.Services.HostedUiBridge.ModelResolver.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.StatusInspection.js" LogicalName="OpenClaw.Services.HostedUiBridge.StatusInspection.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.CommandDispatch.js" LogicalName="OpenClaw.Services.HostedUiBridge.CommandDispatch.js" />
     <EmbeddedResource Include="Services\WebViewCommands.StopInjection.js" LogicalName="OpenClaw.Services.WebViewCommands.StopInjection.js" />
     <EmbeddedResource Include="Services\WebViewCommands.AbortRun.js" LogicalName="OpenClaw.Services.WebViewCommands.AbortRun.js" />
   </ItemGroup>
