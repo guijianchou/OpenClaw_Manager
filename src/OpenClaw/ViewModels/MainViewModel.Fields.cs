@@ -1,5 +1,6 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using OpenClaw.Helpers;
 using OpenClaw.Models;
@@ -18,15 +19,17 @@ public partial class MainViewModel
     private const string DefaultLatencySummary = "-- ms";
     private const string DefaultWorkStatus = "WAIT";
 
-    private static readonly Brush NeutralBrush = CreateBrush(107, 114, 128);
-    private static readonly Brush SuccessBrush = CreateBrush(34, 197, 94);
-    private static readonly Brush WarningBrush = CreateBrush(245, 158, 11);
-    private static readonly Brush ErrorBrush = CreateBrush(239, 68, 68);
+    private static Brush NeutralBrush => GetStatusBrush("StatusOfflineBrush");
+    private static Brush SuccessBrush => GetStatusBrush("SuccessBrush");
+    private static Brush WarningBrush => GetStatusBrush("StatusReconnectingBrush");
+    private static Brush ErrorBrush => GetStatusBrush("StatusErrorBrush");
+    private static StatusBrushes CurrentStatusBrushes => new(NeutralBrush, SuccessBrush, WarningBrush, ErrorBrush);
 
     private readonly WebViewService _webViewService;
     private readonly HostedUiBridge _hostedUiBridge = new();
     private readonly ControlUiLatencyService _latencyService = new();
     private readonly LatencyHistory _latencyHistory = new(LatencyHistoryCapacity);
+    private readonly StatusPresenter _statusPresenter = new();
     private readonly Action<Action> _dispatchToUi;
 
     private ShellSessionCoordinator? _coordinator;
@@ -62,4 +65,11 @@ public partial class MainViewModel
     private RecoveryState _shellConnectionState = RecoveryState.Connecting;
     private bool _isRecovering;
     private string _recoveryMessage = string.Empty;
+
+    private static Brush GetStatusBrush(string key)
+    {
+        return Application.Current.Resources.TryGetValue(key, out var value) && value is Brush brush
+            ? brush
+            : new SolidColorBrush(Microsoft.UI.Colors.Gray);
+    }
 }

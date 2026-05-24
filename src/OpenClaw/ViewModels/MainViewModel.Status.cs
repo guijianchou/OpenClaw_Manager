@@ -67,7 +67,9 @@ public partial class MainViewModel
     private void ApplyControlUiSnapshot(ControlUiProbeSnapshot snapshot)
     {
         ApplyModelSummary(snapshot);
-        (AccessSummaryText, AccessSummaryBrush) = FormatAccessSummary(snapshot);
+        var accessSummary = _statusPresenter.FormatAccessSummary(snapshot, CurrentStatusBrushes, DefaultAccessSummary);
+        AccessSummaryText = accessSummary.Text;
+        AccessSummaryBrush = accessSummary.Brush;
 
         ApplyWorkStatus(snapshot);
         ApplySnapshotErrorState(snapshot);
@@ -78,7 +80,7 @@ public partial class MainViewModel
 
     private void ApplyModelSummary(ControlUiProbeSnapshot snapshot)
     {
-        var modelSummary = FormatModelSummary(snapshot.CurrentModel);
+        var modelSummary = _statusPresenter.FormatModelSummary(snapshot.CurrentModel, DefaultModelSummary);
         if (modelSummary != DefaultModelSummary)
         {
             _lastKnownModelSummaryText = modelSummary;
@@ -114,16 +116,16 @@ public partial class MainViewModel
     {
         ShellConnectionState = state;
         IsRecovering = state is RecoveryState.Reconnecting or RecoveryState.Resyncing or RecoveryState.Refreshing;
-        RecoveryMessage = FormatRecoveryMessage(state);
+        RecoveryMessage = _statusPresenter.FormatRecoveryMessage(state);
         UpdateStatusPresentation();
     }
 
     private void ApplyWorkStatus(ControlUiProbeSnapshot snapshot)
     {
-        var (workStatusText, workStatusBrush, runIndicatorMode) = FormatWorkStatus(snapshot);
-        WorkStatusText = workStatusText;
-        WorkStatusBrush = workStatusBrush;
-        SetRunIndicatorMode(runIndicatorMode);
+        var presentation = _statusPresenter.FormatWorkStatus(snapshot, CurrentStatusBrushes, DefaultWorkStatus);
+        WorkStatusText = presentation.Text;
+        WorkStatusBrush = presentation.Brush;
+        SetRunIndicatorMode(presentation.Mode);
     }
 
     private void ApplySnapshotErrorState(ControlUiProbeSnapshot snapshot)

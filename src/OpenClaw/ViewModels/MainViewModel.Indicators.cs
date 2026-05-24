@@ -3,7 +3,6 @@
 using Microsoft.UI.Xaml.Media;
 using OpenClaw.Helpers;
 using OpenClaw.Services;
-using Windows.UI;
 
 namespace OpenClaw.ViewModels;
 
@@ -33,7 +32,12 @@ public partial class MainViewModel
         _dispatchToUi(() =>
         {
             _latencyHistory.Record(snapshot);
-            (LatencySummaryText, LatencySummaryBrush) = FormatLatencySummary(snapshot);
+            var latencySummary = _statusPresenter.FormatLatencySummary(
+                snapshot,
+                CurrentStatusBrushes,
+                DefaultLatencySummary);
+            LatencySummaryText = latencySummary.Text;
+            LatencySummaryBrush = latencySummary.Brush;
             LatencyTooltipText = LatencyTooltipFormatter.Format(
                 _latencyHistory.CreateSummary(),
                 snapshot.ProxyPoP ?? _lastKnownPoP);
@@ -43,7 +47,4 @@ public partial class MainViewModel
             }
         });
     }
-
-    private static SolidColorBrush CreateBrush(byte red, byte green, byte blue) =>
-        new(Color.FromArgb(255, red, green, blue));
 }

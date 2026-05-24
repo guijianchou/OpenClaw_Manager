@@ -44,7 +44,12 @@ public partial class MainViewModel
     {
         _dispatchToUi(() =>
         {
-            (HeartbeatSummary, HeartbeatSummaryBrush) = FormatHeartbeatSummary(result.Status);
+            var heartbeatSummary = _statusPresenter.FormatHeartbeatSummary(
+                result.Status,
+                CurrentStatusBrushes,
+                DefaultHeartbeatSummary);
+            HeartbeatSummary = heartbeatSummary.Text;
+            HeartbeatSummaryBrush = heartbeatSummary.Brush;
             UpdateHeartbeatIndicators(result.Status);
             UpdateStatusPresentation();
         });

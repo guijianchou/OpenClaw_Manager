@@ -2165,20 +2165,20 @@ git commit -m "refactor: inject MainViewModel UI dispatcher"
 - Modify: `src/OpenClaw/Styles/StatusResources.xaml`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Add semantic status brush resources**
+- [x] **Step 1: Use semantic status brush resources**
 
-In `StatusResources.xaml`, add theme-aware semantic resources instead of constructing status brushes in the ViewModel:
+Use existing semantic resources from `Colors.xaml` instead of constructing status brushes in the ViewModel:
 
 ```xml
-<SolidColorBrush x:Key="StatusNeutralBrush" Color="#6B7280" />
-<SolidColorBrush x:Key="StatusSuccessBrush" Color="#22C55E" />
-<SolidColorBrush x:Key="StatusWarningBrush" Color="#F59E0B" />
-<SolidColorBrush x:Key="StatusErrorBrush" Color="#EF4444" />
+<SolidColorBrush x:Key="StatusOfflineBrush" Color="#FF6B7280" />
+<SolidColorBrush x:Key="SuccessBrush" Color="#FF22C55E" />
+<SolidColorBrush x:Key="StatusReconnectingBrush" Color="#FFF59E0B" />
+<SolidColorBrush x:Key="StatusErrorBrush" Color="#FFEF4444" />
 ```
 
-If the project already has equivalent resources in `Colors.xaml`, reuse those keys and document the chosen key names in `docs/code-style.md` during Task 9.
+Document the chosen key names in `docs/code-style.md` during Task 9.
 
-- [ ] **Step 2: Add resource lookup helpers**
+- [x] **Step 2: Add resource lookup helpers**
 
 Replace static brush creation in `MainViewModel.Fields.cs`:
 
@@ -2192,9 +2192,9 @@ private static readonly Brush ErrorBrush = CreateBrush(239, 68, 68);
 with resource-backed properties:
 
 ```csharp
-private static Brush NeutralBrush => GetStatusBrush("StatusNeutralBrush");
-private static Brush SuccessBrush => GetStatusBrush("StatusSuccessBrush");
-private static Brush WarningBrush => GetStatusBrush("StatusWarningBrush");
+private static Brush NeutralBrush => GetStatusBrush("StatusOfflineBrush");
+private static Brush SuccessBrush => GetStatusBrush("SuccessBrush");
+private static Brush WarningBrush => GetStatusBrush("StatusReconnectingBrush");
 private static Brush ErrorBrush => GetStatusBrush("StatusErrorBrush");
 
 private static Brush GetStatusBrush(string key)
@@ -2207,7 +2207,7 @@ private static Brush GetStatusBrush(string key)
 
 This removes static brush instances while preserving the existing formatting call sites.
 
-- [ ] **Step 3: Extract pure formatting into `StatusPresenter`**
+- [x] **Step 3: Extract pure formatting into `StatusPresenter`**
 
 Create `StatusPresenter` for formatting methods that do not need to mutate ViewModel fields. Keep brush lookup in `MainViewModel` and pass the current brushes into the presenter so `StatusPresenter` does not need to reach into private ViewModel members.
 
@@ -2247,7 +2247,7 @@ private StatusBrushes CurrentStatusBrushes =>
 
 During implementation, move the existing pure methods from `MainViewModel.Formatting.cs` and `MainViewModel.StatusFormatting.cs` into `StatusPresenter`. Keep methods that set bindable properties in `MainViewModel`. Remove the private nested `StatusPresentation` record from `MainViewModel.StatusFormatting.cs` after the new shared record compiles.
 
-- [ ] **Step 4: Keep mutation in MainViewModel**
+- [x] **Step 4: Keep mutation in MainViewModel**
 
 `MainViewModel.Status.cs` should continue to own:
 
@@ -2267,7 +2267,7 @@ During implementation, move the existing pure methods from `MainViewModel.Format
 - no App.MainWindow reads
 ```
 
-- [ ] **Step 5: Add guardrails**
+- [x] **Step 5: Add guardrails**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -2283,7 +2283,7 @@ if ($presenter -match 'App\.Configuration|App\.MainWindow|SetProperty\(') {
 }
 ```
 
-- [ ] **Step 6: Run verification and commit**
+- [x] **Step 6: Run verification and commit**
 
 Run full verification from Task 1.
 

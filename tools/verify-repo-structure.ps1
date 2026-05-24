@@ -148,4 +148,14 @@ if ($viewModelStatus -match 'App\.MainWindow|RunOnUiThread') {
     throw 'MainViewModel status updates must use injected UI dispatcher.'
 }
 
+$fields = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Fields.cs') -Raw
+if ($fields -match 'CreateBrush\(|new SolidColorBrush\(Color\.FromArgb') {
+    throw 'MainViewModel must use theme-aware status brush resources.'
+}
+
+$presenter = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/StatusPresenter.cs') -Raw
+if ($presenter -match 'App\.Configuration|App\.MainWindow|SetProperty\(') {
+    throw 'StatusPresenter must stay pure presentation logic.'
+}
+
 Write-Host 'PASS: repository structure guardrails'
