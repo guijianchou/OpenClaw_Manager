@@ -51,7 +51,12 @@ public partial class MainViewModel
         await _hostedUiBridge.InitializeAsync(webView);
         App.Logger.Info("Hosted UI bridge initialized for WebView2.", new { environment = _selectedEnvironment.Name });
 
-        await _coordinator.AttachAsync(_webViewService, _hostedUiBridge);
+        await _coordinator.AttachAsync(
+            _webViewService,
+            _hostedUiBridge,
+            App.Configuration.Settings.RecoveryPolicy,
+            App.Configuration.Settings.Heartbeat,
+            App.Logger);
         _coordinator.SetEnvironment(_selectedEnvironment.Name, _selectedEnvironment.GatewayUrl);
         UpdateStatusPresentation();
         RefreshResourceScheduling();

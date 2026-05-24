@@ -10,15 +10,16 @@ public static class ShellSessionCoordinatorAdapters
         this ShellSessionCoordinator coordinator,
         WebViewService webViewService,
         HostedUiBridge bridge,
-        RecoveryPolicyOptions? recoveryOptions = null,
-        HeartbeatOptions? heartbeatOptions = null)
+        RecoveryPolicyOptions recoveryOptions,
+        HeartbeatOptions heartbeatOptions,
+        IAppLogger logger)
     {
         return coordinator.AttachAsync(
             new ShellSessionWebViewAdapter(webViewService),
             new ShellSessionBridgeAdapter(bridge),
-            recoveryOptions ?? App.Configuration.Settings.RecoveryPolicy,
-            heartbeatOptions ?? App.Configuration.Settings.Heartbeat,
-            App.Logger);
+            recoveryOptions,
+            heartbeatOptions,
+            logger);
     }
 }
 

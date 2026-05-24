@@ -138,4 +138,9 @@ foreach ($placeholder in @(
     }
 }
 
+$adapter = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/ShellSessionCoordinator.Adapters.cs') -Raw
+if ($adapter -match 'App\.Configuration|App\.Logger') {
+    throw 'ShellSessionCoordinator adapter must receive configuration and logger explicitly.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

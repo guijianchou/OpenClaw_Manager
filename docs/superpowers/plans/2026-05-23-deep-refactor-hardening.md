@@ -2005,7 +2005,7 @@ git commit -m "refactor: keep WebView2 diagnostics in WinUI layer"
 - Modify: `src/OpenClaw/ViewModels/MainViewModel.Lifecycle.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Remove global fallback reads from adapter extension**
+- [x] **Step 1: Remove global fallback reads from adapter extension**
 
 Change `ShellSessionCoordinatorAdapters.AttachAsync` so callers must supply recovery and heartbeat options:
 
@@ -2029,7 +2029,7 @@ public static Task AttachAsync(
 
 Do not keep nullable defaults that read `App.Configuration` or `App.Logger` inside the adapter.
 
-- [ ] **Step 2: Pass options at the call site**
+- [x] **Step 2: Pass options at the call site**
 
 In `MainViewModel.Lifecycle.cs`, replace:
 
@@ -2050,7 +2050,7 @@ await _coordinator.AttachAsync(
 
 This keeps App-bound configuration at the application orchestration edge instead of inside the adapter.
 
-- [ ] **Step 3: Add guardrail**
+- [x] **Step 3: Add guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -2061,7 +2061,7 @@ if ($adapter -match 'App\.Configuration|App\.Logger') {
 }
 ```
 
-- [ ] **Step 4: Run verification and commit**
+- [x] **Step 4: Run verification and commit**
 
 Run full verification from Task 1.
 
