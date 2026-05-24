@@ -24,5 +24,5 @@ public sealed partial class MainWindow
     private readonly LiveShellSettingsApplier _liveShellSettingsApplier;
     private string _lastInstrumentationEvent = string.Empty;
 
-    public MainViewModel ViewModel { get; } = new(App.Logger);
+    public MainViewModel ViewModel { get; }
 }

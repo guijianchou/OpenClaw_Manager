@@ -30,7 +30,7 @@ public partial class MainViewModel
 
     private void OnLatencyUpdated(ControlUiLatencySnapshot snapshot)
     {
-        RunOnUiThread(() =>
+        _dispatchToUi(() =>
         {
             _latencyHistory.Record(snapshot);
             (LatencySummaryText, LatencySummaryBrush) = FormatLatencySummary(snapshot);

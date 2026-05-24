@@ -27,6 +27,7 @@ public partial class MainViewModel
     private readonly HostedUiBridge _hostedUiBridge = new();
     private readonly ControlUiLatencyService _latencyService = new();
     private readonly LatencyHistory _latencyHistory = new(LatencyHistoryCapacity);
+    private readonly Action<Action> _dispatchToUi;
 
     private ShellSessionCoordinator? _coordinator;
     private EnvironmentConfig? _selectedEnvironment;

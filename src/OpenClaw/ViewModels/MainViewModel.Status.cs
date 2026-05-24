@@ -9,29 +9,24 @@ namespace OpenClaw.ViewModels;
 
 public partial class MainViewModel
 {
-    private static void RunOnUiThread(Action action)
-    {
-        App.MainWindow?.DispatcherQueue.TryEnqueue(() => action());
-    }
-
     private void OnConnectionStateChanged(ConnectionState state)
     {
-        RunOnUiThread(() => ApplyConnectionState(state));
+        _dispatchToUi(() => ApplyConnectionState(state));
     }
 
     private void OnNavigationError(string message)
     {
-        RunOnUiThread(() => ApplyNavigationError(message));
+        _dispatchToUi(() => ApplyNavigationError(message));
     }
 
     private void OnControlUiSnapshotUpdated(ControlUiProbeSnapshot snapshot)
     {
-        RunOnUiThread(() => ApplyControlUiSnapshot(snapshot));
+        _dispatchToUi(() => ApplyControlUiSnapshot(snapshot));
     }
 
     private void OnRecoveryStateChanged(RecoveryState state)
     {
-        RunOnUiThread(() => ApplyRecoveryState(state));
+        _dispatchToUi(() => ApplyRecoveryState(state));
     }
 
     private void OnTelemetryUpdated(RecoveryTelemetrySnapshot snapshot)

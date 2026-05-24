@@ -42,7 +42,7 @@ public partial class MainViewModel
 
     private void OnHeartbeatObserved(HeartbeatProbeResult result)
     {
-        RunOnUiThread(() =>
+        _dispatchToUi(() =>
         {
             (HeartbeatSummary, HeartbeatSummaryBrush) = FormatHeartbeatSummary(result.Status);
             UpdateHeartbeatIndicators(result.Status);

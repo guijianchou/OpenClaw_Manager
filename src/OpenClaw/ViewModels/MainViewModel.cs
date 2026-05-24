@@ -16,13 +16,23 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     {
     }
 
-    public MainViewModel(IAppLogger logger)
+    public MainViewModel(IAppLogger logger, Action<Action>? dispatchToUi = null)
     {
         _webViewService = new WebViewService(logger);
+        _dispatchToUi = dispatchToUi ?? DispatchThroughMainWindow;
         InitializeCommands();
         SubscribeToServiceEvents();
         InitializeCoordinator();
         LoadEnvironments();
         UpdateStatusPresentation();
+    }
+
+    private static void DispatchThroughMainWindow(Action action)
+    {
+        var dispatcher = App.MainWindow?.DispatcherQueue;
+        if (dispatcher is null || !dispatcher.TryEnqueue(() => action()))
+        {
+            action();
+        }
     }
 }

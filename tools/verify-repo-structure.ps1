@@ -143,4 +143,9 @@ if ($adapter -match 'App\.Configuration|App\.Logger') {
     throw 'ShellSessionCoordinator adapter must receive configuration and logger explicitly.'
 }
 
+$viewModelStatus = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Status.cs') -Raw
+if ($viewModelStatus -match 'App\.MainWindow|RunOnUiThread') {
+    throw 'MainViewModel status updates must use injected UI dispatcher.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

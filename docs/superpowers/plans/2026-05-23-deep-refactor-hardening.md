@@ -2084,7 +2084,7 @@ git commit -m "refactor: inject coordinator adapter configuration"
 - Modify: `src/OpenClaw/ViewModels/MainViewModel.Indicators.cs`
 - Modify: `tools/verify-repo-structure.ps1`
 
-- [ ] **Step 1: Add dispatcher abstraction**
+- [x] **Step 1: Add dispatcher abstraction**
 
 Add a private field:
 
@@ -2118,7 +2118,7 @@ private static void DispatchThroughMainWindow(Action action)
 
 Keep the fallback synchronous execution so startup/shutdown races do not silently drop status updates.
 
-- [ ] **Step 2: Remove static helper from status partial**
+- [x] **Step 2: Remove static helper from status partial**
 
 Replace `RunOnUiThread(() => ...)` in `MainViewModel.Status.cs`, `MainViewModel.Heartbeat.cs`, and `MainViewModel.Indicators.cs` with:
 
@@ -2128,7 +2128,7 @@ _dispatchToUi(() => ApplyConnectionState(state));
 
 Use the matching existing lambda body for each call.
 
-- [ ] **Step 3: Add guardrail**
+- [x] **Step 3: Add guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -2139,7 +2139,7 @@ if ($viewModelStatus -match 'App\.MainWindow|RunOnUiThread') {
 }
 ```
 
-- [ ] **Step 4: Run verification and commit**
+- [x] **Step 4: Run verification and commit**
 
 Run full verification from Task 1.
 
