@@ -3,6 +3,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OpenClaw.Helpers;
+using OpenClaw.Models;
 
 namespace OpenClaw.Views;
 

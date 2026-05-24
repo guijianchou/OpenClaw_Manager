@@ -1203,7 +1203,7 @@ git commit -m "refactor: extract WebView recreation scheduling"
 - Modify: `src/OpenClaw/MainWindow.Hotkey.cs`
 - Modify: `src/OpenClaw/MainWindow.AlwaysOnTop.cs`
 
-- [ ] **Step 1: Create Core settings snapshot**
+- [x] **Step 1: Create Core settings snapshot**
 
 ```csharp
 // Copyright (c) Lanstack @openclaw. All rights reserved.
@@ -1225,7 +1225,7 @@ public sealed record LiveShellSettings(
 }
 ```
 
-- [ ] **Step 2: Create Core change descriptor**
+- [x] **Step 2: Create Core change descriptor**
 
 ```csharp
 // Copyright (c) Lanstack @openclaw. All rights reserved.
@@ -1245,7 +1245,7 @@ public sealed record LiveShellSettingsChange(
 }
 ```
 
-- [ ] **Step 3: Move `SettingsSaveResult` out of the view layer**
+- [x] **Step 3: Move `SettingsSaveResult` out of the view layer**
 
 Create `src/OpenClaw.Core/Models/SettingsSaveResult.cs`:
 
@@ -1286,7 +1286,7 @@ Keep the `SettingsSaved` event signature unchanged:
 public event Action<SettingsSaveResult>? SettingsSaved;
 ```
 
-- [ ] **Step 4: Make `SettingsSaveResult` carry the live-shell change**
+- [x] **Step 4: Make `SettingsSaveResult` carry the live-shell change**
 
 Change result construction in `SettingsViewModel.TrySave`:
 
@@ -1310,7 +1310,7 @@ result = new SettingsSaveResult(
 
 Update `SettingsSaveResult` so `DidChangeLiveShellOptions` is computed from `LiveShellSettingsChange.HasChanges`.
 
-- [ ] **Step 5: Create `LiveShellSettingsApplier`**
+- [x] **Step 5: Create `LiveShellSettingsApplier`**
 
 ```csharp
 // Copyright (c) Lanstack @openclaw. All rights reserved.
@@ -1345,7 +1345,7 @@ internal sealed class LiveShellSettingsApplier
 }
 ```
 
-- [ ] **Step 6: Wire the applier into `MainWindow`**
+- [x] **Step 6: Wire the applier into `MainWindow`**
 
 Add a field to `src/OpenClaw/MainWindow.Shared.cs`:
 
@@ -1359,7 +1359,7 @@ Initialize it in `src/OpenClaw/MainWindow.xaml.cs` after `InitializeComponent()`
 _liveShellSettingsApplier = new LiveShellSettingsApplier(SetAlwaysOnTop, ReapplyGlobalHotkey);
 ```
 
-- [ ] **Step 7: Update `MainWindow` settings handler**
+- [x] **Step 7: Update `MainWindow` settings handler**
 
 Replace `ApplyLiveShellSettings()` with:
 
@@ -1372,7 +1372,7 @@ if (saveResult.LiveShellSettingsChange.HasChanges)
 
 This removes direct re-reading from `App.Configuration.Settings` when the save result already knows what changed.
 
-- [ ] **Step 8: Add structure guardrail**
+- [x] **Step 8: Add structure guardrail**
 
 Extend `tools/verify-repo-structure.ps1`:
 
@@ -1388,7 +1388,7 @@ if ($settingsDialogShared -match 'record struct SettingsSaveResult') {
 }
 ```
 
-- [ ] **Step 9: Run verification and commit**
+- [x] **Step 9: Run verification and commit**
 
 Run full verification from Task 1.
 

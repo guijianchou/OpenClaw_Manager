@@ -21,6 +21,7 @@ public sealed partial class MainWindow
     private GlobalHotkeyService? _globalHotkeyService;
     private readonly TrayClosePolicy _trayClosePolicy = new();
     private readonly WebViewRecreationService _webViewRecreationService = new();
+    private readonly LiveShellSettingsApplier _liveShellSettingsApplier;
     private string _lastInstrumentationEvent = string.Empty;
 
     public MainViewModel ViewModel { get; } = new(App.Logger);

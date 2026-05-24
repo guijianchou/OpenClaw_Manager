@@ -3,6 +3,7 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using OpenClaw.Services;
 
 namespace OpenClaw;
 
@@ -14,6 +15,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         this.InitializeComponent();
+        _liveShellSettingsApplier = new LiveShellSettingsApplier(SetAlwaysOnTop, ReapplyGlobalHotkey);
         ConfigureWindowChrome();
         RestoreWindowBounds();
         SubscribeToViewModelEvents();

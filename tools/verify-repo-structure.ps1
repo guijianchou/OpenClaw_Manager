@@ -73,4 +73,14 @@ if ($mainWindowWebView -match '_webViewRecreationMergedCount|_pendingWebViewRecr
     throw 'WebView recreation scheduling state must live in WebViewRecreationService.'
 }
 
+$settingsViewModel = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/SettingsViewModel.cs') -Raw
+if ($settingsViewModel -match 'using OpenClaw\.Views;') {
+    throw 'SettingsViewModel must not depend on the Views namespace for SettingsSaveResult.'
+}
+
+$settingsDialogShared = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Views/SettingsDialog.Shared.cs') -Raw
+if ($settingsDialogShared -match 'record struct SettingsSaveResult') {
+    throw 'SettingsSaveResult must live in OpenClaw.Core models, not SettingsDialog.Shared.cs.'
+}
+
 Write-Host 'PASS: repository structure guardrails'

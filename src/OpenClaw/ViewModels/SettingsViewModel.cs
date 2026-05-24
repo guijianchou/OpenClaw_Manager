@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using OpenClaw.Helpers;
 using OpenClaw.Models;
 using OpenClaw.Services;
-using OpenClaw.Views;
 
 namespace OpenClaw.ViewModels;
 
@@ -259,6 +258,11 @@ public class SettingsViewModel : INotifyPropertyChanged
     public bool SaveAll(out SettingsSaveResult result)
     {
         result = default;
+        var beforeLiveSettings = new LiveShellSettings(
+            _originalAlwaysOnTop,
+            _originalEnableGlobalHotkey,
+            _originalGlobalHotkey.Trim());
+
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var env in Environments)
         {
@@ -308,19 +312,13 @@ public class SettingsViewModel : INotifyPropertyChanged
         App.Configuration.Save();
         App.Logger.Info("Settings saved.");
         ValidationMessage = StringResources.SettingsValidationDefaultMessage;
+        var afterLiveSettings = LiveShellSettings.From(App.Configuration.Settings);
         result = new SettingsSaveResult(
             DidChangeEnvironmentState,
             DidChangeSessionTopology,
             !string.Equals(_originalLanguage, SelectedLanguage, StringComparison.Ordinal),
-            DidChangeLiveShellOptions());
+            new LiveShellSettingsChange(beforeLiveSettings, afterLiveSettings));
         return true;
-    }
-
-    private bool DidChangeLiveShellOptions()
-    {
-        return _originalAlwaysOnTop != AlwaysOnTop ||
-            _originalEnableGlobalHotkey != EnableGlobalHotkey ||
-            !string.Equals(_originalGlobalHotkey, GlobalHotkey.Trim(), StringComparison.Ordinal);
     }
 
     private void LoadEditFields()

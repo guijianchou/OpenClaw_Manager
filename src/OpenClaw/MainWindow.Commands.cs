@@ -2,6 +2,7 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using OpenClaw.Models;
 using OpenClaw.Views;
 
 namespace OpenClaw;
@@ -120,14 +121,8 @@ public sealed partial class MainWindow
 
         if (saveResult.DidChangeLiveShellOptions)
         {
-            ApplyLiveShellSettings();
+            _liveShellSettingsApplier.Apply(saveResult.LiveShellSettingsChange);
         }
-    }
-
-    private void ApplyLiveShellSettings()
-    {
-        SetAlwaysOnTop(App.Configuration.Settings.AlwaysOnTop);
-        ReapplyGlobalHotkey();
     }
 
     private void OnError(string message)
