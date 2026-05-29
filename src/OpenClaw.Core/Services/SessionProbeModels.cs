@@ -76,7 +76,8 @@ public sealed record ControlUiProbeSnapshot(
         or ControlUiPhase.AuthRequired
         or ControlUiPhase.PairingRequired
         or ControlUiPhase.OriginRejected
-        or ControlUiPhase.GatewayError;
+        or ControlUiPhase.GatewayError
+        or ControlUiPhase.Unavailable;
 
     public string DetailOrSummary => string.IsNullOrWhiteSpace(Detail) ? Summary : Detail;
 

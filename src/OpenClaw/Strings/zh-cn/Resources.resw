@@ -62,6 +62,9 @@
   <data name="RetryUnavailable" xml:space="preserve">
     <value>当前没有可重新启动的 WebView 导航，无法重试。请使用刷新或切换环境来开始新的会话。</value>
   </data>
+  <data name="WebViewRecreationFailedFormat" xml:space="preserve">
+    <value>重建浏览器宿主时 WebView 恢复失败：{0}</value>
+  </data>
   <data name="DevTools" xml:space="preserve">
     <value>开发者工具</value>
   </data>
@@ -107,6 +110,9 @@
   </data>
   <data name="StatusOffline" xml:space="preserve">
     <value>离线</value>
+  </data>
+  <data name="StatusConfigureGateway" xml:space="preserve">
+    <value>请在设置中配置 Gateway URL</value>
   </data>
   <data name="StatusHeartbeatFailed" xml:space="preserve">
     <value>网关心跳丢失，正在刷新...</value>

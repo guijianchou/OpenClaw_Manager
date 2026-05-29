@@ -18,23 +18,33 @@ This project uses C# and WinUI conventions, but follows the Linux engineering bi
 - Settings saves must merge only fields edited in the open Settings window; unchanged stale dialog snapshots must not overwrite live shell changes such as the Pin button, hotkey, multiple-instance mode, or selected environment. Same-value binding writes during Settings initialization must return before marking a field dirty.
 - WebView/CoreWebView2 async work must carry a generation or equivalent ownership token across awaits before applying results back to app state.
 - Programmatic WebView navigation, reload, and retry must invalidate accepted page ownership and clear the accepted navigation id before calling CoreWebView2, because `NavigationStarting` can arrive after old document messages or completion events are already queued.
-- WebView startup recovery must not require `NavigationStarting` to arrive before `NavigationCompleted`. If a start watchdog is still active and the navigation id has not been claimed, a current completion can claim the navigation and cancel the start watchdog.
+- WebView startup recovery must not require `NavigationStarting` to arrive before `NavigationCompleted`. If a start watchdog is still active and the navigation id has not been claimed, only a completion whose current source matches the pending target recorded before `CoreWebView2.Navigate`/`Reload` may claim the navigation and cancel the start watchdog.
+- If completion-timeout recovery cancelled navigation cancellation ownership but a successful `NavigationCompleted` is still current, the completion path must recreate navigation cancellation ownership and continue normal page-token/status-probe recovery instead of returning before cleanup notifications.
 - Navigation completion watchdogs must have independent active-watchdog ownership, because a queued timeout callback can otherwise pass generation/navigation-id checks after the successful completion path has cancelled the watchdog.
 - Hosted bridge WebView message entry points must use host generation plus owner/page-token validation. Do not reject bridge messages by `CoreWebView2` wrapper reference identity.
 - Page-token retry exhaustion must publish `Unavailable` against the captured navigation generation, not the tracker's current generation, so an old retry cannot downgrade a newer page.
 - Stop fallback is a navigation cancellation path. After `CoreWebView2.Stop()`, cancel navigation watchdogs, status probes, page ownership, and navigation cancellation before updating shell state.
 - Reload must return whether CoreWebView2 actually accepted the reload request. Recovery paths must not advance to Connecting or count a hard refresh as started when reload was a no-op because WebView2 was unavailable.
-- Manual Retry must not hide the current error until retry navigation actually starts. If no retryable WebView navigation exists, keep the localized error visible and point the user to Reload or environment switch recovery.
+- Manual Retry and Reload must not hide the current error until navigation actually starts. If no retryable WebView navigation exists, keep the localized error visible and point the user to Reload or environment switch recovery.
 - Auto-retry continuations are still navigation-completed work. After their retry delay, they must treat changed generation/navigation/WebView targets as stale and must surface exhausted retries or CoreWebView2 command-start failures as Error instead of letting the old completion path publish Reconnecting state with no pending retry.
 - WebView/CoreWebView2 async event handlers must route awaited work through a logged exception boundary before publishing app state or notifying observers.
+- Unexpected navigation-completion handler failures must publish an owned `Unavailable`/Error projection. Logging only can leave the shell in stale `Loading` after the completion watchdog has already been cancelled.
 - WebView status probe loops must store their task and cancellation source, stop by cancelling only, and let the running probe dispose its cancellation source.
+- WebView status probe loops must publish an owned `Unavailable` snapshot when all bounded post-navigation probes are exhausted without a terminal Control UI phase. Do not leave the shell indefinitely in `PageLoaded` or `GatewayConnecting`.
+- `ControlUiPhase.Unavailable` is a terminal post-navigation probe result; once it is published, recovery owns the next step and the probe loop should stop issuing page scripts.
 - Control UI latency probe loops must store and observe their task, stop by cancelling only, let the running probe dispose timer/cancellation resources, and reject stale run results before publishing UI state.
 - WebView host recreation must detach native services from the outgoing WebView2 before closing old controls.
+- WebView host recreation must not initialize or navigate a hidden, compact, minimized, unloaded, or zero-sized WebView2 child. Defer recreation until the shell host is visible, but requeue child layout timeouts through the normal recreation timer/circuit-breaker path so a transient child `Loaded`/size miss does not wait forever for another window event.
+- WebView host recreation layout timeouts count as recreation attempts. A hidden or zero-sized child must not retry forever without tripping the circuit breaker.
+- A late successful navigation recovery can cancel pending, deferred, or already-active timeout-only WebView recreation. Before detaching a host for timeout recovery, recheck whether navigation recovery made that replacement unnecessary.
+- WebView recreation exceptions must surface a localized actionable InfoBar error with Retry. Logging alone is not enough after timeout recovery has intentionally hidden the first-hop InfoBar.
 - Cancellation sources shared with a running async operation should be cancelled by external owners but disposed by the operation that owns the token lifetime.
 - Hosted bridge command dispatch and WebView stop/abort command scripts must have bounded timeouts and must reject results if the WebView target or accepted page ownership changes after an await; native recovery and user stop handling should not wait forever on a hosted page promise or consume stale command results.
 - Hosted bridge command CustomEvent fallback is not a handled native command by itself. Return handled only when a hosted bridge method accepts the command; otherwise native soft-resync must remain free to escalate.
 - WebView status inspections must capture an accepted page version before running page script and again before publishing results. If all coalesced callers cancel, the eventual script result may satisfy the old task but must not publish UI state.
 - WebView status inspection timeout or script failure should publish an owned `Unavailable` snapshot when generation/page ownership is still current, downgrade stale connected/busy shell state, and preserve the last non-empty MODEL for the same accepted page.
+- Control UI issue snapshots must update the visible error InfoBar as well as status text. Auth, pairing, origin rejection, Gateway error, and terminal `Unavailable` while reconnecting should not look like a silent hang.
+- `WebViewStatusInspector.cs` should stay focused on shared state, public entry points, and snapshot publication. Direct inspection/coalescing belongs in `WebViewStatusInspector.Inspection.cs`, post-navigation probing belongs in `WebViewStatusInspector.Probe.cs`, parsing belongs in `WebViewStatusInspector.Parsing.cs`, and bounded `ExecuteScriptAsync` handling belongs in `WebViewStatusInspector.ScriptExecution.cs`.
 - WebView Stop fallback must stay tied to the WebView/page target captured at the start of the Stop command. If an abort or `/stop` script returns after navigation or recreation invalidates that target, the fallback must not stop the newer page.
 - WinUI async event handlers that open dialogs or mutate environment/session state must guard reentry, catch/log failures, and show localized user-facing failures where applicable.
 - WebView/CoreWebView2 work triggered by heartbeat, recovery, or navigation-after-load status probes must enter through an app-layer UI dispatcher before touching WebView2 or hosted bridge objects. This includes both ShellSessionCoordinator adapters and WebViewService's internal heartbeat/probe paths.
@@ -43,6 +53,7 @@ This project uses C# and WinUI conventions, but follows the Linux engineering bi
 - Heartbeat loops must publish one immediate observation before waiting for the first periodic interval so the shell does not sit in a stale waiting state after foreground resume or session recovery.
 - Heartbeat runtime must schedule the loop asynchronously; the immediate first observation must not run inline on the caller/UI thread.
 - Hosted-session heartbeat must treat Control UI `Unavailable` as failure. A broken bridge/status inspection path must not fall through to a healthy HTTP transport result.
+- Stopping heartbeat or latency probes must reset the visible HB/Ping projection. Detaching a WebView host must reset visible MODEL, access, work, recovery, heartbeat, and latency projection before the replacement session reports fresh state.
 - Status inspection script execution must be bounded; a stalled WebView2 script task should not keep the shared in-flight inspection alive indefinitely.
 - Page-token ownership can reject very early hosted messages; after token acceptance, native code must request a connected-shell `session-ready` replay rather than assuming the first WebView2 post was accepted.
 - Page-token capture retry and native-triggered `session-ready` replay must use a lease-owned navigation cancellation scope. Reload, detach, or a newer navigation should cancel and retire the old scope, but token disposal must wait until bounded retry/replay operations release their leases; cancellation callback failures must not block scope retirement.
@@ -52,6 +63,15 @@ This project uses C# and WinUI conventions, but follows the Linux engineering bi
 - Hosted bridge document-created script ids must be removed during WebView detach so observers and poll timers do not accumulate across repeated initialization.
 - Hosted bridge JavaScript belongs behind dedicated script-builder and asset seams; keep native WebView orchestration in `HostedUiBridge`, script assembly in `HostedUiBridge.Script.cs`, and executable pure JS logic in focused assets with behavior tests.
 - Pure settings, diagnostics, parser, policy, telemetry, recovery, and window-bounds code should live physically under `src/OpenClaw.Core`; there are no current linked Core source exceptions.
+- `OpenClaw.Core` is a pure SDK class library and must stay platform-independent. Solution-level x64/x86/ARM64 mappings must point to the Core project's `AnyCPU` configuration so VS2026 can load the solution without Configuration Manager repair.
+- Repository guardrails must fail if `OpenClaw.Core` declares architecture-specific platforms or if solution mappings target anything other than Core `AnyCPU`.
+- Runtime and UI code should not introduce new synchronous waits. The current approved exceptions are shutdown drains that preserve settings/log durability and single-instance ownership release; `tools\verify-repo-structure.ps1` must fail any new `.Wait()`, `.GetAwaiter().GetResult()`, `Task.Result`, or `Thread.Sleep()` outside those approved lines.
+- Unpackaged WinUI 3 language override belongs to Windows App SDK's `Microsoft.Windows.Globalization.ApplicationLanguages`; using the system `Windows.Globalization.ApplicationLanguages` API logs `Language override failed` at startup on this app.
+- Diagnostics should depend on narrow session interfaces such as `IDiagnosticWebViewSession`, not concrete navigation/lifecycle services. This keeps diagnostic reporting from becoming another consumer of `WebViewService` internals.
+- Direct `App.Logger`, `App.Configuration`, and `App.MainWindow` access is an app-edge allowance for `App.xaml.cs`, `MainWindow` partials, and dialog glue only. Runtime services, ViewModels, Core-compatible code, and adapters must use injected or typed dependencies.
+- `SettingsViewModel` is a draft/persistence ViewModel, not a WebView runtime coordinator. The only allowed `WebViewService` call there is the existing static profile-rename helper; navigation, heartbeat, session, and recreation work stays behind MainViewModel/MainWindow/service boundaries.
+- `WebViewService.cs` should stay a root partial for shared state, construction, events, state publishing, and public navigation commands. Lifecycle/current-target operations belong in `WebViewService.Lifecycle.cs`; session/profile operations belong in `WebViewService.Session.cs`.
+- WebView navigation partials should stay role-focused: `WebViewService.Navigation.cs` for event/completion flow, `WebViewService.HostMessages.cs` for native host-message handling, `WebViewService.NavigationState.cs` for shared navigation ownership/cancellation helpers, `WebViewService.NavigationWatchdogs.cs` for timeout ownership, `WebViewService.NavigationCommands.cs` for CoreWebView2 command wrappers, `WebViewService.PageToken.cs` for page-token/session-ready retry, and `WebViewService.NavigationRecovery.cs` for process-failure/auto-retry recovery.
 - Settings that affect live shell behavior must map to a current-process apply path, not only persisted configuration.
 - Live shell settings that touch OS listener lifetime, such as multiple-instance mode, must serialize with shutdown and avoid blocking the Settings window on listener stop.
 - Compact mode is a 480px layout, not just a smaller window. The visual state must collapse nonessential fixed-width top-bar segments and nonessential title actions; otherwise the remaining MinWidth values will still clip even if the outer pill minimum is reduced.
@@ -311,6 +331,7 @@ Page-token capture had the opposite problem: ownership validation rejected stale
 - Heartbeat recovery stops only the current run under the run-id gate before raising `HeartbeatFailed`.
 - Exhausted page-token capture publishes an owned `Unavailable` snapshot with a stable message.
 - ShellSessionCoordinator recovery inspections carry the active recovery operation cancellation token before deciding reload fallback or recovery completion.
+- ShellSessionCoordinator must not keep stale Ready/Healthy recovery projections after terminal hosted-session failures. `GatewayError` and `Unavailable` snapshots should move recovery state into degraded/failure handling.
 
 ## ShellSessionCoordinator Observed Recovery Cancellation
 
@@ -348,3 +369,26 @@ WebView process failure already invalidated status inspection generation and pag
 - ViewModel UI dispatcher callbacks are wrapped in a catch/log boundary; failed projections are logged and do not escape as unhandled UI-thread exceptions.
 - WebView process-failure handling cancels and retires navigation retry/replay ownership before publishing the unavailable/error state.
 - Repository guardrails protect both contracts.
+
+## Navigation Start Timeout Late Completion Recovery
+
+This note records the follow-up for the VS2026 debug symptom where the shell could report `Navigation did not start within 12s` even though the hosted page later completed navigation.
+
+### Root Cause
+
+The start watchdog treated its cancellation source as both the timer lifetime and the pending navigation target ownership. When the 12s timer fired, the watchdog task cleared that ownership while the shell requested WebView recreation. A late `NavigationCompleted` for the same target could no longer claim the pending navigation, so the shell could stay in a degraded loading/reconnecting path until a manual refresh forced a new status pass.
+
+### Implementation Rules
+
+- Keep pending start-watchdog target ownership separate from the watchdog CTS.
+- After the 12s start timeout fires, retain the pending target for a bounded recovery window so a target-matching late `NavigationCompleted` can still claim the navigation.
+- Expire that pending target after the bounded window if no late completion arrives.
+- Do not cancel navigation retry/replay cancellation on the first start-timeout notification; a late completion still needs the current navigation lease to capture page token and request `session-ready` replay.
+- If a late completion recovers the page before the timeout-triggered WebView recreation runs, cancel only the queued or deferred `navigation_start_timeout` / `navigation_completion_timeout` recreation request. Do not cancel settings, initial-load, or topology-change recreation.
+- WebView recreation reason merging must preserve the higher-priority reason. Timeout-driven recovery is lower priority than settings, environment, initial-load, session, or topology recreation, and a deferred recreation that resumes after visible layout returns must schedule the original reason rather than replacing it with a generic layout-ready reason.
+- `WebViewRecreationService` owns deferred recreation reason state as well as pending recreation state. `MainWindow` may decide whether the WinUI host is visible and swap controls, but it should not carry a separate deferred-reason field or duplicate timeout-recovery cancellation rules.
+- If the shell host is visible but the newly-created WebView2 child does not become loaded and non-zero sized before the short layout wait expires, requeue the original recreation reason through `WebViewRecreationService.Schedule(...)` so the existing timer and circuit breaker own the retry cadence.
+- Treat the default `https://example.com` environment as a first-run placeholder, not as a navigable Gateway. While selected, skip WebView2 host creation, clear any old host, stop heartbeat/latency probes, and show the localized configure-Gateway status so first-run startup cannot look like a stuck navigation.
+- Placeholder selection must also cancel an active WebView recreation loop, and WebView initialization must capture environment name/URL before awaits and re-check that selected-environment identity before bridge attach or navigation.
+- Placeholder layout-resume events should clear the WebView host only when there is pending, deferred, or active recreation work or a stale WebView2 child to remove; empty layout events should not spam `deferred_resume_placeholder` skip logs and obscure startup diagnostics.
+- Repository guardrails must cover the bounded late-completion window and the timeout-recreation cancellation path.

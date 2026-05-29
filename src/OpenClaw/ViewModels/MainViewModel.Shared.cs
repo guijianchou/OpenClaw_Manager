@@ -19,6 +19,8 @@ public partial class MainViewModel
     /// </summary>
     public event Action<string>? WebViewRecreationRequested;
 
+    public event Action? NavigationTimeoutRecoveryNoLongerNeeded;
+
     /// <summary>
     /// Raised when the user requests to view logs.
     /// </summary>

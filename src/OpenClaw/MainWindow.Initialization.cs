@@ -27,6 +27,7 @@ public sealed partial class MainWindow
     {
         ViewModel.OpenSettingsRequested += OnOpenSettingsRequested;
         ViewModel.WebViewRecreationRequested += OnWebViewRecreationRequested;
+        ViewModel.NavigationTimeoutRecoveryNoLongerNeeded += OnNavigationTimeoutRecoveryNoLongerNeeded;
         ViewModel.ViewLogsRequested += OnViewLogsRequested;
         ViewModel.ErrorOccurred += OnError;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;

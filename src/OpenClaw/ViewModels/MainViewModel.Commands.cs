@@ -40,7 +40,11 @@ public partial class MainViewModel
 
     private void OnReload()
     {
-        _webViewService.Reload();
+        if (_webViewService.Reload())
+        {
+            IsErrorVisible = false;
+            ShowRetryButton = false;
+        }
     }
 
     private async Task OnStopAsync()
@@ -73,6 +77,15 @@ public partial class MainViewModel
     {
         ApplyConnectionState(ConnectionState.Error);
         ErrorMessage = StringResources.CircuitBreakerRecreationSuppressed;
+        IsErrorVisible = true;
+        ShowRetryButton = true;
+        UpdateStatusPresentation();
+    }
+
+    public void ShowWebViewRecreationError(string message)
+    {
+        ApplyConnectionState(ConnectionState.Error);
+        ErrorMessage = message;
         IsErrorVisible = true;
         ShowRetryButton = true;
         UpdateStatusPresentation();

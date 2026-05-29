@@ -155,14 +155,16 @@ public class DiagnosticService
     /// Checks if common session indicators are present in the WebView2.
     /// Returns a hint about whether the session may be expired/invalid.
     /// </summary>
-    public static async Task<DiagnosticResult> CheckSessionAsync(WebViewService webViewService, ControlUiProbeSnapshot? snapshot = null)
+    public static async Task<DiagnosticResult> CheckSessionAsync(
+        IDiagnosticWebViewSession webViewSession,
+        ControlUiProbeSnapshot? snapshot = null)
     {
-        if (!webViewService.IsInitialized)
+        if (!webViewSession.IsInitialized)
         {
             return DiagnosticResult.Skip(StringResources.DiagnosticWebViewNotInitialized);
         }
 
-        snapshot ??= await webViewService.InspectControlUiStateAsync();
+        snapshot ??= await webViewSession.InspectControlUiStateAsync();
         if (snapshot.Phase == ControlUiPhase.Unavailable)
         {
             return DiagnosticResult.Skip(
@@ -193,7 +195,7 @@ public class DiagnosticService
     /// </summary>
     public static async Task<DiagnosticReport> RunAllAsync(
         string? gatewayUrl,
-        WebViewService? webViewService,
+        IDiagnosticWebViewSession? webViewSession,
         IAppLogger logger)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -203,30 +205,30 @@ public class DiagnosticService
 
         report.Items.Add((StringResources.DiagnosticWebView2RuntimeLabel, CheckWebView2Runtime(logger)));
 
-        if (webViewService is not null)
+        if (webViewSession is not null)
         {
-            snapshot = await webViewService.InspectControlUiStateAsync();
+            snapshot = await webViewSession.InspectControlUiStateAsync();
         }
 
         report.Items.Add((StringResources.DiagnosticNetworkConnectivityLabel, await ProbeNetworkAsync(gatewayUrl, snapshot)));
 
-        if (webViewService is not null)
+        if (webViewSession is not null)
         {
-            report.Items.Add((StringResources.DiagnosticSessionStatusLabel, await CheckSessionAsync(webViewService, snapshot)));
-            report.Items.Add((StringResources.DiagnosticInstrumentationLabel, DescribeInstrumentation(webViewService)));
+            report.Items.Add((StringResources.DiagnosticSessionStatusLabel, await CheckSessionAsync(webViewSession, snapshot)));
+            report.Items.Add((StringResources.DiagnosticInstrumentationLabel, DescribeInstrumentation(webViewSession)));
         }
 
         return report;
     }
 
-    public static DiagnosticResult DescribeInstrumentation(WebViewService webViewService)
+    public static DiagnosticResult DescribeInstrumentation(IDiagnosticWebViewSession webViewSession)
     {
-        var snapshot = webViewService.LatestControlUiSnapshot;
+        var snapshot = webViewSession.LatestControlUiSnapshot;
         var summary =
-            $"Inspect req={webViewService.TotalControlUiInspectionRequests}, " +
-            $"cache={webViewService.CachedControlUiInspectionRequests}, " +
-            $"coalesced={webViewService.CoalescedControlUiInspectionRequests}, " +
-            $"hb reload={webViewService.HeartbeatRecoveryRequests}, " +
+            $"Inspect req={webViewSession.TotalControlUiInspectionRequests}, " +
+            $"cache={webViewSession.CachedControlUiInspectionRequests}, " +
+            $"coalesced={webViewSession.CoalescedControlUiInspectionRequests}, " +
+            $"hb reload={webViewSession.HeartbeatRecoveryRequests}, " +
             $"phase={snapshot.Phase}, " +
             $"busy={snapshot.IsBusy}, " +
             $"stale={snapshot.IsBusyStale}/{snapshot.BusyStaleSeconds}s, " +

@@ -28,7 +28,6 @@ public sealed partial class MainWindow
     private readonly CancellationTokenSource _windowLifetimeCts = new();
     private Task? _webViewRecreationTask;
     private string _lastInstrumentationEvent = string.Empty;
-    private string? _deferredWebViewRecreationReason;
     private bool _isClosing;
 
     public MainViewModel ViewModel { get; }

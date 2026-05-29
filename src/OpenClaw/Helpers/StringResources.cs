@@ -53,6 +53,7 @@ public static class StringResources
     public static string Close => Get("Close");
     public static string Retry => Get("Retry");
     public static string RetryUnavailable => Get("RetryUnavailable");
+    public static string WebViewRecreationFailedFormat => Get("WebViewRecreationFailedFormat");
     public static string DevTools => Get("DevTools");
     public static string ConnectionIssue => Get("ConnectionIssue");
     public static string DiagnosticsTitle => Get("DiagnosticsTitle");
@@ -82,6 +83,7 @@ public static class StringResources
     public static string StatusAuthFailed => Get("StatusAuthFailed");
     public static string StatusError => Get("StatusError");
     public static string StatusOffline => Get("StatusOffline");
+    public static string StatusConfigureGateway => Get("StatusConfigureGateway");
     public static string StatusHeartbeatFailed => Get("StatusHeartbeatFailed");
     public static string HeartbeatOk => Get("HeartbeatOk");
     public static string HeartbeatWait => Get("HeartbeatWait");

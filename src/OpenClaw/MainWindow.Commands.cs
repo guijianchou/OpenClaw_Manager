@@ -144,6 +144,26 @@ public sealed partial class MainWindow
         ScheduleWebViewRecreation(reason);
     }
 
+    private void OnNavigationTimeoutRecoveryNoLongerNeeded()
+    {
+        if (!_webViewRecreationService.TryCancelNavigationTimeoutRecovery(out var cancelled))
+        {
+            return;
+        }
+
+        if (cancelled.CancelledPending && _webViewRecreationTimer.IsRunning)
+        {
+            _webViewRecreationTimer.Stop();
+        }
+
+        RecordInstrumentationEvent("webview.recreation.cancelled_after_navigation_recovered", new
+        {
+            pendingReason = cancelled.PendingReason,
+            deferredReason = cancelled.DeferredReason,
+            activeReason = cancelled.ActiveReason
+        });
+    }
+
     private void OnInfoBarClosed(InfoBar sender, InfoBarClosedEventArgs args)
     {
         ViewModel.DismissError();

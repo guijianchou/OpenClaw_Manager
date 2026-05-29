@@ -62,6 +62,9 @@
   <data name="RetryUnavailable" xml:space="preserve">
     <value>Retry is not available because no active WebView navigation can be restarted. Use Reload or switch environments to start a fresh session.</value>
   </data>
+  <data name="WebViewRecreationFailedFormat" xml:space="preserve">
+    <value>WebView recovery failed while recreating the browser host: {0}</value>
+  </data>
   <data name="DevTools" xml:space="preserve">
     <value>Developer Tools</value>
   </data>
@@ -107,6 +110,9 @@
   </data>
   <data name="StatusOffline" xml:space="preserve">
     <value>Offline</value>
+  </data>
+  <data name="StatusConfigureGateway" xml:space="preserve">
+    <value>Configure a Gateway URL in Settings</value>
   </data>
   <data name="StatusHeartbeatFailed" xml:space="preserve">
     <value>Gateway heartbeat lost - refreshing...</value>

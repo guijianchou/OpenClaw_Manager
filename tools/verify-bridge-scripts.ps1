@@ -299,6 +299,26 @@ assertTrue('status inspection composes split bridge modules',
   statusSnapshot.currentModel === 'openai/gpt-5.5' &&
   statusSnapshot.currentModelSource === 'app-state:default');
 
+appElement.chatLoading = false;
+appElement.configSaving = true;
+appElement.cronBusy = true;
+const shellBusySnapshot = statusInspector.inspectControlUi();
+assertTrue('status inspection keeps settings/cron busy out of stale-chat recovery',
+  shellBusySnapshot.isBusy === true &&
+  shellBusySnapshot.isBusyStaleCandidate === false &&
+  shellBusySnapshot.isBusyStale === false);
+
+appElement.configSaving = false;
+appElement.cronBusy = false;
+appElement.chatLoading = true;
+appElement.chatMessages = [{ id: 'm1', text: 'hello' }];
+const chatBusySnapshot = statusInspector.inspectControlUi();
+assertTrue('status inspection marks chat busy as stale-busy candidate',
+  chatBusySnapshot.isBusy === true &&
+  chatBusySnapshot.isBusyStaleCandidate === true &&
+  chatBusySnapshot.activitySignature.includes('hello'));
+appElement.chatLoading = false;
+
 globalThis.CustomEvent = class CustomEvent {
   constructor(type, options) {
     this.type = type;

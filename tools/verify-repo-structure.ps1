@@ -13,9 +13,38 @@ if ($solution -match 'OpenClaw\.Tests|tests\\OpenClaw\.Tests') {
     throw 'OpenClaw.sln still references the removed test harness.'
 }
 
-$coreSolutionMappingPattern = '\{BC4C7184-C8DD-4748-AC82-D26123568BD1\}\.(Debug|Release)\|(x64|x86|ARM64)\.(ActiveCfg|Build\.0) = (Debug|Release)\|(x64|x86|ARM64)'
-if ($solution -match $coreSolutionMappingPattern) {
-    throw 'OpenClaw.Core solution platform mappings must stay on Any CPU because the class library does not define architecture-specific project configurations.'
+$coreProjectId = '{BC4C7184-C8DD-4748-AC82-D26123568BD1}'
+$coreProject = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/OpenClaw.Core.csproj') -Raw
+if ($coreProject -match '<Platforms>') {
+        throw 'OpenClaw.Core.csproj must stay platform-independent. Do not declare x64/x86/ARM64 platforms on the pure SDK class library; map solution platforms to Debug/Release|AnyCPU instead.'
+}
+
+$coreSolutionMappingPattern = [regex]::Escape($coreProjectId) + '\.(Debug|Release)\|(x64|x86|ARM64)\.(ActiveCfg|Build\.0) = (Debug|Release)\|([^`\r\n]+)'
+foreach ($coreSolutionMapping in [regex]::Matches($solution, $coreSolutionMappingPattern)) {
+    if ($coreSolutionMapping.Groups[5].Value -ne 'AnyCPU') {
+        throw "OpenClaw.Core solution platform mappings must target the pure class-library AnyCPU configuration; invalid mapping: $($coreSolutionMapping.Value)"
+    }
+}
+
+$allCoreSolutionMappingPattern = [regex]::Escape($coreProjectId) + '\.(?<configuration>[^|`\r\n]+)\|(?<solutionPlatform>[^.=`\r\n]+)\.(?<mapping>ActiveCfg|Build\.0|Deploy\.0) = (?<projectConfiguration>[^|`\r\n]+)\|(?<projectPlatform>[^`\r\n]+)'
+foreach ($coreSolutionMapping in [regex]::Matches($solution, $allCoreSolutionMappingPattern)) {
+    if ($coreSolutionMapping.Groups['configuration'].Value -notin @('Debug', 'Release') -or
+        $coreSolutionMapping.Groups['projectConfiguration'].Value -ne $coreSolutionMapping.Groups['configuration'].Value -or
+        $coreSolutionMapping.Groups['solutionPlatform'].Value -notin @('x64', 'x86', 'ARM64') -or
+        $coreSolutionMapping.Groups['projectPlatform'].Value -ne 'AnyCPU') {
+        throw "OpenClaw.Core solution mappings must map Debug/Release x64/x86/ARM64 solution platforms to the matching Debug/Release|AnyCPU project configuration: $($coreSolutionMapping.Value)"
+    }
+}
+
+foreach ($configuration in @('Debug', 'Release')) {
+    foreach ($platform in @('x64', 'x86', 'ARM64')) {
+        foreach ($mapping in @('ActiveCfg', 'Build.0')) {
+            $expectedCoreMapping = "$coreProjectId.$configuration|$platform.$mapping = $configuration|AnyCPU"
+            if ($solution -notmatch [regex]::Escape($expectedCoreMapping)) {
+                throw "OpenClaw.Core solution platform mapping is missing or invalid: $expectedCoreMapping"
+            }
+        }
+    }
 }
 
 $coreFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core') -Recurse -File -Include *.cs
@@ -27,8 +56,55 @@ foreach ($file in $coreFiles) {
     }
 }
 
+$approvedSynchronousWaits = @{
+    'src/OpenClaw.Core/Services/ConfigurationService.cs' = @(
+        'task.Wait(TimeSpan.FromSeconds(2))'
+    )
+    'src/OpenClaw.Core/Services/LoggingService.cs' = @(
+        '_writerTask.Wait(TimeSpan.FromSeconds(2))'
+    )
+    'src/OpenClaw.Core/Services/SingleInstanceCoordinator.cs' = @(
+        'StopAsync().GetAwaiter().GetResult()'
+    )
+    'src/OpenClaw/App.xaml.cs' = @(
+        '_singleInstancePreferenceGate.Wait()',
+        'coordinator.StopAsync().GetAwaiter().GetResult()'
+    )
+}
+
+$repoRootPath = ([string]$repoRoot).TrimEnd('\', '/')
+$synchronousWaitMatches = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src') -Recurse -File -Filter *.cs |
+    Select-String -Pattern '\.Wait\(|GetAwaiter\(\)\.GetResult\(\)|Task\.Result|Thread\.Sleep\('
+foreach ($match in $synchronousWaitMatches) {
+    $relativePath = $match.Path.Substring($repoRootPath.Length + 1).Replace('\', '/')
+    if (-not $approvedSynchronousWaits.ContainsKey($relativePath)) {
+        throw "Unapproved synchronous wait in runtime code: ${relativePath}:$($match.LineNumber)"
+    }
+
+    $approved = $false
+    foreach ($approvedSnippet in $approvedSynchronousWaits[$relativePath]) {
+        if ($match.Line.IndexOf($approvedSnippet, [StringComparison]::Ordinal) -ge 0) {
+            $approved = $true
+            break
+        }
+    }
+
+    if (-not $approved) {
+        throw "Unapproved synchronous wait in runtime code: ${relativePath}:$($match.LineNumber)"
+    }
+}
+
 $project = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/OpenClaw.csproj') -Raw
-$currentVersion = '3.0.1'
+$linkedCompileItems = [regex]::Matches($project, '<Compile\s+(?:Include|Update)="(?<path>[^"]+)"')
+foreach ($linkedCompileItem in $linkedCompileItems) {
+    $compilePath = $linkedCompileItem.Groups['path'].Value
+    if ($compilePath -match '(^|[\\/])\.\.[\\/]' -or
+        $compilePath -match '(^|[\\/])OpenClaw\.Core([\\/]|$)') {
+        throw "OpenClaw.csproj must not link Core source files or compile sources outside the WinUI project: $compilePath"
+    }
+}
+
+$currentVersion = '5.0.0'
 $currentFileVersion = "$currentVersion.0"
 if ($project -notmatch [regex]::Escape("<Version>$currentVersion</Version>") -or
     $project -notmatch [regex]::Escape("<AssemblyVersion>$currentFileVersion</AssemblyVersion>") -or
@@ -94,6 +170,30 @@ foreach ($resource in @(
     }
 }
 
+$hostedBridgeScriptBuilder = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.Script.cs') -Raw
+$hostedBridgeScriptTemplate = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.Script.js') -Raw
+$bridgeScriptResourcePairs = @(
+    @{ Resource = 'HostedUiBridge.HostMessaging.js'; ResourceField = 'HostMessagingResourceName'; ScriptField = 'HostMessagingScript'; PlaceholderField = 'HostMessagingPlaceholder'; Placeholder = '__OPENCLAW_HOST_MESSAGING_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.MutationFilter.js'; ResourceField = 'MutationFilterResourceName'; ScriptField = 'MutationFilterScript'; PlaceholderField = 'MutationFilterPlaceholder'; Placeholder = '__OPENCLAW_MUTATION_FILTER_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.ModelResolver.js'; ResourceField = 'ModelResolverResourceName'; ScriptField = 'ModelResolverScript'; PlaceholderField = 'ModelResolverPlaceholder'; Placeholder = '__OPENCLAW_MODEL_RESOLVER_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.DomUtilities.js'; ResourceField = 'DomUtilitiesResourceName'; ScriptField = 'DomUtilitiesScript'; PlaceholderField = 'DomUtilitiesPlaceholder'; Placeholder = '__OPENCLAW_DOM_UTILITIES_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.ModelDomFallback.js'; ResourceField = 'ModelDomFallbackResourceName'; ScriptField = 'ModelDomFallbackScript'; PlaceholderField = 'ModelDomFallbackPlaceholder'; Placeholder = '__OPENCLAW_MODEL_DOM_FALLBACK_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.ActivityState.js'; ResourceField = 'ActivityStateResourceName'; ScriptField = 'ActivityStateScript'; PlaceholderField = 'ActivityStatePlaceholder'; Placeholder = '__OPENCLAW_ACTIVITY_STATE_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.PhaseClassifier.js'; ResourceField = 'PhaseClassifierResourceName'; ScriptField = 'PhaseClassifierScript'; PlaceholderField = 'PhaseClassifierPlaceholder'; Placeholder = '__OPENCLAW_PHASE_CLASSIFIER_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.StatusInspection.js'; ResourceField = 'StatusInspectionResourceName'; ScriptField = 'StatusInspectionScript'; PlaceholderField = 'StatusInspectionPlaceholder'; Placeholder = '__OPENCLAW_STATUS_INSPECTION_SCRIPT__' },
+    @{ Resource = 'HostedUiBridge.CommandDispatch.js'; ResourceField = 'CommandDispatchResourceName'; ScriptField = 'CommandDispatchScript'; PlaceholderField = 'CommandDispatchPlaceholder'; Placeholder = '__OPENCLAW_COMMAND_DISPATCH_SCRIPT__' }
+)
+
+foreach ($pair in $bridgeScriptResourcePairs) {
+    if ($hostedBridgeScriptTemplate -notmatch [regex]::Escape($pair.Placeholder) -or
+        $hostedBridgeScriptBuilder -notmatch [regex]::Escape($pair.ResourceField) -or
+        $hostedBridgeScriptBuilder -notmatch [regex]::Escape($pair.ScriptField) -or
+        $hostedBridgeScriptBuilder -notmatch [regex]::Escape($pair.PlaceholderField) -or
+        $hostedBridgeScriptBuilder -notmatch "\.Replace\($($pair.PlaceholderField),\s*$($pair.ScriptField)\.Value,\s*StringComparison\.Ordinal\)") {
+        throw "Hosted bridge script builder must compose $($pair.Resource) through its matching placeholder."
+    }
+}
+
 foreach ($resource in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortRun.js')) {
     if ($project -notmatch [regex]::Escape($resource)) {
         throw "Missing embedded WebView command resource entry: $resource"
@@ -109,6 +209,42 @@ if ($webViewService -match 'ParseControlUiSnapshot|ExecuteControlUiInspectionAsy
     throw 'WebViewService.cs must not own Control UI inspection internals.'
 }
 
+$webViewNavigation = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Navigation.cs') -Raw
+$webViewHostMessages = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.HostMessages.cs') -Raw
+$webViewNavigationState = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.NavigationState.cs') -Raw
+$webViewNavigationWatchdogs = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.NavigationWatchdogs.cs') -Raw
+$webViewNavigationCommands = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.NavigationCommands.cs') -Raw
+$webViewPageToken = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.PageToken.cs') -Raw
+$webViewNavigationRecovery = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.NavigationRecovery.cs') -Raw
+$webViewLifecycle = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Lifecycle.cs') -Raw
+$webViewSession = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Session.cs') -Raw
+if ($webViewService -match 'private\s+(?:async\s+)?(?:void|Task|Task<[^>]+>|bool|int)\s+(?:OnNavigationStarting|OnNavigationCompleted|ObserveNavigationStartTimeout|CaptureCurrentPageTokenAsync)|private enum AutoRetryOutcome' -or
+    $webViewNavigation -notmatch 'OnNavigationStarting' -or
+    $webViewNavigation -notmatch 'OnNavigationCompleted' -or
+    $webViewNavigationWatchdogs -notmatch 'ObserveNavigationStartTimeout' -or
+    $webViewPageToken -notmatch 'CaptureCurrentPageTokenAsync' -or
+    $webViewNavigationRecovery -notmatch 'AutoRetryOutcome') {
+    throw 'WebView navigation events, watchdogs, page-token capture, and retry helpers must live in focused WebViewService navigation partials.'
+}
+
+if ($webViewNavigation -match 'private\s+(?:async\s+)?(?:void|Task|Task<[^>]+>|bool|int)\s+(?:ObserveNavigation(?:Start|Completion)Timeout|HandleNavigation(?:Start|Completion)Timeout|CancelNavigation(?:Start|Completion)Watchdog|TryNavigateCoreWebView|TryReloadCoreWebView|CaptureCurrentPageTokenAsync|RetryPageTokenCaptureAsync|RequestSessionReadyReportAsync|TryAutoRetryAfterConnectionErrorAsync|OnProcessFailed|OnWebMessageReceived|PrepareNavigationStart|CancelActiveNavigation|ReplaceNavigationCancellation|CancelNavigationCancellation|IsRecoveredNavigationCompletionForPendingTarget|AreNavigationUrlsEquivalent)\b|private enum AutoRetryOutcome') {
+    throw 'WebViewService.Navigation.cs must stay focused on WebView2 event entry and completion flow; host-message, navigation-state, watchdog, command, page-token, and recovery helpers belong in dedicated partials.'
+}
+
+if ($webViewService -match 'public\s+async\s+Task\s+InitializeAsync|private\s+void\s+DetachCurrentWebView\(|public\s+void\s+Dispose\(|private\s+static\s+CoreWebView2\?\s+TryGetCoreWebView2|private\s+CoreWebView2\?\s+GetCoreWebView\(|private\s+bool\s+IsCurrent(?:Initialization|Host|Navigation)\(' -or
+    $webViewService -match 'public\s+async\s+Task\s+ClearBrowsingDataAsync|public\s+void\s+OpenDevTools\(|public\s+async\s+Task\s+ClearEnvironmentSessionAsync|public\s+string\?\s+GetCurrentUrl\(|public\s+bool\s+IsUsingEnvironmentProfile\(' -or
+    $webViewLifecycle -notmatch 'public async Task InitializeAsync' -or
+    $webViewLifecycle -notmatch 'private void DetachCurrentWebView\(' -or
+    $webViewLifecycle -notmatch 'public void Dispose\(' -or
+    $webViewLifecycle -notmatch 'private CoreWebView2\? GetCoreWebView\(' -or
+    $webViewSession -notmatch 'public async Task ClearBrowsingDataAsync' -or
+    $webViewSession -notmatch 'public void OpenDevTools\(' -or
+    $webViewSession -notmatch 'public async Task ClearEnvironmentSessionAsync' -or
+    $webViewSession -notmatch 'public string\? GetCurrentUrl\(' -or
+    $webViewSession -notmatch 'public bool IsUsingEnvironmentProfile\(') {
+    throw 'WebViewService.cs must keep fields, events, construction, and navigation commands; lifecycle and session/profile operations belong in dedicated partials.'
+}
+
 if ($webViewService -notmatch 'public bool Reload\(\)' -or
     $webViewService -match 'public void Reload\(\)' -or
     $webViewService -notmatch 'Cannot reload: WebView2 not initialized' -or
@@ -119,7 +255,7 @@ if ($webViewService -notmatch 'public bool Reload\(\)' -or
     throw 'WebView reload/retry command-start failures must publish error state and expose whether navigation actually started.'
 }
 
-if ($webViewService -notmatch 'TrySetUnavailableSnapshot\(\s*"Hosted bridge page token was not accepted after navigation\.",\s*generation\)' -or
+if ($webViewPageToken -notmatch 'TrySetUnavailableSnapshot\(\s*"Hosted bridge page token was not accepted after navigation\.",\s*generation\)' -or
     $webViewService -match 'SetUnavailableSnapshot\("Hosted bridge page token was not accepted after navigation\."\)') {
     throw 'WebView page-token retry exhaustion must publish Unavailable only for the original navigation generation.'
 }
@@ -173,6 +309,12 @@ if ($latencyService -notmatch '_probeTask' -or
 
 $singleInstanceCoordinator = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/SingleInstanceCoordinator.cs') -Raw
 $app = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/App.xaml.cs') -Raw
+
+if ($app -match '(?<!Microsoft\.)Windows\.Globalization\.ApplicationLanguages\.PrimaryLanguageOverride' -or
+    $app -notmatch 'Microsoft\.Windows\.Globalization\.ApplicationLanguages\.PrimaryLanguageOverride') {
+    throw 'WinUI language preference must use Microsoft.Windows.Globalization.ApplicationLanguages from Windows App SDK, not Windows.Globalization.ApplicationLanguages.'
+}
+
 if ($singleInstanceCoordinator -notmatch 'public async Task StopAsync\(\)' -or
     $singleInstanceCoordinator -notmatch 'TryCreatePrimaryAfterActivationFailureAsync' -or
     $singleInstanceCoordinator -notmatch 'TryCreatePrimaryAsync\(' -or
@@ -238,6 +380,13 @@ if ($hostedSessionHeartbeatPolicy -notmatch 'ControlUiPhase\.Unavailable\s*=>\s*
     throw 'Hosted-session heartbeat must treat unavailable bridge/status inspection as a failure instead of falling through to healthy HTTP transport.'
 }
 
+$sessionProbeModels = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/SessionProbeModels.cs') -Raw
+$isTerminalExpression = [regex]::Match($sessionProbeModels, 'public bool IsTerminal =>(?<body>[\s\S]*?);')
+if (-not $isTerminalExpression.Success -or
+    $isTerminalExpression.Groups['body'].Value -notmatch 'ControlUiPhase\.Unavailable') {
+    throw 'Control UI Unavailable must be terminal for post-navigation status probes so recovery can take ownership without extra script churn.'
+}
+
 $commandFile = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Commands.cs') -Raw
 if ($commandFile -match 'ExecuteScriptAsync\(@"|ExecuteScriptAsync\(\$@"|const string script = """') {
     throw 'WebViewService.Commands.cs must load browser scripts from embedded JS assets, not large inline strings.'
@@ -259,38 +408,70 @@ if ($commandFile -notmatch 'public async Task StopAsync\(\)[\s\S]*?var coreWebVi
 }
 
 $statusInspector = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewStatusInspector.cs') -Raw
-if ($statusInspector -match 'const string script = """|ExecuteScriptAsync\(@"|ExecuteScriptAsync\(\$@"') {
+$statusInspectorInspection = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewStatusInspector.Inspection.cs') -Raw
+$statusInspectorParsing = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewStatusInspector.Parsing.cs') -Raw
+$statusInspectorProbe = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewStatusInspector.Probe.cs') -Raw
+$statusInspectorScriptExecution = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewStatusInspector.ScriptExecution.cs') -Raw
+if ($statusInspector -match 'const string script = """|ExecuteScriptAsync\(@"|ExecuteScriptAsync\(\$@"' -or
+    $statusInspectorInspection -match 'const string script = """|ExecuteScriptAsync\(@"|ExecuteScriptAsync\(\$@"' -or
+    $statusInspectorScriptExecution -match 'const string script = """|ExecuteScriptAsync\(@"|ExecuteScriptAsync\(\$@"') {
     throw 'WebViewStatusInspector must load browser scripts from embedded JS assets.'
 }
 
+if ($statusInspector -match 'private static ControlUiProbeSnapshot ParseControlUiSnapshot|private static string GetString|private static ControlUiPhase ParsePhase|private static async Task<string> ExecuteStatusScriptWithTimeoutAsync|private\s+(?:async\s+)?Task<ControlUiProbeSnapshot>\s+ExecuteControlUiInspectionAsync|private\s+(?:async\s+)?Task\s+CompleteControlUiInspectionAsync|private\s+(?:async\s+)?Task\s+ProbeControlUiStateAfterNavigationAsync') {
+    throw 'WebViewStatusInspector.cs must keep state, construction, public entry points, and snapshot publication only; inspection, probe, parsing, and script execution belong in focused partials.'
+}
+
+if ($statusInspector -notmatch 'partial class WebViewStatusInspector' -or
+    $statusInspectorInspection -notmatch 'partial class WebViewStatusInspector' -or
+    $statusInspectorParsing -notmatch 'partial class WebViewStatusInspector' -or
+    $statusInspectorProbe -notmatch 'partial class WebViewStatusInspector' -or
+    $statusInspectorScriptExecution -notmatch 'partial class WebViewStatusInspector') {
+    throw 'WebViewStatusInspector must use focused partials for inspection, parsing, probe, and script execution.'
+}
+
 if ($statusInspector -notmatch 'InspectionTimeout' -or
-    $statusInspector -notmatch 'CancellationTokenSource\(InspectionTimeout\)' -or
-    $statusInspector -notmatch '\.AsTask\(timeout\.Token\)') {
+    $statusInspectorScriptExecution -notmatch 'CancellationTokenSource\(InspectionTimeout\)' -or
+    $statusInspectorScriptExecution -notmatch '\.AsTask\(timeout\.Token\)') {
     throw 'WebViewStatusInspector script execution must have a bounded timeout.'
+}
+
+if ($statusInspectorParsing -notmatch 'ParseControlUiSnapshot\(string json\)' -or
+    $statusInspectorParsing -notmatch 'ControlUiStatusMessageKind' -or
+    $statusInspectorParsing -notmatch 'ParsePhase\(GetString\(root, "phase"\)\)' -or
+    $statusInspectorParsing -notmatch 'ModelSource = currentModelSource') {
+    throw 'WebViewStatusInspector parsing must stay in the focused parsing partial and preserve full Control UI snapshot payload support.'
 }
 
 if ($statusInspector -notmatch '_statusProbeTask' -or
     $statusInspector -notmatch '_probeGate' -or
-    $statusInspector -notmatch 'ProbeControlUiStateAfterNavigationAsync\(CancellationTokenSource cancellation' -or
-    $statusInspector -notmatch 'finally[\s\S]*cancellation\.Dispose\(\)') {
+    $statusInspectorProbe -notmatch 'ProbeControlUiStateAfterNavigationAsync\(CancellationTokenSource cancellation' -or
+    $statusInspectorProbe -notmatch 'finally[\s\S]*cancellation\.Dispose\(\)') {
     throw 'WebViewStatusInspector probe loop must own its task/cancellation lifetime.'
 }
 
 if ($statusInspector -notmatch 'UiTaskDispatcher _uiDispatcher' -or
-    $statusInspector -notmatch '_uiDispatcher\.RunAsync\(') {
+    $statusInspectorProbe -notmatch '_uiDispatcher\.RunAsync\(') {
     throw 'WebViewStatusInspector status probe loop must marshal WebView2 inspection through the UI dispatcher.'
 }
 
+if ($statusInspectorProbe -notmatch 'PublishProbeExhaustedSnapshot\(generation\)' -or
+    $statusInspectorProbe -notmatch 'private void PublishProbeExhaustedSnapshot\(int generation\)' -or
+    $statusInspectorProbe -notmatch 'Control UI did not report a terminal session state after navigation probes were exhausted' -or
+    $statusInspectorProbe -notmatch 'TrySetUnavailableSnapshot') {
+    throw 'WebViewStatusInspector status probe loop must publish an owned Unavailable snapshot when post-navigation probes are exhausted.'
+}
+
 if ($statusInspector -notmatch 'WebViewMessageOwnership _messageOwnership' -or
-    $statusInspector -notmatch 'CaptureAcceptedPageVersion' -or
+    $statusInspectorInspection -notmatch 'CaptureAcceptedPageVersion' -or
     $statusInspector -notmatch '_latestControlUiSnapshotPageVersion' -or
     $statusInspector -notmatch '_inFlightInspectionPageVersion' -or
-    $statusInspector -notmatch 'IsCurrentInspectionTarget\(int generation, int pageVersion\)' -or
-    $statusInspector -notmatch 'TryPublishInspectionSnapshot\([\s\S]*ControlUiProbeSnapshot snapshot' -or
-    $statusInspector -notmatch 'ControlUiProbeSnapshot\.Unavailable\("Control UI inspection timed out\."\)[\s\S]*TryPublishInspectionSnapshot' -or
-    $statusInspector -notmatch 'HasActiveInFlightPublishWaiter\(int inspectionId\)' -or
+    $statusInspectorInspection -notmatch 'IsCurrentInspectionTarget\(int generation, int pageVersion\)' -or
+    $statusInspectorInspection -notmatch 'TryPublishInspectionSnapshot\([\s\S]*ControlUiProbeSnapshot snapshot' -or
+    $statusInspectorInspection -notmatch 'ControlUiProbeSnapshot\.Unavailable\("Control UI inspection timed out\."\)[\s\S]*TryPublishInspectionSnapshot' -or
+    $statusInspectorInspection -notmatch 'HasActiveInFlightPublishWaiter\(int inspectionId\)' -or
     $statusInspector -notmatch 'TryApplyHostMessage\(string json, int pageVersion, out ControlUiProbeSnapshot snapshot\)' -or
-    $statusInspector -notmatch 'ExecuteControlUiInspectionAsync\([\s\S]*int generation,[\s\S]*int pageVersion,[\s\S]*int inspectionId' -or
+    $statusInspectorInspection -notmatch 'ExecuteControlUiInspectionAsync\([\s\S]*int generation,[\s\S]*int pageVersion,[\s\S]*int inspectionId' -or
     $statusInspector -notmatch 'ApplyControlUiSnapshot\([\s\S]*int generation,[\s\S]*int pageVersion,[\s\S]*bool notifySnapshotUpdated') {
     throw 'WebViewStatusInspector direct script inspections must be scoped by generation, accepted page version, and active caller cancellation before publishing.'
 }
@@ -301,6 +482,10 @@ if ($statusInspector -match 'CancelProbeLoop\(\)[\s\S]*?_statusProbeCts\.Dispose
 
 if ($statusInspector -notmatch 'CancelProbeLoop\(\)[\s\S]*?_statusProbeCts\?\.Cancel\(\)[\s\S]*?_statusProbeCts = null') {
     throw 'WebViewStatusInspector stop paths must cancel the active probe CTS before clearing ownership.'
+}
+
+if ($statusInspector -notmatch 'public void SetUnknownSnapshot\(\)[\s\S]*notifySnapshotUpdated:\s*true') {
+    throw 'WebView detach must publish an Unknown snapshot so visible MODEL/AUTH/WORK projection cannot survive host replacement.'
 }
 
 $ownership = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewMessageOwnership.cs') -Raw
@@ -317,19 +502,20 @@ if ($ownership -notmatch 'CaptureAcceptedPageVersion' -or
 
 $webViewServiceMain = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.cs') -Raw
 if ($webViewServiceMain -notmatch 'WebViewMessageOwnership' -or
-    $webViewServiceMain -notmatch 'OnWebMessageReceived[\s\S]*IsCurrentHost\(hostGeneration\)' -or
-    $webViewServiceMain -notmatch 'TryCaptureCurrentVersion\(args, root, out var pageVersion\)' -or
-    $webViewServiceMain -notmatch 'TryApplyHostMessage\(message, pageVersion, out var snapshot\)' -or
-    $webViewServiceMain -notmatch 'IsCurrentAcceptedPageVersion\(pageVersion\)' -or
-    $webViewServiceMain -notmatch 'CaptureCurrentPageTokenAsync') {
+    $webViewHostMessages -notmatch 'CreateWebMessageReceivedHandler\(int hostGeneration\)' -or
+    $webViewHostMessages -notmatch 'OnWebMessageReceived[\s\S]*IsCurrentHost\(hostGeneration\)' -or
+    $webViewHostMessages -notmatch 'TryCaptureCurrentVersion\(args, root, out var pageVersion\)' -or
+    $webViewHostMessages -notmatch 'TryApplyHostMessage\(message, pageVersion, out var snapshot\)' -or
+    $webViewHostMessages -notmatch 'IsCurrentAcceptedPageVersion\(pageVersion\)' -or
+    $webViewPageToken -notmatch 'CaptureCurrentPageTokenAsync') {
     throw 'WebViewService must reject stale WebView messages by host generation and page ownership.'
 }
 
-if ($webViewServiceMain -notmatch 'PrepareNavigationStart[\s\S]*_messageOwnership\.BeginNavigation\(\)') {
+if ($webViewNavigationState -notmatch 'PrepareNavigationStart[\s\S]*_messageOwnership\.BeginNavigation\(\)') {
     throw 'Programmatic WebView navigation must invalidate the accepted page token before CoreWebView2 starts navigating.'
 }
 
-$cancelActiveNavigationMethod = [regex]::Match($webViewServiceMain, 'private void CancelActiveNavigation\([\s\S]*?\n    \}')
+$cancelActiveNavigationMethod = [regex]::Match($webViewNavigationState, 'private void CancelActiveNavigation\([\s\S]*?\n    \}')
 if (!$cancelActiveNavigationMethod.Success -or
     $cancelActiveNavigationMethod.Value -notmatch 'CancelNavigationStartWatchdog\(\)' -or
     $cancelActiveNavigationMethod.Value -notmatch 'CancelNavigationCompletionWatchdog\(\)' -or
@@ -341,8 +527,8 @@ if (!$cancelActiveNavigationMethod.Success -or
     throw 'Stopping an in-flight navigation must cancel navigation watchdogs, probes, page ownership, and async navigation callbacks.'
 }
 
-$navigationStartingMethod = [regex]::Match($webViewServiceMain, 'private void OnNavigationStarting\([\s\S]*?\n    \}')
-$navigationCompletedMethod = [regex]::Match($webViewServiceMain, 'private async Task HandleNavigationCompletedAsync\([\s\S]*?\n    \}')
+$navigationStartingMethod = [regex]::Match($webViewNavigation, 'private void OnNavigationStarting\([\s\S]*?\n    \}')
+$navigationCompletedMethod = [regex]::Match($webViewNavigation, 'private async Task HandleNavigationCompletedAsync\([\s\S]*?\n    \}')
 if (-not $navigationStartingMethod.Success -or
     -not $navigationCompletedMethod.Success -or
     $navigationStartingMethod.Value -match 'ReferenceEquals\(sender, _coreWebView\)' -or
@@ -351,40 +537,68 @@ if (-not $navigationStartingMethod.Success -or
 }
 
 if ($navigationCompletedMethod.Value -notmatch 'TryClaimNavigationCompleted\(sender, args, hostGeneration\)' -or
-    $webViewServiceMain -notmatch 'TryClaimNavigationCompleted[\s\S]*_currentNavigationId == NoCurrentNavigationId[\s\S]*navigation\.starting\.recovered_from_completion') {
+    $webViewNavigation -notmatch 'TryClaimNavigationCompleted[\s\S]*_currentNavigationId == NoCurrentNavigationId[\s\S]*IsRecoveredNavigationCompletionForPendingTarget\(sender, hostGeneration\)[\s\S]*navigation\.starting\.recovered_from_completion' -or
+    $webViewNavigationState -notmatch 'private bool IsRecoveredNavigationCompletionForPendingTarget\(CoreWebView2 sender, int hostGeneration\)' -or
+    $webViewNavigationState -notmatch 'TryGetActiveNavigationStartWatchdog\([\s\S]*out var navigationGeneration,[\s\S]*out var expectedUrl,[\s\S]*out var previousSource' -or
+    $webViewNavigationState -notmatch 'AreNavigationUrlsEquivalent\(currentSource, expectedUrl\)' -or
+    $webViewNavigationState -notmatch 'AreNavigationUrlsEquivalent\(expectedUrl, previousSource\)' -or
+    $webViewNavigationState -notmatch 'private static bool AreNavigationUrlsEquivalent') {
     throw 'WebView2 NavigationCompleted must be able to claim a current navigation when NavigationStarting was not delivered.'
 }
 
 if ($webViewServiceMain -notmatch 'NavigationStartTimeout' -or
-    $webViewServiceMain -notmatch 'ObserveNavigationStartTimeout\(navigationGeneration, url\)' -or
-    $webViewServiceMain -notmatch 'navigation\.start\.timeout' -or
-    $webViewServiceMain -notmatch 'Navigation did not start within' -or
-    $webViewServiceMain -notmatch 'NavigationStartTimedOut\?\.Invoke' -or
-    $webViewServiceMain -notmatch 'CancelNavigationStartWatchdog\(\)' -or
-    $webViewServiceMain -notmatch 'private async Task ObserveNavigationStartTimeoutAsync') {
+    $webViewServiceMain -notmatch 'NavigationStartRecoveryWindow = NavigationCompletionTimeout - NavigationStartTimeout' -or
+    $webViewServiceMain -notmatch 'ObserveNavigationStartTimeout\(navigationGeneration, url, previousSource\)' -or
+    $webViewNavigationWatchdogs -notmatch 'navigation\.start\.timeout' -or
+    $webViewNavigationWatchdogs -notmatch 'Navigation did not start within' -or
+    $webViewNavigationWatchdogs -notmatch 'NavigationStartTimedOut\?\.Invoke' -or
+    $webViewNavigationWatchdogs -notmatch 'CancelNavigationStartWatchdog\(\)' -or
+    $webViewNavigationWatchdogs -notmatch '_activeNavigationStartWatchdogGeneration' -or
+    $webViewNavigationWatchdogs -notmatch '_activeNavigationStartWatchdogUrl' -or
+    $webViewNavigationWatchdogs -notmatch '_activeNavigationStartWatchdogPreviousSource' -or
+    $webViewNavigationWatchdogs -notmatch '_hasActiveNavigationStartWatchdogOwnership = true' -or
+    $webViewNavigationWatchdogs -notmatch 'TryGetActiveNavigationStartWatchdog' -or
+    $webViewNavigationWatchdogs -notmatch 'Task\.Delay\(NavigationStartRecoveryWindow, cancellation\.Token\)' -or
+    $webViewNavigationWatchdogs -notmatch 'ClearExpiredNavigationStartWatchdogOwnership' -or
+    $webViewNavigationWatchdogs -notmatch 'private async Task ObserveNavigationStartTimeoutAsync') {
     throw 'WebView navigation must have a bounded start watchdog so a missing WebView2 NavigationStarting/Completed callback cannot leave the shell stuck in Loading.'
 }
 
-$navigationStartTimeoutMethod = [regex]::Match($webViewServiceMain, 'private void HandleNavigationStartTimeout\([\s\S]*?\n    \}')
+$navigationStartTimeoutMethod = [regex]::Match($webViewNavigationWatchdogs, 'private void HandleNavigationStartTimeout\([\s\S]*?\n    \}')
 if (-not $navigationStartTimeoutMethod.Success -or
     $navigationStartTimeoutMethod.Value -match 'ReferenceEquals\(coreWebView, _coreWebView\)' -or
-    $navigationStartTimeoutMethod.Value -match 'NavigationErrorOccurred\?\.Invoke|SetState\(ConnectionState\.Error\)' -or
+    $navigationStartTimeoutMethod.Value -match 'NavigationErrorOccurred\?\.Invoke|SetState\(ConnectionState\.Error\)|CancelNavigationCancellation\(\)' -or
     $navigationStartTimeoutMethod.Value -notmatch 'SetState\(ConnectionState\.Reconnecting\)[\s\S]*NavigationStartTimedOut\?\.Invoke') {
     throw 'Navigation-start timeout is a recoverable WebView2 startup stall and must request WebView recreation without relying on CoreWebView2 wrapper reference identity.'
 }
 
+$tryGetNavigationStartWatchdogMethod = [regex]::Match($webViewNavigationWatchdogs, 'private bool TryGetActiveNavigationStartWatchdog\([\s\S]*?\n    \}')
+if (-not $tryGetNavigationStartWatchdogMethod.Success -or
+    $tryGetNavigationStartWatchdogMethod.Value -match 'return _navigationStartWatchdogCts is not null' -or
+    $tryGetNavigationStartWatchdogMethod.Value -notmatch 'return _hasActiveNavigationStartWatchdogOwnership') {
+    throw 'Navigation-start timeout must keep pending target ownership after its CTS fires so a late NavigationCompleted can still be recovered.'
+}
+
+$clearExpiredNavigationStartWatchdogMethod = [regex]::Match($webViewNavigationWatchdogs, 'private void ClearExpiredNavigationStartWatchdogOwnership\([\s\S]*?\n    \}')
+if (-not $clearExpiredNavigationStartWatchdogMethod.Success -or
+    $clearExpiredNavigationStartWatchdogMethod.Value -notmatch '_activeNavigationStartWatchdogGeneration != navigationGeneration' -or
+    $clearExpiredNavigationStartWatchdogMethod.Value -notmatch 'ClearNavigationStartWatchdogOwnershipLocked\(\)' -or
+    $clearExpiredNavigationStartWatchdogMethod.Value -notmatch 'navigation\.start\.recovery_window_expired') {
+    throw 'Navigation-start timeout recovery ownership must expire after a bounded grace window when no late NavigationCompleted arrives.'
+}
+
 if ($webViewServiceMain -notmatch 'NavigationCompletionTimeout' -or
-    $webViewServiceMain -notmatch 'ObserveNavigationCompletionTimeout' -or
-    $webViewServiceMain -notmatch 'NavigationCompletionTimedOut\?\.Invoke' -or
-    $webViewServiceMain -notmatch 'CancelNavigationCompletionWatchdog\(\)' -or
-    $webViewServiceMain -notmatch 'navigation\.completion\.timeout' -or
-    $webViewServiceMain -notmatch 'Navigation did not complete within' -or
-    $webViewServiceMain -notmatch 'private async Task ObserveNavigationCompletionTimeoutAsync') {
+    $webViewNavigationWatchdogs -notmatch 'ObserveNavigationCompletionTimeout' -or
+    $webViewNavigationWatchdogs -notmatch 'NavigationCompletionTimedOut\?\.Invoke' -or
+    $webViewNavigationWatchdogs -notmatch 'CancelNavigationCompletionWatchdog\(\)' -or
+    $webViewNavigationWatchdogs -notmatch 'navigation\.completion\.timeout' -or
+    $webViewNavigationWatchdogs -notmatch 'Navigation did not complete within' -or
+    $webViewNavigationWatchdogs -notmatch 'private async Task ObserveNavigationCompletionTimeoutAsync') {
     throw 'WebView navigation must have a bounded completion watchdog so a started navigation cannot leave the shell stuck in Loading forever.'
 }
 
-$navigationStartingMethod = [regex]::Match($webViewServiceMain, 'private void OnNavigationStarting\([\s\S]*?\n    \}')
-$navigationCompletionTimeoutMethod = [regex]::Match($webViewServiceMain, 'private void HandleNavigationCompletionTimeout\([\s\S]*?\n    \}')
+$navigationStartingMethod = [regex]::Match($webViewNavigation, 'private void OnNavigationStarting\([\s\S]*?\n    \}')
+$navigationCompletionTimeoutMethod = [regex]::Match($webViewNavigationWatchdogs, 'private void HandleNavigationCompletionTimeout\([\s\S]*?\n    \}')
 if (-not $navigationStartingMethod.Success -or
     $navigationStartingMethod.Value -notmatch 'ObserveNavigationCompletionTimeout' -or
     -not $navigationCompletionTimeoutMethod.Success -or
@@ -397,15 +611,20 @@ if (-not $navigationStartingMethod.Success -or
 }
 
 if ($webViewServiceMain -notmatch '_hostGeneration' -or
-    $webViewServiceMain -notmatch 'CreateNavigationStartingHandler\(hostGeneration\)' -or
-    $webViewServiceMain -notmatch 'CreateNavigationCompletedHandler\(hostGeneration\)' -or
-    $webViewServiceMain -notmatch 'CreateProcessFailedHandler\(hostGeneration\)' -or
-    $webViewServiceMain -notmatch 'IsCurrentHost\(hostGeneration\)' -or
-    $webViewServiceMain -notmatch 'CancelNavigationCompletionWatchdog\(\)[\s\S]*_generations\.Next\(\)[\s\S]*_messageOwnership\.BeginNavigation\(\)') {
+    $webViewNavigation -notmatch 'CreateNavigationStartingHandler\(int hostGeneration\)' -or
+    $webViewNavigation -notmatch 'CreateNavigationCompletedHandler\(int hostGeneration\)' -or
+    $webViewNavigation -notmatch 'CreateProcessFailedHandler\(int hostGeneration\)' -or
+    $webViewLifecycle -notmatch 'CreateNavigationStartingHandler\(hostGeneration\)' -or
+    $webViewLifecycle -notmatch 'CreateNavigationCompletedHandler\(hostGeneration\)' -or
+    $webViewLifecycle -notmatch 'CreateProcessFailedHandler\(hostGeneration\)' -or
+    $webViewLifecycle -notmatch 'IsCurrentHost\(hostGeneration\)' -or
+    $webViewLifecycle -notmatch 'CancelNavigationCompletionWatchdog\(\)[\s\S]*_generations\.Next\(\)[\s\S]*_messageOwnership\.BeginNavigation\(\)' -or
+    $webViewNavigationState -notmatch 'CancelNavigationCompletionWatchdog\(\)[\s\S]*_generations\.Next\(\)[\s\S]*_messageOwnership\.BeginNavigation\(\)' -or
+    $webViewNavigationRecovery -notmatch 'CancelActiveNavigation\(\)') {
     throw 'WebViewService must use an explicit host generation for WebView2 events/watchdogs and cancel both navigation watchdogs when detaching a host.'
 }
 
-if ($webViewServiceMain -match 'ObserveNavigation(Start|Completion)TimeoutAsync\(\s*CoreWebView2 coreWebView') {
+if ($webViewNavigationWatchdogs -match 'ObserveNavigation(Start|Completion)TimeoutAsync\(\s*CoreWebView2 coreWebView') {
     throw 'Navigation watchdog tasks must not capture CoreWebView2 wrapper instances after scheduling; validate by generation/id instead.'
 }
 
@@ -424,6 +643,8 @@ $mainViewModelStatus = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenCl
 $mainWindowWebView = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.WebView.cs') -Raw
 if ($mainViewModelLifecycle -notmatch 'NavigationStartTimedOut \+= OnNavigationStartTimedOut' -or
     $mainViewModelLifecycle -notmatch 'NavigationStartTimedOut -= OnNavigationStartTimedOut' -or
+    $mainViewModelLifecycle -notmatch 'NavigationTimeoutRecovered \+= OnNavigationTimeoutRecovered' -or
+    $mainViewModelLifecycle -notmatch 'NavigationTimeoutRecovered -= OnNavigationTimeoutRecovered' -or
     $mainViewModelStatus -notmatch 'private void OnNavigationStartTimedOut\(string message\)' -or
     $mainViewModelStatus -notmatch 'WebViewRecreationRequested\?\.Invoke\("navigation_start_timeout"\)' -or
     $mainViewModelStatus -notmatch 'navigation\.start\.timeout\.recovery_requested' -or
@@ -445,13 +666,70 @@ if ($mainViewModelLifecycle -notmatch 'NavigationCompletionTimedOut \+= OnNaviga
     throw 'Navigation-completion timeout must be handled by MainViewModel as a WebView recreation request without showing a first-hop Connection Issue.'
 }
 
+$mainWindowInitialization = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.Initialization.cs') -Raw
+$mainWindowCommands = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.Commands.cs') -Raw
+$mainWindowLifecycle = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.Lifecycle.cs') -Raw
+$mainWindowShared = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.Shared.cs') -Raw
+$mainViewModelShared = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Shared.cs') -Raw
+$webViewRecreationService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewRecreationService.cs') -Raw
+if ($webViewServiceMain -notmatch 'event Action\? NavigationTimeoutRecovered' -or
+    $webViewNavigation -notmatch 'NavigationTimeoutRecovered\?\.Invoke\(\)[\s\S]*NavigationCompleted\?\.Invoke' -or
+    $mainViewModelStatus -notmatch 'private void OnNavigationTimeoutRecovered\(\)[\s\S]*NavigationTimeoutRecoveryNoLongerNeeded\?\.Invoke\(\)' -or
+    $mainViewModelShared -notmatch 'event Action\? NavigationTimeoutRecoveryNoLongerNeeded' -or
+    $mainWindowInitialization -notmatch 'NavigationTimeoutRecoveryNoLongerNeeded \+= OnNavigationTimeoutRecoveryNoLongerNeeded' -or
+    $mainWindowLifecycle -notmatch 'NavigationTimeoutRecoveryNoLongerNeeded -= OnNavigationTimeoutRecoveryNoLongerNeeded' -or
+    $mainWindowCommands -notmatch 'OnNavigationTimeoutRecoveryNoLongerNeeded\(\)[\s\S]*TryCancelNavigationTimeoutRecovery\([\s\S]*_webViewRecreationTimer\.Stop\(\)' -or
+    $mainWindowCommands -notmatch 'webview\.recreation\.cancelled_after_navigation_recovered' -or
+    $webViewRecreationService -notmatch 'TryCancelNavigationTimeoutRecovery\(out WebViewRecreationCancelledRecoveryResult result\)' -or
+    $webViewRecreationService -notmatch 'IsNavigationTimeoutRecoveryReason\(string\? reason\)' -or
+    $webViewRecreationService -notmatch 'ChooseHigherPriorityReason\(string\? currentReason, string newReason\)' -or
+    $webViewRecreationService -notmatch 'var pendingReason = ChooseHigherPriorityReason\(_pendingReason, normalizedReason\)' -or
+    $webViewRecreationService -notmatch '_pendingReason = pendingReason' -or
+    $webViewRecreationService -notmatch 'public string Defer\(string reason\)' -or
+    $webViewRecreationService -notmatch 'public bool TryConsumeDeferred\(out string\? reason\)' -or
+    $webViewRecreationService -notmatch 'public bool HasPendingDeferredOrActiveWork' -or
+    $webViewRecreationService -notmatch '_pendingReason is not null[\s\S]*_deferredReason is not null[\s\S]*IsRecreating' -or
+    $webViewRecreationService -notmatch 'public void ClearPending\(\)[\s\S]*_pendingReason = null;[\s\S]*_deferredReason = null;[\s\S]*_activeReasonCancelled = IsRecreating;' -or
+    $webViewRecreationService -notmatch 'navigation_start_timeout' -or
+    $webViewRecreationService -notmatch 'navigation_completion_timeout' -or
+    $webViewRecreationService -notmatch 'CancelledActive' -or
+    $webViewRecreationService -notmatch 'IsRecreating && IsNavigationTimeoutRecoveryReason\(LastReason\)' -or
+    $webViewRecreationService -notmatch 'ShouldSkipCurrentRecreation\(\)' -or
+    $mainWindowWebView -notmatch 'ShouldSkipCurrentRecreation\(\)[\s\S]*webview\.recreation\.skipped_after_navigation_recovered' -or
+    $mainWindowCommands -notmatch 'activeReason = cancelled\.ActiveReason') {
+    throw 'Late navigation completion after a timeout must cancel pending/deferred timeout-driven WebView recreation without cancelling or overwriting settings, initial-load, or topology-change recreation.'
+}
+
+if ($webViewNavigation -notmatch 'TryEnsureNavigationCancellationForRecoveredCompletion\(\s*args\.NavigationId,\s*completionGeneration,\s*hostGeneration\)' -or
+    $webViewNavigation -notmatch 'private NavigationCancellationScope\? TryEnsureNavigationCancellationForRecoveredCompletion' -or
+    $webViewNavigation -notmatch 'navigation\.completion\.recovered_after_timeout') {
+    throw 'Late successful NavigationCompleted after a completion timeout must recreate navigation cancellation ownership and run the normal page-token/probe recovery path.'
+}
+
 if ($mainWindowWebView -notmatch 'if \(!await WaitForWebViewHostLayoutAsync\(nextWebView, cancellationToken\)\)' -or
     $mainWindowWebView -notmatch 'private async Task<bool> WaitForWebViewHostLayoutAsync\(WebView2 webView, CancellationToken cancellationToken\)' -or
     $mainWindowWebView -notmatch 'webview\.host\.layout_ready' -or
     $mainWindowWebView -notmatch 'webview\.host\.layout_wait_timeout' -or
     $mainWindowWebView -notmatch 'webview\.recreation\.deferred_until_visible_layout' -or
-    $mainWindowWebView -notmatch 'ScheduleWebViewRecreation\("visible_layout_ready"\)' -or
+    $mainWindowWebView -notmatch 'webview\.recreation\.retry_after_layout_timeout' -or
+    $mainWindowWebView -notmatch 'ScheduleDeferredWebViewRecreationRetry' -or
+    $mainWindowWebView -notmatch '_webViewRecreationService\.Defer\(reason\)' -or
+    $mainWindowWebView -notmatch 'ScheduleDeferredWebViewRecreationRetry\(_webViewRecreationService\.LastReason \?\? begin\.Reason\)' -or
+    $mainWindowWebView -notmatch 'ScheduleDeferredWebViewRecreationRetry\(string reason\)[\s\S]*_webViewRecreationService\.Schedule\(reason\)' -or
+    $mainWindowWebView -notmatch 'TryConsumeDeferred\(out var reason\)' -or
+    $mainWindowWebView -notmatch 'ScheduleWebViewRecreation\(reason\)' -or
     $mainWindowWebView -notmatch 'webView\.Loaded \+=' -or
+    $mainWindowWebView -notmatch 'webView\.SizeChanged \+=' -or
+    $mainWindowWebView -notmatch 'webView\.SizeChanged -=' -or
+    $mainWindowWebView -notmatch 'webView\.ActualSize\.X > 0' -or
+    $mainWindowWebView -notmatch 'webView\.ActualSize\.Y > 0' -or
+    $mainWindowWebView -notmatch 'webView\.Visibility == Visibility\.Visible' -or
+    $mainWindowWebView -notmatch '!_isCompactMode' -or
+    $mainWindowWebView -notmatch '!_isWindowHidden' -or
+    $mainWindowWebView -notmatch '!WindowFrameHelper\.IsWindowMinimized\(this\)' -or
+    $mainWindowWebView -notmatch 'isCompactMode = _isCompactMode' -or
+    $mainWindowWebView -notmatch 'isWindowHidden = _isWindowHidden' -or
+    $mainWindowWebView -notmatch 'isMinimized = WindowFrameHelper\.IsWindowMinimized\(this\)' -or
     $mainWindowWebView -notmatch 'WebViewHost\.ActualSize') {
     throw 'Dynamically recreated WebView2 hosts must defer initialization/navigation until Loaded and non-zero visible host layout are available.'
 }
@@ -463,6 +741,7 @@ if ($recreationService -notmatch 'new\(\)' -or
     $recreationService -notmatch 'TryBegin[\s\S]*_circuitBreaker\.CanAttempt\(\)' -or
     $recreationService -notmatch 'CircuitBreakerTripped\(LastReason, TotalRecreations\)' -or
     $recreationService -notmatch 'RecordAttempt\(\)[\s\S]*_circuitBreaker\.RecordAttempt\(\)' -or
+    $mainWindowWebView -notmatch 'WaitForWebViewHostLayoutAsync[\s\S]*_webViewRecreationService\.RecordAttempt\(' -or
     $mainWindowWebView -notmatch 'CanAttemptInLoop\(\)' -or
     $mainWindowWebView -notmatch 'webview\.recreation\.circuit_breaker_tripped_in_loop' -or
     $mainWindowWebView -notmatch 'ShowCircuitBreakerError\(\)' -or
@@ -471,25 +750,29 @@ if ($recreationService -notmatch 'new\(\)' -or
     throw 'WebView recreation must bound repeated navigation_start_timeout recovery attempts and surface circuit-breaker suppression.'
 }
 
-$directCoreNavigationCalls = [regex]::Matches($webViewServiceMain, 'coreWebView\.(Navigate|Reload)\(')
+if ($mainWindowWebView -notmatch 'catch \(Exception ex\)[\s\S]*Failed to recreate WebView2 host[\s\S]*ViewModel\.ShowWebViewRecreationError\(') {
+    throw 'WebView recreation exceptions must surface an actionable visible error instead of only logging after timeout recovery hid the InfoBar.'
+}
+
+$directCoreNavigationCalls = [regex]::Matches($webViewNavigationCommands, 'coreWebView\.(Navigate|Reload)\(')
 if ($directCoreNavigationCalls.Count -ne 2 -or
-    $webViewServiceMain -notmatch 'private bool TryNavigateCoreWebView[\s\S]*coreWebView\.Navigate\(url\)' -or
-    $webViewServiceMain -notmatch 'private bool TryReloadCoreWebView[\s\S]*coreWebView\.Reload\(\)') {
+    $webViewNavigationCommands -notmatch 'private bool TryNavigateCoreWebView[\s\S]*coreWebView\.Navigate\(url\)' -or
+    $webViewNavigationCommands -notmatch 'private bool TryReloadCoreWebView[\s\S]*coreWebView\.Reload\(\)') {
     throw 'CoreWebView2 Navigate/Reload calls must be centralized behind helpers that are paired with PrepareNavigationStart().'
 }
 
-if ($webViewServiceMain -notmatch 'await CaptureCurrentPageTokenAsync[\s\S]*if \(!IsCurrentNavigation' -or
-    $webViewServiceMain -notmatch 'private bool IsCurrentNavigation') {
+if ($webViewNavigation -notmatch 'await CaptureCurrentPageTokenAsync[\s\S]*if \(!IsCurrentNavigation' -or
+    $webViewLifecycle -notmatch 'private bool IsCurrentNavigation') {
     throw 'Navigation completion must re-check WebView generation after awaiting page-token capture before publishing loaded state.'
 }
 
-if ($webViewServiceMain -notmatch 'ObserveSessionReadyReportRequest' -or
-    $webViewServiceMain -notmatch 'reportSessionReady') {
+if ($webViewPageToken -notmatch 'ObserveSessionReadyReportRequest' -or
+    $webViewPageToken -notmatch 'reportSessionReady') {
     throw 'WebViewService must request a session-ready replay after accepting the hosted page token.'
 }
 
 $navigationCancellationScope = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/NavigationCancellationScope.cs') -Raw
-$navigationCancellationLinks = [regex]::Matches($webViewServiceMain, 'CancellationTokenSource\.CreateLinkedTokenSource\(timeout\.Token, cancellationToken\)')
+$navigationCancellationLinks = [regex]::Matches($webViewPageToken, 'CancellationTokenSource\.CreateLinkedTokenSource\(timeout\.Token, cancellationToken\)')
 if ($webViewServiceMain -match '_retryCts|CancellationTokenSource\? _navigationCancellation|_navigationCancellation\?\.Dispose\(' -or
     $navigationCancellationScope -notmatch 'internal sealed class NavigationCancellationScope' -or
     $navigationCancellationScope -notmatch 'public Lease\? TryAcquire\(\)' -or
@@ -503,45 +786,50 @@ if ($webViewServiceMain -match '_retryCts|CancellationTokenSource\? _navigationC
     throw 'WebView navigation cancellation must use a lease-owned scope, not a raw CTS that can be disposed while retry/replay work still holds its token.'
 }
 
-if ($webViewServiceMain -notmatch 'var navigationCancellation = _navigationCancellation' -or
-    $webViewServiceMain -notmatch 'var navigationLease = navigationCancellation\?\.TryAcquire\(\)' -or
-    $webViewServiceMain -notmatch 'CaptureCurrentPageTokenAsync\([\s\S]*CancellationToken cancellationToken = default' -or
+if ($webViewNavigation -notmatch 'var navigationCancellation = _navigationCancellation' -or
+    $webViewNavigation -notmatch 'var navigationLease = navigationCancellation\??\.TryAcquire\(\)' -or
+    $webViewPageToken -notmatch 'CaptureCurrentPageTokenAsync\([\s\S]*CancellationToken cancellationToken = default' -or
     $navigationCancellationLinks.Count -lt 2 -or
-    $webViewServiceMain -notmatch 'CaptureCurrentPageTokenAsync\([\s\S]*navigationLease\.Token' -or
-    $webViewServiceMain -notmatch 'ObservePageTokenCaptureRetry\(sender, args\.NavigationId, completionGeneration, hostGeneration, navigationCancellation\)' -or
-    $webViewServiceMain -notmatch 'ObserveSessionReadyReportRequest\(sender, args\.NavigationId, completionGeneration, hostGeneration, navigationCancellation\)' -or
-    $webViewServiceMain -notmatch 'RetryPageTokenCaptureAsync\([\s\S]*NavigationCancellationScope\.Lease navigationLease' -or
-    $webViewServiceMain -notmatch 'RequestSessionReadyReportAsync\([\s\S]*NavigationCancellationScope\.Lease navigationLease' -or
-    $webViewServiceMain -notmatch 'Task\.Delay\(PageTokenCaptureRetryDelay, cancellationToken\)' -or
-    $webViewServiceMain -notmatch 'catch \(OperationCanceledException\) when \(cancellationToken\.IsCancellationRequested\)' -or
-    $webViewServiceMain -notmatch 'Hosted session-ready report request was interrupted by disposed resource' -or
-    $webViewServiceMain -notmatch 'Hosted session-ready report request failed') {
+    $webViewNavigation -notmatch 'CaptureCurrentPageTokenAsync\([\s\S]*navigationLease\.Token' -or
+    $webViewNavigation -notmatch 'ObservePageTokenCaptureRetry\(sender, args\.NavigationId, completionGeneration, hostGeneration, navigationCancellation\)' -or
+    $webViewNavigation -notmatch 'ObserveSessionReadyReportRequest\(sender, args\.NavigationId, completionGeneration, hostGeneration, navigationCancellation\)' -or
+    $webViewPageToken -notmatch 'RetryPageTokenCaptureAsync\([\s\S]*NavigationCancellationScope\.Lease navigationLease' -or
+    $webViewPageToken -notmatch 'RequestSessionReadyReportAsync\([\s\S]*NavigationCancellationScope\.Lease navigationLease' -or
+    $webViewPageToken -notmatch 'Task\.Delay\(PageTokenCaptureRetryDelay, cancellationToken\)' -or
+    $webViewPageToken -notmatch 'catch \(OperationCanceledException\) when \(cancellationToken\.IsCancellationRequested\)' -or
+    $webViewPageToken -notmatch 'Hosted session-ready report request was interrupted by disposed resource' -or
+    $webViewPageToken -notmatch 'Hosted session-ready report request failed') {
     throw 'WebView page-token retry and session-ready replay work must carry the current navigation cancellation token and observe late failures.'
 }
 
-if ($webViewServiceMain -notmatch 'private async void OnNavigationCompleted[\s\S]*try[\s\S]*HandleNavigationCompletedAsync' -or
-    $webViewServiceMain -notmatch 'private async Task HandleNavigationCompletedAsync' -or
-    $webViewServiceMain -notmatch 'Navigation completion handling failed') {
-    throw 'WebView navigation completion async event handling must be observed and logged.'
+if ($webViewNavigation -notmatch 'private async void OnNavigationCompleted[\s\S]*try[\s\S]*HandleNavigationCompletedAsync' -or
+    $webViewNavigation -notmatch 'private async Task HandleNavigationCompletedAsync' -or
+    $webViewNavigation -notmatch 'Navigation completion handling failed' -or
+    $webViewNavigation -notmatch 'Navigation completion handling failed[\s\S]*_statusInspector\.SetUnavailableSnapshot' -or
+    $webViewNavigation -notmatch 'Navigation completion handling failed[\s\S]*SetState\(ConnectionState\.Error\)' -or
+    $webViewNavigation -notmatch 'Navigation completion handling failed[\s\S]*NavigationErrorOccurred\?\.Invoke') {
+    throw 'WebView navigation completion async event handling must be observed, logged, and projected as an error instead of leaving Loading stale.'
 }
 
-if ($webViewServiceMain -notmatch 'await Task\.Run\(\(\) => DeleteUserDataFolderForEnvironment\(environmentName, _logger\)\)') {
+if ($webViewSession -notmatch 'await Task\.Run\(\(\) => DeleteUserDataFolderForEnvironment\(environmentName, _logger\)\)') {
     throw 'Inactive WebView2 profile deletion must run off the UI thread.'
 }
 
-if ($webViewServiceMain -notmatch 'private void OnProcessFailed[\s\S]*CancelNavigationCancellation\(\)[\s\S]*_statusInspector\.SetUnavailableSnapshot') {
+if ($webViewNavigationRecovery -notmatch 'private void OnProcessFailed[\s\S]*CancelActiveNavigation\(\)[\s\S]*_statusInspector\.SetUnavailableSnapshot') {
     throw 'WebView process-failure handling must retire navigation retry/replay cancellation before publishing unavailable state.'
 }
 
-if ($webViewServiceMain -notmatch 'TryAutoRetryAfterConnectionErrorAsync' -or
-    $webViewServiceMain -notmatch 'AutoRetryOutcome\.Stale' -or
-    $webViewServiceMain -notmatch 'AutoRetryOutcome\.Failed' -or
-    $webViewServiceMain -notmatch 'AutoRetryOutcome\.NotAttempted' -or
-    $webViewServiceMain -notmatch 'Auto-retry failed before WebView2 was ready' -or
-    $webViewServiceMain -notmatch 'return AutoRetryOutcome\.Stale' -or
-    $webViewServiceMain -notmatch 'SetState\(ConnectionState\.Error\)[\s\S]*NavigationErrorOccurred\?\.Invoke\("Auto-retry failed before WebView2 was ready\."\)' -or
-    $webViewServiceMain -notmatch '_ when isConnectionError => ConnectionState\.Error' -or
-    $webViewServiceMain -match '_ when isConnectionError => ConnectionState\.Reconnecting') {
+if ($webViewNavigationRecovery -notmatch 'TryAutoRetryAfterConnectionErrorAsync' -or
+    $webViewNavigationRecovery -notmatch 'AutoRetryOutcome\.Stale' -or
+    $webViewNavigationRecovery -notmatch 'AutoRetryOutcome\.Failed' -or
+    $webViewNavigationRecovery -notmatch 'AutoRetryOutcome\.NotAttempted' -or
+    $webViewNavigation -notmatch 'Auto-retry failed before WebView2 was ready' -or
+    $webViewNavigationRecovery -notmatch 'return AutoRetryOutcome\.Stale' -or
+    $webViewNavigationRecovery -notmatch 'ObserveNavigationStartTimeout\(navigationGeneration, _lastNavigatedUrl, previousSource\)' -or
+    $webViewNavigationRecovery -notmatch 'CancelNavigationStartWatchdog\(\)' -or
+    $webViewNavigation -notmatch 'SetState\(ConnectionState\.Error\)[\s\S]*NavigationErrorOccurred\?\.Invoke\("Auto-retry failed before WebView2 was ready\."\)' -or
+    $webViewNavigation -notmatch '_ when isConnectionError => ConnectionState\.Error' -or
+    $webViewNavigation -match '_ when isConnectionError => ConnectionState\.Reconnecting') {
     throw 'WebView auto-retry must not let stale navigation-completed continuations publish state, and exhausted or failed retries must surface as Error.'
 }
 
@@ -577,7 +865,9 @@ foreach ($asset in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortR
 }
 
 $mainWindowWebView = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.WebView.cs') -Raw
-if ($mainWindowWebView -match '_webViewRecreationMergedCount|_pendingWebViewRecreationReason|_isRecreatingWebView') {
+if ($mainWindowWebView -match '_webViewRecreationMergedCount|_pendingWebViewRecreationReason|_isRecreatingWebView|_deferredWebViewRecreationReason' -or
+    $mainWindowCommands -match '_deferredWebViewRecreationReason' -or
+    $mainWindowShared -match '_deferredWebViewRecreationReason') {
     throw 'WebView recreation scheduling state must live in WebViewRecreationService.'
 }
 
@@ -598,9 +888,44 @@ if ($mainWindowWebView -notmatch 'ViewModel\.DetachWebViewHost\(\)[\s\S]*foreach
 
 $mainViewModelLifecycle = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Lifecycle.cs') -Raw
 if ($mainViewModelLifecycle -notmatch '_lifetimeCts' -or
-    $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, _selectedEnvironment\.Name, cancellationToken\)' -or
-    $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, cancellationToken\)') {
-    throw 'MainViewModel WebView initialization must honor the ViewModel lifetime cancellation token.'
+    $mainViewModelLifecycle -notmatch 'var environmentName = _selectedEnvironment\.Name' -or
+    $mainViewModelLifecycle -notmatch 'var gatewayUrl = _selectedEnvironment\.GatewayUrl' -or
+    $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, environmentName, cancellationToken\)' -or
+    $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, cancellationToken\)' -or
+    $mainViewModelLifecycle -notmatch 'IsCurrentSelectedEnvironment\(environmentName, gatewayUrl\)' -or
+    $mainViewModelLifecycle -notmatch 'private bool IsCurrentSelectedEnvironment\(string environmentName, string gatewayUrl\)') {
+    throw 'MainViewModel WebView initialization must honor the ViewModel lifetime cancellation token and selected-environment identity across awaits.'
+}
+
+$environmentConfig = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Models/EnvironmentConfig.cs') -Raw
+if ($environmentConfig -notmatch 'PlaceholderGatewayUrl = "https://example\.com"' -or
+    $environmentConfig -notmatch '\[JsonIgnore\][\s\S]*public bool IsPlaceholder') {
+    throw 'EnvironmentConfig must expose a JSON-ignored placeholder-environment predicate for first-run startup gating.'
+}
+
+$mainViewModelEnvironment = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Environment.cs') -Raw
+$mainViewModelConstructor = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.cs') -Raw
+if ($mainViewModelLifecycle -notmatch 'if \(_selectedEnvironment\.IsPlaceholder\)[\s\S]*ApplyPlaceholderEnvironmentState\(\)[\s\S]*return;' -or
+    $mainViewModelLifecycle -match 'IsPlaceholder[\s\S]{0,900}Navigate\(' -or
+    $mainViewModelLifecycle -notmatch '_selectedEnvironment\?\.IsPlaceholder == true[\s\S]*ApplyPlaceholderEnvironmentState\(\)' -or
+    $mainViewModelEnvironment -notmatch 'environment\.IsPlaceholder[\s\S]*var shouldClearWebViewHost = _webViewService\.IsInitialized[\s\S]*ApplyPlaceholderEnvironmentState\(\)' -or
+    $mainViewModelEnvironment -notmatch 'WebViewRecreationRequested\?\.Invoke\("environment_placeholder_selected"\)' -or
+    $mainViewModelEnvironment -notmatch 'private void ApplyPlaceholderEnvironmentState\(\)' -or
+    $mainViewModelEnvironment -notmatch 'ApplyConnectionState\((?:OpenClaw\.Services\.)?ConnectionState\.Offline\)' -or
+    $mainViewModelEnvironment -notmatch 'StatusMessage = StringResources\.StatusConfigureGateway' -or
+    $mainViewModelEnvironment -notmatch '_webViewService\.StopHeartbeat\(\)' -or
+    $mainViewModelEnvironment -notmatch '_latencyService\.Stop\(\)' -or
+    $mainViewModelEnvironment -notmatch 'WebViewRecreationRequested\?\.Invoke\("environment_placeholder_replaced"\)' -or
+    $mainViewModelConstructor -match 'LoadEnvironments\(\);\s*UpdateStatusPresentation\(\);') {
+    throw 'Placeholder environment selection must stop probes, clear stale status, and avoid navigating to example.com.'
+}
+
+if ($mainWindowWebView -notmatch 'ViewModel\.IsPlaceholderEnvironment[\s\S]*ClearWebViewHostForPlaceholderEnvironment\(reason\)' -or
+    $mainWindowWebView -notmatch 'ViewModel\.IsPlaceholderEnvironment[\s\S]*_webViewRecreationService\.HasPendingDeferredOrActiveWork \|\| WebViewHost\.Children\.Count > 0[\s\S]*ClearWebViewHostForPlaceholderEnvironment\("deferred_resume_placeholder"\)' -or
+    $mainWindowWebView -notmatch 'private void ClearWebViewHostForPlaceholderEnvironment\(string reason\)[\s\S]*_webViewRecreationService\.ClearPending\(\)[\s\S]*ViewModel\.DetachWebViewHost\(\)[\s\S]*WebViewHost\.Children\.Clear\(\)' -or
+    $mainWindowWebView -notmatch 'ShouldSkipCurrentRecreation\(\)[\s\S]*webview\.recreation\.skipped_after_navigation_recovered' -or
+    $mainWindowWebView -notmatch 'webview\.recreation\.skipped_placeholder_environment') {
+    throw 'MainWindow must skip WebView host recreation while the selected environment is the first-run placeholder.'
 }
 
 if ($mainViewModelLifecycle -notmatch 'public void DetachWebViewHost\(\)') {
@@ -689,6 +1014,10 @@ if ($coordinatorStateEffects -notmatch 'SafeFireAndForget\(\s*async token' -or
     throw 'ShellSessionCoordinator stale-busy recovery tasks must observe cancellation before starting recovery operations.'
 }
 
+if ($coordinatorStateEffects -notmatch 'case ControlUiPhase\.GatewayError:[\s\S]*case ControlUiPhase\.Unavailable:[\s\S]*MarkRecoveryDegraded\(snapshot\.DetailOrSummary\)') {
+    throw 'ShellSessionCoordinator terminal hosted-session failures must move recovery state out of stale Ready/Healthy state.'
+}
+
 $coordinatorHost = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/ShellSessionCoordinator.Host.cs') -Raw
 if ($coordinatorHost -notmatch 'OnHostVisibleAsync\(CancellationToken cancellationToken = default\)' -or
     $coordinatorHost -notmatch 'CreateObservedOperationCancellation\(\)' -or
@@ -730,6 +1059,13 @@ if ($settingsViewModel -match 'App\.Configuration') {
 
 if ($settingsViewModel -match 'App\.Logger') {
     throw 'SettingsViewModel must use SettingsPersistenceAdapter instead of App.Logger.'
+}
+
+$settingsViewModelWebViewServiceCalls = [regex]::Matches($settingsViewModel, 'WebViewService\.(?<method>[A-Za-z_][A-Za-z0-9_]*)')
+foreach ($call in $settingsViewModelWebViewServiceCalls) {
+    if ($call.Groups['method'].Value -ne 'TryMoveUserDataFolderToRenamedEnvironment') {
+        throw "SettingsViewModel must not call WebViewService runtime/session APIs; keep WebView work behind MainViewModel/MainWindow/service boundaries: $($call.Value)"
+    }
 }
 
 if ($settingsViewModel -notmatch '_didEditAlwaysOnTop' -or
@@ -1010,12 +1346,25 @@ if ($viewModelStatus -match 'App\.MainWindow|RunOnUiThread') {
     throw 'MainViewModel status updates must use injected UI dispatcher.'
 }
 
-if ($viewModelStatus -match 'ShouldClearModelSummary[\s\S]*ControlUiPhase\.Unavailable|ShouldClearModelSummary[\s\S]*ControlUiPhase\.Unknown') {
+$shouldClearModelSummaryMethod = [regex]::Match($viewModelStatus, 'private static bool ShouldClearModelSummary\(ControlUiProbeSnapshot snapshot\)[\s\S]*?\n    \}')
+if (-not $shouldClearModelSummaryMethod.Success) {
+    throw 'MainViewModel must keep MODEL reset policy in ShouldClearModelSummary.'
+}
+
+if ($shouldClearModelSummaryMethod.Value -match 'ControlUiPhase\.Unavailable|ControlUiPhase\.Unknown') {
     throw 'Transient unavailable/unknown Control UI inspections must not clear the last non-empty MODEL summary.'
 }
 
-if ($viewModelStatus -match 'ShouldClearModelSummary[\s\S]*ControlUiPhase\.Loading') {
+if ($shouldClearModelSummaryMethod.Value -match 'ControlUiPhase\.Loading') {
     throw 'Transient loading/navigation Control UI snapshots must not clear the last non-empty MODEL summary.'
+}
+
+if ($viewModelStatus -notmatch 'ApplySnapshotErrorState\(ControlUiProbeSnapshot snapshot\)[\s\S]*snapshot\.IsIssue[\s\S]*ErrorMessage = snapshot\.DetailOrSummary[\s\S]*IsErrorVisible = true') {
+    throw 'Control UI issue snapshots must show a visible error InfoBar, not only change status text.'
+}
+
+if ($viewModelStatus -notmatch 'snapshot\.Phase == ControlUiPhase\.Unavailable[\s\S]*ConnectionState == ConnectionState\.Reconnecting[\s\S]*ErrorMessage = snapshot\.DetailOrSummary[\s\S]*IsErrorVisible = true') {
+    throw 'Terminal Control UI Unavailable snapshots must show a visible InfoBar while the shell is reconnecting.'
 }
 
 $webViewInspection = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.ControlUiInspection.cs') -Raw
@@ -1030,10 +1379,20 @@ if ($mainViewModelLifecycle -notmatch 'ShouldRunHeartbeatForCurrentState\(\)' -o
     throw 'Resource scheduling must keep heartbeat alive for owned Unavailable/Reconnecting hosted-session states.'
 }
 
+$viewModelHeartbeat = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Heartbeat.cs') -Raw
 $viewModelIndicators = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Indicators.cs') -Raw
 if ($viewModelIndicators -notmatch 'IsLatencySnapshotForSelectedEnvironment' -or
     $viewModelIndicators -notmatch 'TryGetEnvironmentHost') {
     throw 'MainViewModel latency updates must reject stale snapshots from non-selected environment hosts.'
+}
+
+if ($mainViewModelLifecycle -notmatch 'ApplyWebViewHostDetachedState\(\)' -or
+    $mainViewModelLifecycle -notmatch '_latencyService\.Stop\(\)[\s\S]*_webViewService\.StopHeartbeat\(\)[\s\S]*ResetResourceProbeProjection\(\)' -or
+    $mainViewModelLifecycle -notmatch 'ApplyWebViewHostDetachedState\(\)[\s\S]*ApplyConnectionState\(ConnectionState\.Loading\)[\s\S]*ResetTelemetry\(\)[\s\S]*ApplyRecoveryState\(RecoveryState\.Connecting\)' -or
+    $viewModelHeartbeat -notmatch 'ResetHeartbeatProjection\(\)[\s\S]*HeartbeatSummary = StringResources\.HeartbeatWait[\s\S]*ResetHeartbeatIndicatorsToWarning\(\)' -or
+    $viewModelIndicators -notmatch 'ResetLatencyProjection\(\)[\s\S]*LatencySummaryText = DefaultLatencySummary[\s\S]*LatencySummaryBrush = NeutralBrush' -or
+    $viewModelIndicators -notmatch 'snapshot\.State == ControlUiLatencyState\.Unknown') {
+    throw 'Stopping probes or detaching WebView must reset visible heartbeat, latency, MODEL, access, work, and shell projections instead of leaving stale healthy status visible.'
 }
 
 $presenter = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/StatusPresenter.cs') -Raw
@@ -1051,6 +1410,32 @@ foreach ($file in $mainViewModelFiles) {
 
     if ($content -match 'App\.MainWindow') {
         throw "MainViewModel must use the injected UI dispatcher instead of App.MainWindow: $($file.Name)"
+    }
+}
+
+$appGlobalAllowedFiles = @(
+    'src/OpenClaw/App.xaml.cs',
+    'src/OpenClaw/MainWindow.xaml.cs',
+    'src/OpenClaw/MainWindow.AlwaysOnTop.cs',
+    'src/OpenClaw/MainWindow.Commands.cs',
+    'src/OpenClaw/MainWindow.CompactMode.cs',
+    'src/OpenClaw/MainWindow.Hotkey.cs',
+    'src/OpenClaw/MainWindow.Lifecycle.cs',
+    'src/OpenClaw/MainWindow.Theme.cs',
+    'src/OpenClaw/MainWindow.Tray.cs',
+    'src/OpenClaw/MainWindow.WebView.cs',
+    'src/OpenClaw/Views/LogViewerDialog.xaml.cs',
+    'src/OpenClaw/Views/SettingsDialog.Actions.cs',
+    'src/OpenClaw/Views/SettingsDialog.Initialization.cs',
+    'src/OpenClaw/Views/SettingsDialog.Theme.cs',
+    'src/OpenClaw/Views/SettingsDialog.xaml.cs'
+)
+$appGlobalAccessMatches = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/OpenClaw') -Recurse -File -Filter *.cs |
+    Select-String -Pattern 'App\.(Logger|Configuration|MainWindow)'
+foreach ($match in $appGlobalAccessMatches) {
+    $relativePath = $match.Path.Substring($repoRootPath.Length + 1).Replace('\', '/')
+    if ($relativePath -notin $appGlobalAllowedFiles) {
+        throw "App global access must stay at the WinUI app edge and use injected/adapted dependencies elsewhere: ${relativePath}:$($match.LineNumber)"
     }
 }
 
@@ -1085,6 +1470,14 @@ if ($commands -notmatch 'private void OnRetry\(\)[\s\S]*if \(_webViewService\.Re
     throw 'Manual retry failures must keep an actionable localized error visible when navigation cannot start.'
 }
 
+if ($commands -notmatch 'private void OnReload\(\)[\s\S]*if \(_webViewService\.Reload\(\)\)[\s\S]*IsErrorVisible = false') {
+    throw 'Reload must clear stale visible errors only after WebViewService confirms reload navigation started.'
+}
+
+if ($commands -notmatch 'public void ShowWebViewRecreationError\(string message\)[\s\S]*ApplyConnectionState\(ConnectionState\.Error\)[\s\S]*ErrorMessage = message[\s\S]*IsErrorVisible = true[\s\S]*ShowRetryButton = true') {
+    throw 'WebView recreation failure projection must publish an actionable visible error state.'
+}
+
 foreach ($resourceFile in @(
     'src/OpenClaw/Strings/en-us/Resources.resw',
     'src/OpenClaw/Strings/zh-cn/Resources.resw'
@@ -1098,8 +1491,16 @@ foreach ($resourceFile in @(
         throw "Missing localized retry-unavailable resource: $resourceFile"
     }
 
+    if ($resources -notmatch 'name="WebViewRecreationFailedFormat"') {
+        throw "Missing localized WebView recreation failure resource: $resourceFile"
+    }
+
     if ($resources -notmatch 'name="SettingsControlUiUrlPlaceholder"') {
         throw "Missing localized Control UI URL placeholder resource: $resourceFile"
+    }
+
+    if ($resources -notmatch 'name="StatusConfigureGateway"') {
+        throw "Missing localized placeholder-environment status resource: $resourceFile"
     }
 
     foreach ($trayResource in @('TrayMenuOpen', 'TrayMenuCompactMode', 'TrayMenuExit')) {
@@ -1139,6 +1540,18 @@ if ($diagnosticService -match 'App\.Logger|App\.Configuration|App\.MainWindow') 
     throw 'DiagnosticService must receive app runtime dependencies from its caller instead of reading App globals.'
 }
 
+if ($diagnosticService -match 'WebViewService\s+\w+|WebViewService\?\s+\w+') {
+    throw 'DiagnosticService must depend on a diagnostic WebView interface instead of the concrete WebViewService.'
+}
+
+$diagnosticWebViewSession = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/DiagnosticWebViewSession.cs') -Raw
+if ($diagnosticWebViewSession -notmatch 'interface IDiagnosticWebViewSession' -or
+    $diagnosticWebViewSession -notmatch 'InspectControlUiStateAsync' -or
+    $diagnosticWebViewSession -notmatch 'LatestControlUiSnapshot' -or
+    $webViewService -notmatch 'WebViewService\s*:\s*IDiagnosticWebViewSession,\s*IDisposable') {
+    throw 'Diagnostic WebView session abstraction must exist and WebViewService must implement it explicitly.'
+}
+
 if ($hostedBridge -match '_bridgeScriptResource|BridgeScriptResource') {
     throw 'HostedUiBridge must compose localized bridge scripts at initialization time, not cache localized strings statically.'
 }
@@ -1172,7 +1585,10 @@ $activityStateScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenCl
 $statusInspectionScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.StatusInspection.js') -Raw
 if ($activityStateScript -notmatch 'isChatBusy' -or
     $activityStateScript -notmatch 'isBusyStaleCandidate === false' -or
-    $statusInspectionScript -notmatch 'isBusyStaleCandidate') {
+    $activityStateScript -notmatch 'isBusy: isChatBusy \|\| isShellBusy' -or
+    $activityStateScript -notmatch 'activitySignature: isChatBusy \? readChatActivitySignature\(app\) : ''' -or
+    $statusInspectionScript -notmatch 'const isBusyStaleCandidate = Boolean\(appState\?\.isChatBusy\) \|\| apiBusy \|\| domBusy' -or
+    $statusInspectionScript -match 'isBusyStaleCandidate = Boolean\(appState\?\.isBusy\)') {
     throw 'Hosted bridge stale-busy recovery must be limited to chat/output activity, not non-chat settings/cron busy states.'
 }
 

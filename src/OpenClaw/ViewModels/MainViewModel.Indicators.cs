@@ -10,21 +10,16 @@ public partial class MainViewModel
 {
     private void ResetTelemetry()
     {
-        HeartbeatSummary = StringResources.HeartbeatWait;
-        HeartbeatSummaryBrush = WarningBrush;
+        ResetHeartbeatProjection();
         StatusIndicatorBrush = NeutralBrush;
         _lastKnownModelSummaryText = DefaultModelSummary;
         ModelSummaryText = DefaultModelSummary;
         AccessSummaryText = DefaultAccessSummary;
         AccessSummaryBrush = WarningBrush;
-        LatencySummaryText = DefaultLatencySummary;
-        LatencySummaryBrush = NeutralBrush;
-        LatencyTooltipText = LatencyTooltipFormatter.Format(_latencyHistory.CreateSummary());
+        ResetLatencyProjection();
         WorkStatusText = DefaultWorkStatus;
         WorkStatusBrush = WarningBrush;
         SetRunIndicatorMode(RunIndicatorMode.Wait);
-        _lastHeartbeatStatus = null;
-        ResetHeartbeatIndicatorsToWarning();
     }
 
     private void OnLatencyUpdated(ControlUiLatencySnapshot snapshot)
@@ -55,6 +50,11 @@ public partial class MainViewModel
 
     private bool IsLatencySnapshotForSelectedEnvironment(ControlUiLatencySnapshot snapshot)
     {
+        if (snapshot.State == ControlUiLatencyState.Unknown)
+        {
+            return true;
+        }
+
         var selectedHost = TryGetEnvironmentHost(_selectedEnvironment?.GatewayUrl);
         if (string.IsNullOrWhiteSpace(snapshot.Host))
         {
@@ -79,5 +79,12 @@ public partial class MainViewModel
         return string.IsNullOrWhiteSpace(host)
             ? null
             : host.Trim('[', ']');
+    }
+
+    private void ResetLatencyProjection()
+    {
+        LatencySummaryText = DefaultLatencySummary;
+        LatencySummaryBrush = NeutralBrush;
+        LatencyTooltipText = LatencyTooltipFormatter.Format(_latencyHistory.CreateSummary());
     }
 }

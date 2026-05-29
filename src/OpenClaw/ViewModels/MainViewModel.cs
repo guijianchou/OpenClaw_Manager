@@ -23,7 +23,6 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         SubscribeToServiceEvents();
         InitializeCoordinator();
         LoadEnvironments();
-        UpdateStatusPresentation();
     }
 
     private void DispatchUiUpdate(Action action)

@@ -3,6 +3,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OpenClaw.Helpers;
+using OpenClaw.Services;
 
 namespace OpenClaw;
 
@@ -78,9 +79,15 @@ public sealed partial class MainWindow
             return;
         }
 
+        if (ViewModel.IsPlaceholderEnvironment)
+        {
+            ClearWebViewHostForPlaceholderEnvironment(reason);
+            return;
+        }
+
         if (!CanInitializeWebViewHost())
         {
-            _deferredWebViewRecreationReason = reason;
+            _webViewRecreationService.Defer(reason);
             RecordInstrumentationEvent("webview.recreation.deferred_until_visible_layout", CreateWebViewHostLayoutContext());
             return;
         }
@@ -158,6 +165,15 @@ public sealed partial class MainWindow
                     break;
                 }
 
+                if (_webViewRecreationService.ShouldSkipCurrentRecreation())
+                {
+                    RecordInstrumentationEvent("webview.recreation.skipped_after_navigation_recovered", new
+                    {
+                        reason = _webViewRecreationService.LastReason
+                    });
+                    break;
+                }
+
                 var nextWebView = new WebView2
                 {
                     HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -174,8 +190,9 @@ public sealed partial class MainWindow
                 WebViewHost.Children.Add(nextWebView);
                 if (!await WaitForWebViewHostLayoutAsync(nextWebView, cancellationToken))
                 {
-                    _deferredWebViewRecreationReason = _webViewRecreationService.LastReason ?? begin.Reason;
-                    RecordInstrumentationEvent("webview.recreation.deferred_until_visible_layout", CreateWebViewHostLayoutContext());
+                    _webViewRecreationService.RecordAttempt(
+                        _webViewRecreationService.LastReason ?? begin.Reason);
+                    ScheduleDeferredWebViewRecreationRetry(_webViewRecreationService.LastReason ?? begin.Reason);
                     WebViewHost.Children.Clear();
                     nextWebView.Close();
                     break;
@@ -204,6 +221,8 @@ public sealed partial class MainWindow
             if (!_isClosing && !cancellationToken.IsCancellationRequested)
             {
                 App.Logger.Error($"Failed to recreate WebView2 host: {ex.Message}");
+                ViewModel.ShowWebViewRecreationError(
+                    string.Format(StringResources.WebViewRecreationFailedFormat, ex.Message));
             }
         }
         finally
@@ -227,7 +246,7 @@ public sealed partial class MainWindow
 
     private async Task<bool> WaitForWebViewHostLayoutAsync(WebView2 webView, CancellationToken cancellationToken)
     {
-        if (webView.IsLoaded && HasUsableWebViewHostLayout())
+        if (HasUsableWebViewHostLayout(webView))
         {
             RecordInstrumentationEvent("webview.host.layout_ready", CreateWebViewHostLayoutContext());
             return true;
@@ -237,7 +256,7 @@ public sealed partial class MainWindow
 
         void TryComplete()
         {
-            if (webView.IsLoaded && HasUsableWebViewHostLayout())
+            if (HasUsableWebViewHostLayout(webView))
             {
                 completion.TrySetResult();
             }
@@ -249,6 +268,7 @@ public sealed partial class MainWindow
 
         webView.Loaded += OnLoaded;
         WebViewHost.SizeChanged += OnSizeChanged;
+        webView.SizeChanged += OnSizeChanged;
 
         try
         {
@@ -275,22 +295,42 @@ public sealed partial class MainWindow
         {
             webView.Loaded -= OnLoaded;
             WebViewHost.SizeChanged -= OnSizeChanged;
+            webView.SizeChanged -= OnSizeChanged;
         }
     }
 
-    private bool HasUsableWebViewHostLayout()
+    private bool HasUsableWebViewHostLayout(WebView2? webView = null)
     {
-        return WebViewHost.ActualSize.X > 0 &&
+        if (_isCompactMode ||
+            _isWindowHidden ||
+            WindowFrameHelper.IsWindowMinimized(this) ||
+            WebViewHost.ActualSize.X <= 0 ||
+            WebViewHost.ActualSize.Y <= 0 ||
+            WebViewHost.Visibility != Visibility.Visible)
+        {
+            return false;
+        }
+
+        return webView is null ||
+            webView.IsLoaded &&
+            webView.ActualSize.X > 0 &&
+            webView.ActualSize.Y > 0 &&
+            webView.Visibility == Visibility.Visible;
+    }
+
+    private bool HasUsableWebViewHostShellLayout()
+    {
+        return !_isCompactMode &&
+            !_isWindowHidden &&
+            !WindowFrameHelper.IsWindowMinimized(this) &&
+            WebViewHost.ActualSize.X > 0 &&
             WebViewHost.ActualSize.Y > 0 &&
             WebViewHost.Visibility == Visibility.Visible;
     }
 
     private bool CanInitializeWebViewHost()
     {
-        return !_isCompactMode &&
-            !_isWindowHidden &&
-            !WindowFrameHelper.IsWindowMinimized(this) &&
-            HasUsableWebViewHostLayout();
+        return HasUsableWebViewHostShellLayout();
     }
 
     private void OnWebViewHostSizeChanged(object sender, SizeChangedEventArgs args)
@@ -300,27 +340,72 @@ public sealed partial class MainWindow
 
     private void ResumeDeferredWebViewRecreationIfReady()
     {
-        if (string.IsNullOrEmpty(_deferredWebViewRecreationReason) || !CanInitializeWebViewHost())
+        if (ViewModel.IsPlaceholderEnvironment)
+        {
+            if (_webViewRecreationService.HasPendingDeferredOrActiveWork || WebViewHost.Children.Count > 0)
+            {
+                ClearWebViewHostForPlaceholderEnvironment("deferred_resume_placeholder");
+            }
+
+            return;
+        }
+
+        if (!CanInitializeWebViewHost() ||
+            !_webViewRecreationService.TryConsumeDeferred(out var reason) ||
+            reason is null)
         {
             return;
         }
 
-        var reason = _deferredWebViewRecreationReason;
-        _deferredWebViewRecreationReason = null;
-        ScheduleWebViewRecreation("visible_layout_ready");
+        ScheduleWebViewRecreation(reason);
         RecordInstrumentationEvent("webview.recreation.deferred_resumed", new
         {
             reason
         });
     }
 
+    private void ClearWebViewHostForPlaceholderEnvironment(string reason)
+    {
+        _webViewRecreationTimer.Stop();
+        _webViewRecreationService.ClearPending();
+        ViewModel.DetachWebViewHost();
+
+        foreach (var child in WebViewHost.Children.OfType<WebView2>().ToArray())
+        {
+            child.Close();
+        }
+
+        WebViewHost.Children.Clear();
+        RecordInstrumentationEvent("webview.recreation.skipped_placeholder_environment", new { reason });
+    }
+
+    private void ScheduleDeferredWebViewRecreationRetry(string reason)
+    {
+        var scheduled = _webViewRecreationService.Schedule(reason);
+        RecordInstrumentationEvent("webview.recreation.retry_after_layout_timeout", new
+        {
+            reason = scheduled.Reason,
+            scheduled.IsRecreating,
+            scheduled.MergedRequests,
+            layout = CreateWebViewHostLayoutContext()
+        });
+    }
+
     private object CreateWebViewHostLayoutContext()
     {
+        var webView = WebViewHost.Children.OfType<WebView2>().FirstOrDefault();
         return new
         {
             width = WebViewHost.ActualSize.X,
             height = WebViewHost.ActualSize.Y,
-            visibility = WebViewHost.Visibility.ToString()
+            visibility = WebViewHost.Visibility.ToString(),
+            isCompactMode = _isCompactMode,
+            isWindowHidden = _isWindowHidden,
+            isMinimized = WindowFrameHelper.IsWindowMinimized(this),
+            webViewLoaded = webView?.IsLoaded,
+            webViewWidth = webView?.ActualSize.X,
+            webViewHeight = webView?.ActualSize.Y,
+            webViewVisibility = webView?.Visibility.ToString()
         };
     }
 

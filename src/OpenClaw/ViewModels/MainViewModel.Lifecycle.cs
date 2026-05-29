@@ -1,6 +1,7 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
 using Microsoft.UI.Xaml.Controls;
+using OpenClaw.Models;
 using OpenClaw.Services;
 
 namespace OpenClaw.ViewModels;
@@ -13,6 +14,7 @@ public partial class MainViewModel
         _webViewService.NavigationErrorOccurred += OnNavigationError;
         _webViewService.NavigationStartTimedOut += OnNavigationStartTimedOut;
         _webViewService.NavigationCompletionTimedOut += OnNavigationCompletionTimedOut;
+        _webViewService.NavigationTimeoutRecovered += OnNavigationTimeoutRecovered;
         _webViewService.ControlUiSnapshotUpdated += OnControlUiSnapshotUpdated;
         _webViewService.HeartbeatObserved += OnHeartbeatObserved;
         _latencyService.LatencyUpdated += OnLatencyUpdated;
@@ -24,6 +26,7 @@ public partial class MainViewModel
         _webViewService.NavigationErrorOccurred -= OnNavigationError;
         _webViewService.NavigationStartTimedOut -= OnNavigationStartTimedOut;
         _webViewService.NavigationCompletionTimedOut -= OnNavigationCompletionTimedOut;
+        _webViewService.NavigationTimeoutRecovered -= OnNavigationTimeoutRecovered;
         _webViewService.ControlUiSnapshotUpdated -= OnControlUiSnapshotUpdated;
         _webViewService.HeartbeatObserved -= OnHeartbeatObserved;
         _latencyService.LatencyUpdated -= OnLatencyUpdated;
@@ -47,26 +50,38 @@ public partial class MainViewModel
             return;
         }
 
-        var cancellationToken = _lifetimeCts.Token;
-        _runtime.Logger.Info("Initializing WebView2 host.", new { environment = _selectedEnvironment.Name });
+        if (_selectedEnvironment.IsPlaceholder)
+        {
+            ApplyPlaceholderEnvironmentState();
+            return;
+        }
 
-        await _webViewService.InitializeAsync(webView, _selectedEnvironment.Name, cancellationToken);
+        var cancellationToken = _lifetimeCts.Token;
+        var environmentName = _selectedEnvironment.Name;
+        var gatewayUrl = _selectedEnvironment.GatewayUrl;
+        _runtime.Logger.Info("Initializing WebView2 host.", new { environment = environmentName });
+
+        await _webViewService.InitializeAsync(webView, environmentName, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (_isDisposed || !_webViewService.IsInitialized)
+        if (!IsCurrentSelectedEnvironment(environmentName, gatewayUrl) ||
+            _isDisposed ||
+            !_webViewService.IsInitialized)
         {
             return;
         }
 
-        _runtime.Logger.Info("WebView2 host initialized.", new { environment = _selectedEnvironment.Name });
+        _runtime.Logger.Info("WebView2 host initialized.", new { environment = environmentName });
 
         await _hostedUiBridge.InitializeAsync(webView, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (_isDisposed || !_hostedUiBridge.IsInitialized)
+        if (!IsCurrentSelectedEnvironment(environmentName, gatewayUrl) ||
+            _isDisposed ||
+            !_hostedUiBridge.IsInitialized)
         {
             return;
         }
 
-        _runtime.Logger.Info("Hosted UI bridge initialized for WebView2.", new { environment = _selectedEnvironment.Name });
+        _runtime.Logger.Info("Hosted UI bridge initialized for WebView2.", new { environment = environmentName });
 
         await _coordinator.AttachAsync(
             _webViewService,
@@ -76,20 +91,20 @@ public partial class MainViewModel
             _runtime.Logger,
             _dispatchToUi);
         cancellationToken.ThrowIfCancellationRequested();
-        if (_isDisposed)
+        if (!IsCurrentSelectedEnvironment(environmentName, gatewayUrl) || _isDisposed)
         {
             return;
         }
 
-        _coordinator.SetEnvironment(_selectedEnvironment.Name, _selectedEnvironment.GatewayUrl);
+        _coordinator.SetEnvironment(environmentName, gatewayUrl);
         UpdateStatusPresentation();
         RefreshResourceScheduling();
-        _runtime.Logger.Info("Shell session coordinator attached.", new { environment = _selectedEnvironment.Name });
+        _runtime.Logger.Info("Shell session coordinator attached.", new { environment = environmentName });
 
-        if (_webViewService.IsInitialized)
+        if (_webViewService.IsInitialized && IsCurrentSelectedEnvironment(environmentName, gatewayUrl))
         {
-            _runtime.Logger.Info("Navigating WebView2 to selected environment.", new { environment = _selectedEnvironment.Name, gatewayUrl = _selectedEnvironment.GatewayUrl });
-            _webViewService.Navigate(_selectedEnvironment.GatewayUrl);
+            _runtime.Logger.Info("Navigating WebView2 to selected environment.", new { environment = environmentName, gatewayUrl });
+            _webViewService.Navigate(gatewayUrl);
         }
     }
 
@@ -106,6 +121,15 @@ public partial class MainViewModel
         _coordinator?.DetachServices();
         _hostedUiBridge.DetachCurrentWebView();
         _webViewService.DetachCurrentWebViewHost();
+        if (_selectedEnvironment?.IsPlaceholder == true)
+        {
+            ApplyPlaceholderEnvironmentState();
+        }
+        else
+        {
+            ApplyWebViewHostDetachedState();
+        }
+
         RefreshResourceScheduling();
     }
 
@@ -178,6 +202,7 @@ public partial class MainViewModel
         {
             _latencyService.Stop();
             _webViewService.StopHeartbeat();
+            ResetResourceProbeProjection();
             return;
         }
 
@@ -191,6 +216,7 @@ public partial class MainViewModel
         }
 
         _webViewService.StopHeartbeat();
+        ResetHeartbeatProjection();
     }
 
     private bool ShouldRunHeartbeatForCurrentState()
@@ -200,5 +226,29 @@ public partial class MainViewModel
                 snapshot.Phase == ControlUiPhase.Connected) ||
             (_webViewService.CurrentState == ConnectionState.Reconnecting &&
                 snapshot.Phase == ControlUiPhase.Unavailable);
+    }
+
+    private bool IsCurrentSelectedEnvironment(string environmentName, string gatewayUrl)
+    {
+        return _selectedEnvironment is not null &&
+            !_selectedEnvironment.IsPlaceholder &&
+            string.Equals(_selectedEnvironment.Name, environmentName, StringComparison.Ordinal) &&
+            string.Equals(_selectedEnvironment.GatewayUrl, gatewayUrl, StringComparison.Ordinal);
+    }
+
+    private void ResetResourceProbeProjection()
+    {
+        ResetHeartbeatProjection();
+        ResetLatencyProjection();
+    }
+
+    private void ApplyWebViewHostDetachedState()
+    {
+        ApplyConnectionState(ConnectionState.Loading);
+        ResetTelemetry();
+        ApplyRecoveryState(RecoveryState.Connecting);
+        ResetResourceProbeProjection();
+        IsErrorVisible = false;
+        ShowRetryButton = false;
     }
 }

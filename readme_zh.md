@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 3.0.1
+**当前版本：** 5.0.0
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,16 +26,29 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 3.0.1 注意事项
+## 当前 5.0.0 注意事项
 
-- `3.0.1` 是当前重构验证分支的元数据。v3.3.6 架构清理仍是本分支 review baseline；这不表示要改写 [changelog.md](changelog.md) 中历史 `v3.0.1` / `v3.0.0` 发布条目。
+- 本轮收尾继续加固 timeout / `Unavailable` 恢复路径：terminal `Unavailable` 会在 `Reconnecting` 时显示可见 InfoBar，`GatewayError` / `Unavailable` 不会让 ShellSessionCoordinator 停留在旧的 Ready/Healthy 投影，completion timeout 后迟到但仍属当前导航的成功 completion 会重新建立 navigation cancellation ownership 并继续正常 page-token/probe 路径。
+- 动态 WebView 重建如果抛出异常，会显示本地化的可操作错误和 Retry，而不是在 timeout recovery 先隐藏 InfoBar 后只写日志。
+- 迟到但已恢复的导航现在也能取消已经排队、延后或正在执行的 timeout-only WebView 重建，避免重建流程拆掉已经恢复的 WebView。
+- WebView2 子控件 layout timeout 会计入 recreation circuit breaker，不再无限重试。
+- WebView detach / recreation 和资源 probe stop 会同步清理顶部可见状态，避免旧 `HB OK`、ping、`AUTH OK`、`LIVE` / `IDLE` 或 MODEL 看起来仍属于当前会话。
+
+- `5.0.0` 是当前重构验证分支的元数据。v3.3.6 架构清理仍是本分支 review baseline；这不表示要改写 [changelog.md](changelog.md) 中历史 `v3.0.5` / `v3.0.1` / `v3.0.0` 发布条目。
 - [docs/code-style.md](docs/code-style.md) 是本分支统一的代码规范和架构边界入口。
+- solution 会把当前 `x64`/`x86`/`ARM64` solution platform 下的 `OpenClaw.Core` 映射到 Core project 自身的平台无关 `AnyCPU` 配置，避免 VS2026 打开 Debug/Release x64 时要求手动修 Configuration Manager。
+- 默认的 `https://example.com` 环境会被当作首次运行占位符，而不是真实 Control UI。选中该环境时，MainWindow 会跳过 WebView2 host 创建、停止 heartbeat/latency probe、清理旧 WebView host，并显示本地化的“请在设置中配置 Gateway URL”状态，不会继续导航到 `example.com` 或让 loading ring 保持转圈。
+- 已保存的语言偏好现在使用 Windows App SDK 的 `Microsoft.Windows.Globalization.ApplicationLanguages` API，启动时会应用配置的语言，不再记录之前 WinRT API 触发的 `Language override failed` warning。
 - 运行时职责拆到聚焦服务：`WebViewStatusInspector`、`HeartbeatRuntime`、`GatewayHeartbeatTransport`、`HostedSessionHeartbeatPolicy`、`WebViewRecreationService`、`SettingsPersistenceAdapter`、`LiveShellSettingsApplier` 和 `StatusPresenter`。
+- `WebViewService.cs` 现在只保留共享字段、构造、事件和 public navigation command；WebView2 初始化、detach/dispose 和 current-target 检查放在 `WebViewService.Lifecycle.cs`，profile/session 操作放在 `WebViewService.Session.cs`。
+- `WebViewService` navigation 代码继续按职责拆分：event/completion flow 在 `WebViewService.Navigation.cs`，host-message handling 在 `WebViewService.HostMessages.cs`，shared navigation ownership/cancellation helpers 在 `WebViewService.NavigationState.cs`，watchdog ownership 在 `WebViewService.NavigationWatchdogs.cs`，CoreWebView2 command wrapper 在 `WebViewService.NavigationCommands.cs`，page-token/session-ready retry 在 `WebViewService.PageToken.cs`，process-failure/auto-retry recovery 在 `WebViewService.NavigationRecovery.cs`。
 - Hosted bridge 逻辑拆成嵌入式 JavaScript assets，分别负责 host messaging、mutation filtering、MODEL resolution、DOM fallback、activity/stale-busy、phase classification、command dispatch 和 status inspection。
-- WebView status probe 现在按 generation 和 accepted page version 归属、带 timeout、触碰 WebView2 前回到 UI dispatcher，并通过 owner/page-token 校验避免旧 document 或已取消 inspection 覆盖当前状态；timeout 或脚本失败会发布归属明确的 `Unavailable` 快照、降级旧的 `Connected` shell 状态，并在同一个 accepted page 内让最近一次非空 MODEL 贯穿 loading、unavailable 和 unknown 快照。
+- `WebViewStatusInspector` 主 partial 保留共享状态、公共入口和 snapshot publication，direct inspection/coalescing、post-navigation probe、Control UI snapshot parsing 和有界 script execution 已拆到聚焦 partial。
+- WebView status probe 现在按 generation 和 accepted page version 归属、带 timeout、触碰 WebView2 前回到 UI dispatcher，并通过 owner/page-token 校验避免旧 document 或已取消 inspection 覆盖当前状态；timeout、脚本失败或导航后 probe 耗尽都会发布归属明确且会终止 probe 的 `Unavailable` 快照、降级旧的 `Connected` shell 状态，并在同一个 accepted page 内让最近一次非空 MODEL 贯穿 loading、unavailable 和 unknown 快照。
 - Hosted bridge command 和 WebView stop/abort 脚本都有有界执行 timeout，并在 WebView 目标或已接受 page ownership 切换后拒绝旧结果；由 recovery 拥有的 bridge command 会把当前 recovery cancellation token 串到 UI dispatch 和脚本执行中；CustomEvent command fallback 不再被当成已处理命令，除非 hosted bridge method 真正接受了命令；Stop fallback 会绑定最初的页面目标，避免旧 command 被拒后误停新页面。
 - WebView navigation、reload、手动 retry 和 auto-retry 会在调用 CoreWebView2 前失效 page ownership；手动 Retry 在没有可重试 navigation 时会保留本地化可操作错误提示，由 recovery 拥有的 reload 会携带当前 recovery cancellation token，并确认 reload 确实启动后才推进状态；过期 auto-retry continuation 会直接退出，不再发布旧 navigation 状态，page-token retry 和 native-triggered `session-ready` replay 使用 lease-owned navigation cancellation scope，确保 reload、detach 或新 navigation 会取消旧工作，同时不会 dispose 仍被使用的 token；重试耗尽或失败也会进入 Error，而不是让外壳卡在 Reconnecting；page-token 捕获耗尽只会对原 navigation generation 发布 `Unavailable`，Stop fallback 也会取消 navigation watchdog、probe 和 page ownership，避免用户 Stop 后旧启动 timeout 回头触发 recovery。
-- WebView 启动恢复现在允许当前 `NavigationCompleted` 在缺失 `NavigationStarting` 回调时接管 navigation，completion timeout 需要匹配 active watchdog id 才能生效，并且全窗口 loading ring 只绑定浏览器 navigation 的 `Loading`，不再覆盖较长的 `GatewayConnecting` 状态阶段。
+- WebView 启动恢复现在只允许匹配 pending 目标的 `NavigationCompleted` 在缺失 `NavigationStarting` 回调时接管 navigation，并记录 previous source 用于拒绝 stale completion；start timeout 后会在有界恢复窗口内保留 pending target，迟到的 completion 恢复页面时会取消尚未执行或因 compact/隐藏/最小化而延后的 timeout 触发型 WebView 重建；timeout recovery 请求与其他请求合并时会保留 settings、initial、session 和 topology 等更高优先级的重建原因；completion timeout 需要匹配 active watchdog id 才能生效，并且全窗口 loading ring 只绑定浏览器 navigation 的 `Loading`，不再覆盖较长的 `GatewayConnecting` 状态阶段。
+- 动态 WebView 重建现在会等待 window shell、host panel 和新 WebView2 子控件都可见且尺寸非零后才初始化/导航；compact、隐藏到托盘或最小化启动状态会延后重建且不丢失原始的高优先级原因，WebView2 子控件 layout timeout 会通过正常 recreation timer/circuit-breaker 路径重新排队，避免一直等下一个窗口事件；延后重建归属也由 `WebViewRecreationService` 持有，不再对不可呈现的 WebView 发起导航并在 12 秒后触发 start watchdog。
 - Hosted bridge 的 session/status 消息使用 host generation 和 owner/page-token 归属校验，不再依赖 CoreWebView2 wrapper reference identity，避免 WebView2 暴露不同 COM wrapper 对象时吞掉有效的 `session-ready` 或 status post。
 - WebView process failure 会先退休 navigation retry/replay cancellation，再发布 unavailable 状态；注入式 ViewModel UI 更新会捕获并记录回调异常，避免 dispatcher 回调变成 UI 线程未处理异常。
 - Gateway heartbeat 会把 5xx、缺失 Control UI 路径的 404、heartbeat probe 被拒绝的 405 和未预期 4xx transport 响应识别为失败，也会把 hosted-session inspection `Unavailable` 识别为失败，避免页面 bridge/status probe 不可用时误回落到健康 HTTP transport；并在 stop/restart 后拒绝旧 heartbeat run 的观察和 recovery 请求，触发 recovery 前只会停掉当前 run，同时保持自己接管的 `Reconnecting`/`Unavailable` hosted-session 状态继续跑 heartbeat；heartbeat loop 会离开调用线程调度，同时启动时会先发布一次即时观察，再进入周期探测；native 接受 page-token 后也可以请求 hosted `session-ready` replay。
@@ -235,7 +248,7 @@ Manual debug 需要明确覆盖：
 
 - 仓库内没有 active C# test harness；当前验证依赖 restore/build/format、guardrail scripts、bridge script checks 和 VS2026 manual debug。
 - Bridge 脚本行为由 `tools\verify-bridge-scripts.ps1` 覆盖，但浏览器运行时行为仍需要 WebView2/VS2026 debug；当前 checkpoint 有意不保留 C# harness。
-- `WebViewService.cs` 仍是 navigation/lifecycle shell，不应再吸收新的 inspection、heartbeat 或 bridge 职责。
+- `WebViewService` 已拆成聚焦 partial；新的 lifecycle、navigation、inspection、heartbeat、command 和 profile/session 行为应放到对应 partial，而不是继续塞进 root 文件。
 - 真实 Gateway、Cloudflare Tunnel、反代错误页、tray、hotkey、single-instance、DWM title-bar 和 compact mode 行为仍需要 VS2026 manual debug；当前 checkpoint 有意不保留本地 C# harness。
 
 ### 开发日志
@@ -261,7 +274,7 @@ dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 
 ### 首次启动
 
-1. 应用会使用一个占位环境启动。
+1. 应用会使用一个占位环境启动，在配置真实 Control UI URL 前不会导航 WebView2。
 2. 从顶部栏打开 Settings。
 3. 添加你的公共 OpenClaw Control UI URL，例如 `https://your-gateway.example.com`。
 4. 保存设置后，内嵌 WebView2 外壳会加载远程 UI。

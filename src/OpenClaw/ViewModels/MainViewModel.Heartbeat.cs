@@ -27,6 +27,14 @@ public partial class MainViewModel
         HeartbeatSummaryBrush = WarningBrush;
     }
 
+    private void ResetHeartbeatProjection()
+    {
+        HeartbeatSummary = StringResources.HeartbeatWait;
+        HeartbeatSummaryBrush = WarningBrush;
+        _lastHeartbeatStatus = null;
+        ResetHeartbeatIndicatorsToWarning();
+    }
+
     private void StartHeartbeatForSelectedEnvironment()
     {
         if (_selectedEnvironment is null)

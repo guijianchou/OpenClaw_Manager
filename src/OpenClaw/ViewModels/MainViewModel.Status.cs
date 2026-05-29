@@ -41,6 +41,14 @@ public partial class MainViewModel
         });
     }
 
+    private void OnNavigationTimeoutRecovered()
+    {
+        DispatchUiUpdate(() =>
+        {
+            NavigationTimeoutRecoveryNoLongerNeeded?.Invoke();
+        });
+    }
+
     private void OnControlUiSnapshotUpdated(ControlUiProbeSnapshot snapshot)
     {
         DispatchUiUpdate(() => ApplyControlUiSnapshot(snapshot));
@@ -152,6 +160,13 @@ public partial class MainViewModel
         if (snapshot.IsIssue && ConnectionState is ConnectionState.Error or ConnectionState.AuthFailed or ConnectionState.Reconnecting)
         {
             ErrorMessage = snapshot.DetailOrSummary;
+            IsErrorVisible = true;
+        }
+        else if (snapshot.Phase == ControlUiPhase.Unavailable &&
+            ConnectionState == ConnectionState.Reconnecting)
+        {
+            ErrorMessage = snapshot.DetailOrSummary;
+            IsErrorVisible = true;
         }
         else if (ConnectionState is not ConnectionState.Error and not ConnectionState.AuthFailed)
         {

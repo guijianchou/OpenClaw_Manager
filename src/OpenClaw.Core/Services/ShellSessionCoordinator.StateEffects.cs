@@ -49,6 +49,10 @@ public sealed partial class ShellSessionCoordinator
             case ControlUiPhase.OriginRejected:
                 MarkRecoveryAuthIssue(snapshot.DetailOrSummary);
                 break;
+            case ControlUiPhase.GatewayError:
+            case ControlUiPhase.Unavailable:
+                MarkRecoveryDegraded(snapshot.DetailOrSummary);
+                break;
         }
     }
 

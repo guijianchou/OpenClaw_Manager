@@ -282,11 +282,11 @@ public partial class App : Application
         {
             if (string.IsNullOrEmpty(language) || language == "System")
             {
-                Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = string.Empty;
+                Microsoft.Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = string.Empty;
             }
             else
             {
-                Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = language;
+                Microsoft.Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = language;
             }
 
             return true;

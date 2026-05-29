@@ -19,8 +19,10 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - Keep comments sparse and useful. Explain ownership, lifecycle, or non-obvious platform behavior.
 - Keep user-visible strings in `StringResources` typed properties and `.resw` files. Diagnostic-only text and protocol/status tokens may stay close to the code that emits them.
 - Keep English and Chinese `.resw` resource keys aligned; `tools\verify-repo-structure.ps1` must fail if a resource key exists in only one locale.
+- WinUI language overrides must use `Microsoft.Windows.Globalization.ApplicationLanguages` from Windows App SDK. Do not use `Windows.Globalization.ApplicationLanguages` in this unpackaged WinUI app.
 - Prefer structured logs with stable event keys and context objects for state transitions.
 - Background work owns its lifetime explicitly: store the `Task`, store cancellation state, and observe shutdown exceptions.
+- Do not add synchronous waits in runtime/UI paths. The only approved `.Wait()` / `.GetAwaiter().GetResult()` calls are documented shutdown drains for settings flush, logger flush, and single-instance listener ownership release.
 - Long-running UI commands must use `AsyncCommand` or an equivalent reentry guard so repeated clicks cannot start concurrent command work; reset command state in `finally` and observe/log failures.
 - Large filesystem work started by UI commands or Settings must run off the UI thread. Log enumeration, diagnostic bundle compression, and inactive WebView2 profile deletion are not allowed to run synchronously in dialog or command handlers.
 - Deferred/coalesced background workers must serialize queue state with their lifetime gate, then be cancelled, drained, or observed before shutdown flush paths dispose shared logger/configuration services.
@@ -32,14 +34,20 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - WebView/CoreWebView2 async work must carry cancellation and generation ownership before applying state after an `await`.
 - Programmatic WebView navigation, reload, and retry must invalidate accepted page ownership and clear the accepted navigation id before the CoreWebView2 call, not only in `NavigationStarting`.
 - `NavigationCompleted` must tolerate a missing `NavigationStarting` when a start watchdog is still active and the navigation id has not been claimed; this is a WebView2 event-delivery edge, not a network failure.
+- If a successful `NavigationCompleted` arrives after completion-timeout recovery cancelled navigation cancellation ownership, and the navigation generation/id/host are still current, recreate navigation cancellation ownership and run the normal page-token/status-probe path rather than returning before recovery cleanup can complete.
 - Navigation completion timeouts must validate an active completion-watchdog id, not only the current page generation and navigation id, so queued timeout callbacks cannot publish recovery after successful completion.
 - Reload must report whether CoreWebView2 actually accepted the command; recovery code must treat a no-op reload as failed recovery instead of advancing to Connecting.
-- Manual Retry must not clear visible errors until retry navigation actually starts; when no retryable WebView navigation exists, keep a localized actionable error visible.
+- Manual Retry and Reload must not clear visible errors until WebViewService reports that navigation actually started; when no retryable WebView navigation exists, keep a localized actionable error visible.
 - Auto-retry continuations must re-check generation/navigation/WebView ownership after their delay, return stale when another navigation has taken over, and publish Error if retries are exhausted or the retry command cannot start.
-- WebView/CoreWebView2 async event handlers must delegate awaited work to observed helpers and log failures instead of letting exceptions escape `async void` handlers.
+- WebView/CoreWebView2 async event handlers must delegate awaited work to observed helpers and log failures instead of letting exceptions escape `async void` handlers. Navigation-completion handler failures must also publish `Unavailable` plus Error rather than leaving stale Loading state.
 - WebView status probe loops must store their task and cancellation source; stop paths cancel only, while the running probe task disposes its cancellation source in `finally`.
+- WebView status probe loops must publish an owned `Unavailable` snapshot when all bounded post-navigation probes are exhausted without a terminal Control UI phase.
+- `ControlUiPhase.Unavailable` is terminal for post-navigation status probes; recovery owns follow-up after that state, so probes should not keep executing page scripts.
 - Control UI latency probe loops follow the same ownership rule: keep the task observed, make stop paths cancel only, let the running probe dispose timer/cancellation resources, and reject stale run results before publishing UI state.
 - WebView host recreation must detach the coordinator, hosted bridge, and WebView service from the outgoing control before closing old WebView2 instances.
+- WebView host recreation must wait for a visible non-compact/non-minimized host and a loaded, visible, non-zero-sized WebView2 child before initialization or navigation. If the shell host is unavailable, defer recreation instead of navigating into a non-presented control. If the child layout times out, requeue through the normal recreation timer and count it as a circuit-breaker attempt.
+- A late successful navigation recovery must be able to cancel pending, deferred, or already-active timeout-only WebView recreation before that recreation detaches the recovered host.
+- WebView host recreation exceptions must surface a localized actionable InfoBar error with Retry. Do not only log after timeout recovery hid the previous InfoBar.
 - Cancellation sources handed to running async operations should have one disposal owner; external abort paths cancel them and let the owning operation dispose them.
 - WinUI async event handlers that show dialogs or clear environment/session state must guard reentry, catch/log failures, and use localized user-facing error text.
 - WebView2 and hosted bridge operations that originate from background recovery, heartbeat, or status-probe paths must marshal through the app-layer UI dispatcher, including WebViewService's own heartbeat and navigation-after-load inspection loops.
@@ -59,12 +67,14 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - Fire-and-forget recovery work must be observed through a helper that catches cancellation, disposal, and unexpected exceptions.
 - ShellSessionCoordinator event-gap, heartbeat-triggered, stale-busy, and foreground-resume recovery work must own cancellable observed-operation CTS instances. Attach, detach, reset, and dispose paths cancel those operations before replacing WebView/bridge services.
 - ShellSessionCoordinator public reconnect, soft-resync, and hard-refresh requests must link the caller cancellation token into the actual recovery operation CTS before queueing inspections, bridge commands, or reloads.
+- ShellSessionCoordinator must not leave `RecoveryState` in a stale Ready/Healthy projection after terminal hosted-session failures; `GatewayError` and `Unavailable` should move recovery state to degraded/failure handling.
 - Recovery inspection helpers must pass their active cancellation token into `InspectControlUiStateAsync` and must rethrow `OperationCanceledException`; cancellation must not be converted into reconnect fallback.
 - ShellSessionCoordinator reconnect and hard-refresh reloads must pass the active recovery operation cancellation token through the Core WebView contract and app-layer UI dispatcher adapter.
 - ShellSessionCoordinator reconnect and soft-resync bridge commands must pass the active recovery operation cancellation token through the Core bridge contract, app-layer UI dispatcher adapter, and hosted bridge command execution path.
 - WebView2 script probes and hosted command dispatch must have bounded timeouts and post-await current-target checks so coalesced callers, recovery operations, and user stop handling cannot inherit an indefinitely stuck page script or consume stale results from a replaced WebView.
 - WebView status inspections must capture an accepted page version before executing page script, require that version before publishing, and suppress publication when all coalesced callers have cancelled.
 - WebView status inspection timeout or script failure must publish an owned `Unavailable` snapshot when generation/page ownership is still current, downgrade stale `Connected` shell state, and preserve the last non-empty MODEL for the same accepted page.
+- Control UI issue snapshots such as auth required, pairing required, origin rejected, and Gateway error must make the user-facing error InfoBar visible; terminal `Unavailable` snapshots must also show a visible InfoBar while the shell is reconnecting. Do not only change status text.
 - Hosted bridge commands and WebView stop/abort command results must also validate the accepted page-ownership version after awaits, because same-WebView navigation can invalidate the page without replacing the `CoreWebView2` object.
 - Hosted bridge CustomEvent fallback must not be reported as a handled command unless a hosted bridge method actually accepted the command.
 - WebView Stop fallback must remain bound to the original WebView/page target captured at command start; a stale hosted command rejection must not call `Stop()` on a newer page.
@@ -79,6 +89,7 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - Exhausted native page-token capture after navigation must publish an owned `Unavailable` snapshot instead of leaving the shell in `PageLoaded` or `GatewayConnecting` indefinitely.
 - ShellSessionCoordinator recovery inspections must carry the active recovery operation cancellation token before making reload fallback decisions.
 - MainViewModel latency updates must reject snapshots whose host no longer matches the selected environment.
+- Stopping heartbeat or latency probes must reset the visible HB/Ping projection, and WebView detach/recreation must reset MODEL, access, work, recovery, heartbeat, and latency projections before a replacement session reports fresh state.
 
 ## XAML Rules
 
@@ -98,19 +109,29 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - The Core physical source tree (`src/OpenClaw.Core`) owns pure settings, diagnostics formatting, parser, policy, telemetry, and recovery logic.
 - Define "Core" as WinUI-free. Core-compatible files must not reference `Microsoft.UI`, `Microsoft.Web.WebView2`, XAML types, Windows App SDK packages, or `App`.
 - Core-compatible files physically live under `src/OpenClaw.Core`; do not add linked Core source files unless a migration plan explicitly scopes a short-lived transition.
+- `OpenClaw.Core` must remain a platform-independent SDK class library. The solution may expose `x86`, `x64`, and `ARM64` for the WinUI app, but Core mappings must target `Debug|AnyCPU` or `Release|AnyCPU` because VS2026 validates project configurations before build.
 - There are no current linked Core source exceptions. WinUI adapters should convert platform objects into plain Core types at the app boundary.
 - `WebViewStatusInspector` owns generation-scoped and accepted-page-version-scoped Control UI inspection and must not let stale async script results update current state.
-- `WebViewStatusInspector` owns the status inspection timeout and in-flight coalescing boundary.
+- `WebViewStatusInspector.cs` owns shared state, public entry points, and snapshot publication. Keep direct inspection/coalescing in `WebViewStatusInspector.Inspection.cs`, post-navigation probing in `WebViewStatusInspector.Probe.cs`, Control UI snapshot parsing in `WebViewStatusInspector.Parsing.cs`, and bounded script execution in `WebViewStatusInspector.ScriptExecution.cs`.
 - `HeartbeatRuntime` owns heartbeat task/cancellation lifetime; heartbeat policy code should not recreate CTS/task ownership, and hosted-session inspection must use the injected UI dispatcher before touching WebView2.
 - `GatewayHeartbeatTransport` owns HTTP probing, and `HostedSessionHeartbeatPolicy` owns hosted Control UI phase-to-heartbeat mapping.
 - `HostedSessionHeartbeatPolicy` must treat `Unavailable` as failure so a broken page bridge does not appear healthy because transport still responds.
-- `WebViewRecreationService` owns recreation scheduling, merge accounting, and circuit-breaker decisions; `MainWindow` should keep the actual WebView2 control swap.
+- `WebViewRecreationService` owns recreation scheduling, deferred/pending reason state, merge accounting, and circuit-breaker decisions; `MainWindow` should keep the actual WebView2 control swap.
+- The default `https://example.com` environment is a first-run placeholder. While it is selected, `MainWindow` must not create, initialize, or navigate a WebView2 host; it should clear any old WebView host and leave status projection on the localized configure-Gateway state.
+- WebView initialization must capture selected environment name and URL before awaits and re-check that identity before bridge attach and navigation. A late environment switch to the placeholder must cancel active recreation, not just clear queued recreation.
+- Placeholder WebView cleanup should be signal-bearing. Layout resume events in placeholder mode should log a skip only when pending/deferred/active recreation work exists or a stale WebView2 child is removed.
 - `LiveShellSettingsApplier` owns current-process application of live shell settings such as always-on-top and global hotkey changes.
 - Live multiple-instance setting changes must serialize listener ownership with app shutdown and must not block Settings save while waiting for the named-pipe listener to stop.
 - `SingleInstanceCoordinator` owns the named semaphore and named pipe. Keep the pipe name stable for activation handoff, keep secondary-launch activation/takeover waits asynchronous under one shared deadline, and treat legacy same-name lock conflicts as secondary launches instead of crashing startup.
+- Single-instance shutdown is a deliberate drain: app close waits for listener stop before releasing ownership, but ordinary settings/startup/recovery code must stay async and must not add new synchronous waits.
 - `SettingsPersistenceAdapter` owns the `App.Configuration` boundary for settings save/load from the settings UI.
+- `SettingsViewModel` must stay a settings draft/persistence ViewModel. It may use `WebViewService.TryMoveUserDataFolderToRenamedEnvironment` for the existing profile-rename migration only; runtime WebView navigation, heartbeat, session, and recreation operations stay behind MainViewModel, MainWindow, and focused services.
 - `AppRuntimeContext` owns logger/configuration access for `MainViewModel`; do not reintroduce `App.Logger` or `App.Configuration` inside ViewModel partials.
+- Direct `App.Logger`, `App.Configuration`, and `App.MainWindow` access is restricted to WinUI app-edge files such as `App.xaml.cs`, `MainWindow` partials, and dialog glue. Services, ViewModels, Core-compatible code, and adapters must receive logger/configuration/window state through typed dependencies.
 - `StatusPresenter` owns pure status text/brush/mode formatting and should not mutate bindable ViewModel state.
+- `DiagnosticService` depends on `IDiagnosticWebViewSession`; do not couple diagnostic checks directly to concrete `WebViewService` lifecycle/navigation internals.
+- `WebViewService.cs` should remain the small root partial for shared state, construction, events, state publishing, and public navigation commands. Keep WebView2 initialization/detach/dispose/current-target checks in `WebViewService.Lifecycle.cs`, and session/profile operations in `WebViewService.Session.cs`.
+- `WebViewService.Navigation.cs` owns WebView2 navigation event entry and completion flow only. Keep host-message handling in `WebViewService.HostMessages.cs`, shared navigation ownership/cancellation helpers in `WebViewService.NavigationState.cs`, watchdogs in `WebViewService.NavigationWatchdogs.cs`, CoreWebView2 command wrappers in `WebViewService.NavigationCommands.cs`, page-token/session-ready retry in `WebViewService.PageToken.cs`, and recovery-specific helpers in `WebViewService.NavigationRecovery.cs`.
 - New protocol or parser code starts in Core-compatible files unless it directly needs WinUI/WebView2 APIs.
 - For guardrail tests, keep this contract explicit: new protocol or parser code starts in Core-compatible files.
 
@@ -119,7 +140,8 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - `MainWindow` partial files are split by responsibility: lifecycle, initialization, commands, WebView host recreation, tray, hotkey, compact mode, always-on-top, and theme.
 - `MainViewModel` partial files are split by responsibility: fields, bindable properties, commands, environment selection, lifecycle, status formatting, heartbeat, indicators, and telemetry.
 - `ShellSessionCoordinator` partial files are split by responsibility: dependency interfaces, attach/dispose, event routing, recovery, recovery inspection, recovery state transitions, state effects, host visibility, helpers, and telemetry.
-- `WebViewService` partial files are split by responsibility: lifecycle/navigation shell, heartbeat, Control UI inspection, command injection, and profile-folder helpers.
+- `WebViewService` partial files are split by responsibility: root state/events/public commands, lifecycle/current-target checks, session/profile operations, navigation event/completion flow, host-message handling, navigation state/cancellation ownership, navigation watchdogs, CoreWebView2 command wrappers, page-token/session-ready retry, process-failure/auto-retry recovery, heartbeat, Control UI inspection, hosted command injection, and profile-folder helpers.
+- `WebViewStatusInspector` partial files are split by responsibility: root state/public entry points/snapshot publication, direct inspection/coalescing, post-navigation probes, JSON parsing, and bounded script execution.
 - `HostedUiBridge` keeps native WebView2 bridge lifecycle in C#, while focused embedded JS assets own browser-side host messaging, mutation filtering, model resolution, MODEL DOM fallback, activity/stale-busy state, phase classification, status inspection composition, and command dispatch.
 - New partial files are acceptable only when partial files are split by responsibility. Do not create catch-all "misc" or one-feature dumping grounds.
 
@@ -135,7 +157,7 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 
 ## Tests
 
-- There is no active in-repo regression harness at this checkpoint.
+- There is no active `.NET tests/` regression harness at this checkpoint; embedded bridge behavior is still covered by the script verifier below.
 - When tests are reintroduced, prefer behavior tests against Core services and fakes.
 - Use source-text assertions only for contracts a harness cannot execute, such as XAML resource usage, project metadata, and platform integration declarations.
 - `tools\verify-bridge-scripts.ps1` is the active behavior check for embedded JS assets. Future bridge, MODEL, mutation-filter, status-inspection, and command-dispatch changes must update that script rather than restoring `tests/`.

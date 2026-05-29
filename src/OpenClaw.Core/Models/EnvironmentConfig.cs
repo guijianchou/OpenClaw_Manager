@@ -11,6 +11,8 @@ namespace OpenClaw.Models;
 /// </summary>
 public class EnvironmentConfig : INotifyPropertyChanged
 {
+    public const string PlaceholderGatewayUrl = "https://example.com";
+
     private string _name = string.Empty;
     private string _gatewayUrl = string.Empty;
     private bool _isDefault;
@@ -43,6 +45,10 @@ public class EnvironmentConfig : INotifyPropertyChanged
         get => _isDefault;
         set => SetProperty(ref _isDefault, value);
     }
+
+    [JsonIgnore]
+    public bool IsPlaceholder =>
+        string.Equals(GatewayUrl?.Trim(), PlaceholderGatewayUrl, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Creates a deep copy of this environment configuration.

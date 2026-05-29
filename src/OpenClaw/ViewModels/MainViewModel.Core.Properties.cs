@@ -25,6 +25,8 @@ public partial class MainViewModel
 
     public string SelectedEnvironmentName => _selectedEnvironment?.Name ?? string.Empty;
 
+    public bool IsPlaceholderEnvironment => _selectedEnvironment?.IsPlaceholder == true;
+
     public string StatusMessage
     {
         get => _statusMessage;
