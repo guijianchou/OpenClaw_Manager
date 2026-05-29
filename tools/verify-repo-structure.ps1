@@ -13,8 +13,9 @@ if ($solution -match 'OpenClaw\.Tests|tests\\OpenClaw\.Tests') {
     throw 'OpenClaw.sln still references the removed test harness.'
 }
 
-if ($solution -match '\{BC4C7184-C8DD-4748-AC82-D26123568BD1\}\.(Debug|Release)\|(x64|x86|ARM64)\.(ActiveCfg|Build\.0) = (Debug|Release)\|Any CPU') {
-    throw 'OpenClaw.Core solution platform mappings must stay architecture-specific so WinUI XAML compiler can resolve platform output paths.'
+$coreSolutionMappingPattern = '\{BC4C7184-C8DD-4748-AC82-D26123568BD1\}\.(Debug|Release)\|(x64|x86|ARM64)\.(ActiveCfg|Build\.0) = (Debug|Release)\|(x64|x86|ARM64)'
+if ($solution -match $coreSolutionMappingPattern) {
+    throw 'OpenClaw.Core solution platform mappings must stay on Any CPU because the class library does not define architecture-specific project configurations.'
 }
 
 $coreFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core') -Recurse -File -Include *.cs
