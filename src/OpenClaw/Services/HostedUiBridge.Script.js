@@ -1,5 +1,6 @@
 (() => {
   const STRINGS = __OPENCLAW_BRIDGE_STRINGS_JSON__;
+  const OWNER_TOKEN = __OPENCLAW_OWNER_TOKEN_JSON__;
 
 __OPENCLAW_HOST_MESSAGING_SCRIPT__
 
@@ -7,11 +8,20 @@ __OPENCLAW_MUTATION_FILTER_SCRIPT__
 
 __OPENCLAW_MODEL_RESOLVER_SCRIPT__
 
+__OPENCLAW_DOM_UTILITIES_SCRIPT__
+
+__OPENCLAW_MODEL_DOM_FALLBACK_SCRIPT__
+
+__OPENCLAW_ACTIVITY_STATE_SCRIPT__
+
+__OPENCLAW_PHASE_CLASSIFIER_SCRIPT__
+
 __OPENCLAW_STATUS_INSPECTION_SCRIPT__
 
 __OPENCLAW_COMMAND_DISPATCH_SCRIPT__
 
   const { KIND, SESSION_READY_KIND, GAP_KIND, postHostMessage } = openClawHostMessaging;
+  openClawHostMessaging.setOwnerToken(OWNER_TOKEN);
   const { inspectControlUi } = openClawStatusInspection.createInspector({
     strings: STRINGS,
     mutationFilter: openClawMutationFilter,
@@ -22,6 +32,7 @@ __OPENCLAW_COMMAND_DISPATCH_SCRIPT__
   let lastSeq = null;
   let lastStateVersion = null;
   let sessionReadyEmitted = false;
+  let sessionReadyModelEmitted = false;
   let lastSerialized = '';
 
   const postStatus = (snapshot = inspectControlUi()) => {
@@ -31,18 +42,33 @@ __OPENCLAW_COMMAND_DISPATCH_SCRIPT__
     lastSerialized = serialized;
   };
 
+  const postSessionReady = (snapshot = inspectControlUi()) => {
+    if (snapshot.phase !== 'connected' || !snapshot.shellDetected) {
+      return false;
+    }
+
+    const posted = postHostMessage({
+      kind: SESSION_READY_KIND,
+      detectedAt: new Date().toISOString(),
+      model: snapshot.currentModel,
+      modelSource: snapshot.currentModelSource,
+      uri: snapshot.url
+    });
+
+    if (posted) {
+      sessionReadyEmitted = true;
+      sessionReadyModelEmitted = sessionReadyModelEmitted || Boolean(String(snapshot.currentModel || '').trim());
+    }
+
+    return posted;
+  };
+
   const checkSessionReady = (snapshot = inspectControlUi()) => {
-    if (sessionReadyEmitted) return;
+    const hasModel = Boolean(String(snapshot.currentModel || '').trim());
+    if (sessionReadyEmitted && (sessionReadyModelEmitted || !hasModel)) return;
 
     if (snapshot.phase === 'connected' && snapshot.shellDetected) {
-      const posted = postHostMessage({
-        kind: SESSION_READY_KIND,
-        detectedAt: new Date().toISOString(),
-        model: snapshot.currentModel,
-        modelSource: snapshot.currentModelSource,
-        uri: snapshot.url
-      });
-      sessionReadyEmitted = posted;
+      postSessionReady(snapshot);
     }
   };
 
@@ -79,6 +105,8 @@ __OPENCLAW_COMMAND_DISPATCH_SCRIPT__
   });
 
   window.__openClawHostBridge = {
+    ownerToken: OWNER_TOKEN,
+    pageToken: openClawHostMessaging.pageToken,
     inspect: inspectControlUi,
     sendStatus: postStatus,
     onCommand,
@@ -90,17 +118,7 @@ __OPENCLAW_COMMAND_DISPATCH_SCRIPT__
       postStatus();
     },
     reportSessionReady: () => {
-      if (!sessionReadyEmitted) {
-        const snapshot = inspectControlUi();
-        const posted = postHostMessage({
-          kind: SESSION_READY_KIND,
-          detectedAt: new Date().toISOString(),
-          model: snapshot.currentModel,
-          modelSource: snapshot.currentModelSource,
-          uri: snapshot.url
-        });
-        sessionReadyEmitted = posted;
-      }
+      return postSessionReady();
     }
   };
 

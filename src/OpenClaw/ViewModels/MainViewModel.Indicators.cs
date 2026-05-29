@@ -29,8 +29,13 @@ public partial class MainViewModel
 
     private void OnLatencyUpdated(ControlUiLatencySnapshot snapshot)
     {
-        _dispatchToUi(() =>
+        DispatchUiUpdate(() =>
         {
+            if (!IsLatencySnapshotForSelectedEnvironment(snapshot))
+            {
+                return;
+            }
+
             _latencyHistory.Record(snapshot);
             var latencySummary = _statusPresenter.FormatLatencySummary(
                 snapshot,
@@ -46,5 +51,33 @@ public partial class MainViewModel
                 _lastKnownPoP = snapshot.ProxyPoP;
             }
         });
+    }
+
+    private bool IsLatencySnapshotForSelectedEnvironment(ControlUiLatencySnapshot snapshot)
+    {
+        var selectedHost = TryGetEnvironmentHost(_selectedEnvironment?.GatewayUrl);
+        if (string.IsNullOrWhiteSpace(snapshot.Host))
+        {
+            return string.IsNullOrWhiteSpace(selectedHost);
+        }
+
+        return string.Equals(snapshot.Host, selectedHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? TryGetEnvironmentHost(string? gatewayUrl)
+    {
+        if (string.IsNullOrWhiteSpace(gatewayUrl) ||
+            !Uri.TryCreate(gatewayUrl, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        var host = string.IsNullOrWhiteSpace(uri.IdnHost)
+            ? uri.Host
+            : uri.IdnHost;
+
+        return string.IsNullOrWhiteSpace(host)
+            ? null
+            : host.Trim('[', ']');
     }
 }

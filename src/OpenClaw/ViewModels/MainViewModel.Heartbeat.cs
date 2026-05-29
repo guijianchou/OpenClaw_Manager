@@ -36,13 +36,13 @@ public partial class MainViewModel
 
         _webViewService.StartHeartbeat(
             _selectedEnvironment.GatewayUrl,
-            App.Configuration.Settings.Heartbeat,
-            App.Configuration.Settings.RecoveryPolicy);
+            _runtime.Configuration.Settings.Heartbeat,
+            _runtime.Configuration.Settings.RecoveryPolicy);
     }
 
     private void OnHeartbeatObserved(HeartbeatProbeResult result)
     {
-        _dispatchToUi(() =>
+        DispatchUiUpdate(() =>
         {
             var heartbeatSummary = _statusPresenter.FormatHeartbeatSummary(
                 result.Status,

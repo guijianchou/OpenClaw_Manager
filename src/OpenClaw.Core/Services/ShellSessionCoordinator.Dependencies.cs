@@ -11,8 +11,8 @@ public interface IShellSessionWebView
     event Action<string>? HeartbeatFailed;
     event Action<ControlUiProbeSnapshot>? ControlUiSnapshotUpdated;
 
-    Task<ControlUiProbeSnapshot> InspectControlUiStateAsync();
-    void Reload();
+    Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(CancellationToken cancellationToken);
+    Task<bool> ReloadAsync(CancellationToken cancellationToken);
     int TotalControlUiInspectionRequests { get; }
     int CachedControlUiInspectionRequests { get; }
     int CoalescedControlUiInspectionRequests { get; }
@@ -24,8 +24,8 @@ public interface IShellSessionBridge
     event Action<SessionReadyEventArgs>? SessionReady;
     event Action<EventGapEventArgs>? EventGapDetected;
 
-    Task<bool> RequestSessionRefreshAsync();
-    Task<bool> RequestRecentMessagesAsync();
-    Task<bool> RequestLightweightSyncAsync();
-    Task<bool> NotifyReconnectIntentAsync();
+    Task<bool> RequestSessionRefreshAsync(CancellationToken cancellationToken);
+    Task<bool> RequestRecentMessagesAsync(CancellationToken cancellationToken);
+    Task<bool> RequestLightweightSyncAsync(CancellationToken cancellationToken);
+    Task<bool> NotifyReconnectIntentAsync(CancellationToken cancellationToken);
 }

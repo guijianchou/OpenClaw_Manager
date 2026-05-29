@@ -1,6 +1,7 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
 using Microsoft.UI.Xaml;
+using OpenClaw.Helpers;
 using Windows.Graphics;
 
 namespace OpenClaw;
@@ -50,20 +51,15 @@ public sealed partial class MainWindow
         var appWindow = this.AppWindow;
         _normalSize = appWindow.Size;
         _normalPosition = appWindow.Position;
+        _isCompactMode = true;
 
         // Hide WebView and InfoBars (Rows 2-4)
         SetCompactVisibility(Visibility.Collapsed);
         ApplyCompactTopBarState(true);
-
-        // Restore compact position if previously saved
-        var settings = App.Configuration.Settings;
-        if (settings.CompactWindowLeft >= 0 && settings.CompactWindowTop >= 0)
-        {
-            appWindow.Move(new PointInt32((int)settings.CompactWindowLeft, (int)settings.CompactWindowTop));
-        }
+        UpdateLoadingRingVisibility();
 
         appWindow.Resize(new SizeInt32(CompactWidth, CompactHeight));
-        _isCompactMode = true;
+        RestoreCompactWindowPosition(appWindow);
         App.Logger.Info("Entered compact mode.");
     }
 
@@ -71,21 +67,52 @@ public sealed partial class MainWindow
     {
         // Save compact position
         var appWindow = this.AppWindow;
-        var compactPos = appWindow.Position;
-        App.Configuration.Settings.CompactWindowLeft = compactPos.X;
-        App.Configuration.Settings.CompactWindowTop = compactPos.Y;
+        SaveCompactWindowPosition();
 
         // Restore normal bounds
+        _isCompactMode = false;
         SetCompactVisibility(Visibility.Visible);
         ApplyCompactTopBarState(false);
+        UpdateLoadingRingVisibility();
         appWindow.Resize(_normalSize.Width > 0 ? _normalSize : new SizeInt32(1280, 800));
         if (_normalSize.Width > 0)
         {
             appWindow.Move(_normalPosition);
         }
 
-        _isCompactMode = false;
+        ResumeDeferredWebViewRecreationIfReady();
         App.Logger.Info("Exited compact mode.");
+    }
+
+    private void SaveCompactWindowPosition()
+    {
+        var compactPos = this.AppWindow.Position;
+        App.Configuration.Settings.CompactWindowLeft = compactPos.X;
+        App.Configuration.Settings.CompactWindowTop = compactPos.Y;
+    }
+
+    private static void RestoreCompactWindowPosition(Microsoft.UI.Windowing.AppWindow appWindow)
+    {
+        var settings = App.Configuration.Settings;
+        if (!WindowBoundsUtilities.HasSavedPosition(settings.CompactWindowLeft, settings.CompactWindowTop))
+        {
+            return;
+        }
+
+        var left = (int)settings.CompactWindowLeft;
+        var top = (int)settings.CompactWindowTop;
+        if (WindowBoundsUtilities.IsVisibleWithinAnyWorkArea(left, top, CompactWidth, CompactHeight, GetDisplayWorkAreas()))
+        {
+            appWindow.Move(new PointInt32(left, top));
+            return;
+        }
+
+        if (TryGetCurrentDisplayWorkArea(appWindow, out var currentWorkArea) &&
+            WindowBoundsUtilities.TryCenterInWorkArea(CompactWidth, CompactHeight, currentWorkArea, out var centeredLeft, out var centeredTop))
+        {
+            appWindow.Move(new PointInt32(centeredLeft, centeredTop));
+            App.Logger.Info("Saved compact bounds were outside current displays; moved compact window to the current display.");
+        }
     }
 
     private void SetCompactVisibility(Visibility visibility)
@@ -110,11 +137,13 @@ public sealed partial class MainWindow
         {
             webViewHost.Visibility = visibility;
         }
+    }
 
-        if (root.FindName("LoadingRing") is UIElement loadingRing)
-        {
-            loadingRing.Visibility = visibility;
-        }
+    private void UpdateLoadingRingVisibility()
+    {
+        LoadingRing.Visibility = !_isCompactMode && ViewModel.IsLoading
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void ApplyCompactTopBarState(bool isCompact)

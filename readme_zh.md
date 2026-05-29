@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 3.3.6
+**当前版本：** 3.0.1
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,17 +26,23 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 3.3.6 注意事项
+## 当前 3.0.1 注意事项
 
-- 新增 [docs/code-style.md](docs/code-style.md)，作为项目代码规范和架构边界的统一入口。
-- 将顶部状态栏和底部状态栏的字号、间距、布局常量集中到 `src/OpenClaw/Styles` 下的 WinUI 资源字典。
-- 保留 Core/app 架构清理结果，同时从当前 solution 中移除本地回归测试 harness。
-- 将 `WebViewService` 的命令注入、heartbeat、Control UI inspection 和 profile 文件夹帮助器拆分到独立 partial 文件。
-- 将所有 Core-compatible 源文件迁移到 `src/OpenClaw.Core` 物理源码树，包括窗口边界策略。
-- 将主托管 bridge 浏览器脚本迁移为嵌入式 JS asset，C# 侧只负责资源加载、本地化字符串注入和 MODEL resolver 注入。
-- 保留托管 MODEL 的 app-state 解析嵌入式 JS asset，覆盖默认值、`null` override、Map override 和对象形 payload 的运行路径。
-- 保留 bridge 加固：session-ready 元数据、命令分发返回值、mutation filtering、安全 host messaging，以及按 generation 隔离的 WebView inspection cache 复用。
-- VS2026 debug 验证架构清理分支后，将发布元数据同步到 `3.3.6`。
+- `3.0.1` 是当前重构验证分支的元数据。v3.3.6 架构清理仍是本分支 review baseline；这不表示要改写 [changelog.md](changelog.md) 中历史 `v3.0.1` / `v3.0.0` 发布条目。
+- [docs/code-style.md](docs/code-style.md) 是本分支统一的代码规范和架构边界入口。
+- 运行时职责拆到聚焦服务：`WebViewStatusInspector`、`HeartbeatRuntime`、`GatewayHeartbeatTransport`、`HostedSessionHeartbeatPolicy`、`WebViewRecreationService`、`SettingsPersistenceAdapter`、`LiveShellSettingsApplier` 和 `StatusPresenter`。
+- Hosted bridge 逻辑拆成嵌入式 JavaScript assets，分别负责 host messaging、mutation filtering、MODEL resolution、DOM fallback、activity/stale-busy、phase classification、command dispatch 和 status inspection。
+- WebView status probe 现在按 generation 和 accepted page version 归属、带 timeout、触碰 WebView2 前回到 UI dispatcher，并通过 owner/page-token 校验避免旧 document 或已取消 inspection 覆盖当前状态；timeout 或脚本失败会发布归属明确的 `Unavailable` 快照、降级旧的 `Connected` shell 状态，并在同一个 accepted page 内让最近一次非空 MODEL 贯穿 loading、unavailable 和 unknown 快照。
+- Hosted bridge command 和 WebView stop/abort 脚本都有有界执行 timeout，并在 WebView 目标或已接受 page ownership 切换后拒绝旧结果；由 recovery 拥有的 bridge command 会把当前 recovery cancellation token 串到 UI dispatch 和脚本执行中；CustomEvent command fallback 不再被当成已处理命令，除非 hosted bridge method 真正接受了命令；Stop fallback 会绑定最初的页面目标，避免旧 command 被拒后误停新页面。
+- WebView navigation、reload、手动 retry 和 auto-retry 会在调用 CoreWebView2 前失效 page ownership；手动 Retry 在没有可重试 navigation 时会保留本地化可操作错误提示，由 recovery 拥有的 reload 会携带当前 recovery cancellation token，并确认 reload 确实启动后才推进状态；过期 auto-retry continuation 会直接退出，不再发布旧 navigation 状态，page-token retry 和 native-triggered `session-ready` replay 使用 lease-owned navigation cancellation scope，确保 reload、detach 或新 navigation 会取消旧工作，同时不会 dispose 仍被使用的 token；重试耗尽或失败也会进入 Error，而不是让外壳卡在 Reconnecting；page-token 捕获耗尽只会对原 navigation generation 发布 `Unavailable`，Stop fallback 也会取消 navigation watchdog、probe 和 page ownership，避免用户 Stop 后旧启动 timeout 回头触发 recovery。
+- WebView 启动恢复现在允许当前 `NavigationCompleted` 在缺失 `NavigationStarting` 回调时接管 navigation，completion timeout 需要匹配 active watchdog id 才能生效，并且全窗口 loading ring 只绑定浏览器 navigation 的 `Loading`，不再覆盖较长的 `GatewayConnecting` 状态阶段。
+- Hosted bridge 的 session/status 消息使用 host generation 和 owner/page-token 归属校验，不再依赖 CoreWebView2 wrapper reference identity，避免 WebView2 暴露不同 COM wrapper 对象时吞掉有效的 `session-ready` 或 status post。
+- WebView process failure 会先退休 navigation retry/replay cancellation，再发布 unavailable 状态；注入式 ViewModel UI 更新会捕获并记录回调异常，避免 dispatcher 回调变成 UI 线程未处理异常。
+- Gateway heartbeat 会把 5xx、缺失 Control UI 路径的 404、heartbeat probe 被拒绝的 405 和未预期 4xx transport 响应识别为失败，也会把 hosted-session inspection `Unavailable` 识别为失败，避免页面 bridge/status probe 不可用时误回落到健康 HTTP transport；并在 stop/restart 后拒绝旧 heartbeat run 的观察和 recovery 请求，触发 recovery 前只会停掉当前 run，同时保持自己接管的 `Reconnecting`/`Unavailable` hosted-session 状态继续跑 heartbeat；heartbeat loop 会离开调用线程调度，同时启动时会先发布一次即时观察，再进入周期探测；native 接受 page-token 后也可以请求 hosted `session-ready` replay。
+- ShellSessionCoordinator 的 recovery work 现在覆盖 event gap、stale-busy recovery、heartbeat-triggered recovery、foreground resume、in-page bridge command 和 UI-dispatched reload 的取消链；public recovery request 会先把调用方 cancellation token 链接到当前 operation，再排队 inspection、bridge command 或 reload；attach/detach/reset/dispose 会在替换 WebView 或 bridge 服务前取消 pending work，避免旧 recovery 决策写到新的 hosted session。
+- Settings 中的全局热键、Always on Top 和多实例行为保存后会影响当前进程；Settings 保存只合并当前打开对话框中实际编辑过的字段，避免 stale snapshot 覆盖外部 Pin、hotkey 或 environment 变更，并且 two-way binding 初始化时的同值写回不会把字段误标为 dirty；多实例 listener 变更会走被观察的异步路径，Settings 保存不会同步等待 named-pipe shutdown，二次启动的 primary 激活和失败接管等待也走异步路径，并共用一个有界接管 deadline，避免重新启动接力卡住启动线程；跨进程 single-instance lock 使用 named semaphore，并且 shutdown 会等待 named-pipe listener 停止后再释放所有权；compact mode 使用 visual states 并在 480px 折叠非必要固定宽度顶栏段，compact 下 loading ring 会保持折叠，同时会按当前显示器 work area 校验已保存的 compact 位置；Log Viewer 和 latency probe 的 refresh/stop 竞态也已通过 run-id 和 selected-host 校验加固；长耗时 async command 运行中会拒绝重复触发，诊断包导出的日志枚举/zip 压缩移出 UI 线程，非当前环境的 WebView2 profile 删除也改到后台线程执行。
+- 当前 checkpoint 有意不保留本地 C# 回归 harness；本地自动验证由 restore/build/format、仓库 guardrail、bridge script checks、空白差异检查和 VS2026 manual debug 组成。
+- 详细实现历史保留在 [changelog.md](changelog.md) 和 [docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md](docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md)。
 
 ### 本项目是
 
@@ -61,13 +67,13 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 | Connection Status | 状态栏、错误 InfoBar 和重试支持 |
 | Auto-Reconnect | 导航失败后自动重试 |
 | Heartbeat | 周期性 Control UI 和 transport 探测，支持可配置重连阈值 |
-| System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、设置和退出操作（支持中文菜单） |
+| System Tray | 可配置的最小化/关闭到托盘行为，提供打开、重新加载、查看日志、紧凑模式、设置和退出操作（支持中文菜单） |
 | Global Hotkey | 可配置的全局热键（默认 Ctrl+Alt+Space）随时显示/隐藏窗口，并支持设置界面校验和重置 |
 | Instance Control | 可选多实例模式；默认关闭，重新启动会恢复已有托盘隐藏窗口 |
 | Session Isolation | 每个配置环境使用独立 WebView2 profile 数据 |
 | Latency Tooltip | 悬停延迟徽标查看最新、最小、平均、p95、最大往返时间和 Cloudflare PoP |
 | Always on Top | 标题栏 Pin 按钮让窗口始终置顶，带原生 topmost fallback 和清晰的启用/未启用颜色 |
-| Compact Mode | 缩小窗口（仅显示状态栏）适合屏幕角落放置 |
+| Compact Mode | 缩小后的控制/状态窗口，适合屏幕角落放置 |
 | Diagnostic Export | 一键导出脱敏设置、日志和运行时信息为 zip 包 |
 | Theme | 顶部栏 System、Light、Dark 分段切换 |
 | Language | English、Simplified Chinese、System |
@@ -93,11 +99,30 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 ## 架构
 
 ```text
-MainWindow
-|- MainViewModel
-|  |- ConfigurationService
-|  `- LoggingService
-`- WebViewService
+OpenClaw Manager
+|- MainWindow (WinUI shell: XAML、WebView2 control swap、tray/window integration)
+|  |- WebViewRecreationService
+|  |- LiveShellSettingsApplier
+|  |- SettingsDialog / SettingsPersistenceAdapter
+|  `- MainViewModel (orchestration 和 bindable state)
+|     |- StatusPresenter
+|     |- UiTaskDispatcher
+|     |- WebViewMessageOwnership
+|     |- WebViewService
+|     |  |- WebViewStatusInspector / WebViewStatusInspectionScripts
+|     |  |- HeartbeatRuntime
+|     |  |- GatewayHeartbeatTransport / HostedSessionHeartbeatPolicy
+|     |  |- WebViewGenerationTracker
+|     |  `- WebView command JS assets
+|     |- HostedUiBridge
+|     |  `- embedded bridge JS assets
+|     |- ShellSessionCoordinator adapters
+|     `- ControlUiLatencyService
+`- OpenClaw.Core
+   |- settings/configuration models
+   |- recovery policy/state machine
+   |- diagnostics/log utilities
+   `- parser/policy helpers
 ```
 
 设计原则：remote-first thin shell。真正的 OpenClaw runtime 位于 VPS 上；本应用是托管 Control UI 的原生控制面。
@@ -125,19 +150,23 @@ Claw_winui3/
 |   |   |-- Assets/
 |   |   |-- Abstractions/
 |   |   |-- Helpers/
-|   |   |-- Models/
 |   |   |-- Services/
 |   |   |-- Strings/
+|   |   |-- Styles/
 |   |   |-- ViewModels/
 |   |   `-- Views/
 |   `-- OpenClaw.Core/
-|       `-- OpenClaw.Core.csproj
+|       |-- OpenClaw.Core.csproj
+|       |-- Helpers/
+|       |-- Models/
+|       `-- Services/
 ```
 
 ### 关键目录
 
 - `Services/`：配置、日志、诊断、WebView2 生命周期和恢复辅助逻辑
 - `OpenClaw.Core/`：纯 .NET 共享代码的物理源码树，供 WinUI app 使用
+- `Styles/`：共享 WinUI 字体、间距和状态资源
 - `ViewModels/`：外壳状态、命令和设置编辑
 - `Views/`：设置、关于和日志查看对话框
 - `Strings/`：本地化 UI 资源
@@ -172,18 +201,42 @@ dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 
 ### 当前验证方式
 
-当前 checkpoint 有意不保留本地 `tests/` harness。现行验证由 restore、x64 build、format、仓库结构 guardrail、bridge 脚本检查和空白差异检查组成：
+当前 checkpoint 有意不保留本地 `tests/` harness。现行自动验证由 restore、x64 build、format、仓库结构 guardrail、bridge 脚本检查和空白差异检查组成：
 
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
+$env:OPENCLAW_NODE='C:\Users\Zen\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
 git diff --check
 ```
 
-`tools\verify-bridge-scripts.ps1` 会在可用时使用 Node.js；如果当前环境没有可执行的 Node，会干净跳过。默认 `PATH` 上的 `node` 被阻止或不可用时，可以用 `OPENCLAW_NODE` 指定 Node 可执行文件。
+`tools\verify-bridge-scripts.ps1` 默认要求 Node.js，因为它是当前 embedded bridge assets 的行为验证入口。默认 `PATH` 上的 `node` 被阻止或不可用时，可以用 `OPENCLAW_NODE` 指定 Node 可执行文件；只有明确设置 `OPENCLAW_ALLOW_NODE_SKIP=1` 时才会跳过。
+
+Bridge 脚本验证是当前用于拆分后的 hosted bridge JS assets 的行为检查。当前 checkpoint 有意不保留 C# 回归测试 harness。
+
+真实 WebView2、Gateway、Cloudflare Tunnel、tray、hotkey 和 compact mode 行为仍需要 VS2026 manual debug。
+
+Manual debug 需要明确覆盖：
+
+- 真实 hosted Gateway 加载、任务提交、输出流式更新，并在不手动刷新时完成
+- MODEL 在启动、session 切换、页面 reload 和 native-triggered `session-ready` replay 后都非空
+- Cloudflare Tunnel 或反代 5xx 页面、未预期 4xx 页面、认证/approval 页面、origin rejection，以及上游恢复健康后的 recovery
+- 真实 tunnel 响应中的 latency tooltip `cf-ray` / Cloudflare PoP 解析
+- 托盘 show/hide、close-to-tray、reload、compact-mode 菜单入口和 single-instance 重新启动接管
+- Settings 保存后的全局热键和 Always on Top 无需重启即可生效
+- 480px compact mode 进入/退出，以及 relaunch 后 full-mode window bounds 不会恢复成 compact 尺寸
+- light/dark/theme-switch 路径下 title-bar/DWM border color，包含顶部 1px 边缘
+- Log Viewer 重复 refresh 和加载中关闭行为
+
+### 当前限制
+
+- 仓库内没有 active C# test harness；当前验证依赖 restore/build/format、guardrail scripts、bridge script checks 和 VS2026 manual debug。
+- Bridge 脚本行为由 `tools\verify-bridge-scripts.ps1` 覆盖，但浏览器运行时行为仍需要 WebView2/VS2026 debug；当前 checkpoint 有意不保留 C# harness。
+- `WebViewService.cs` 仍是 navigation/lifecycle shell，不应再吸收新的 inspection、heartbeat 或 bridge 职责。
+- 真实 Gateway、Cloudflare Tunnel、反代错误页、tray、hotkey、single-instance、DWM title-bar 和 compact mode 行为仍需要 VS2026 manual debug；当前 checkpoint 有意不保留本地 C# harness。
 
 ### 开发日志
 
@@ -202,8 +255,8 @@ git diff --check
 ### CLI
 
 ```powershell
-dotnet restore src\OpenClaw\OpenClaw.csproj
-dotnet build src\OpenClaw\OpenClaw.csproj -r win-x64
+dotnet restore OpenClaw.sln --locked-mode
+dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 ```
 
 ### 首次启动

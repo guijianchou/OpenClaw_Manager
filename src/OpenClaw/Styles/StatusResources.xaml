@@ -22,6 +22,7 @@
     <x:Double x:Key="CompactTopStatusPillMinWidth">0</x:Double>
     <Thickness x:Key="CompactTopStatusPillPadding">8,5</Thickness>
     <Thickness x:Key="CompactTopStatusPillMargin">0,0,8,0</Thickness>
+    <x:Double x:Key="CompactTopStatusPillColumnSpacing">4</x:Double>
     <x:Double x:Key="CompactTopStatusModelSegmentMinWidth">0</x:Double>
     <Thickness x:Key="CompactTopStatusModelSegmentMargin">4,0,0,0</Thickness>
     <Thickness x:Key="CompactTopBarPadding">8,6</Thickness>

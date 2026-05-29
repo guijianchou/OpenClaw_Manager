@@ -12,5 +12,11 @@ public sealed record LiveShellSettingsChange(
         Before.EnableGlobalHotkey != After.EnableGlobalHotkey ||
         !string.Equals(Before.GlobalHotkey, After.GlobalHotkey, StringComparison.Ordinal);
 
-    public bool HasChanges => DidChangeAlwaysOnTop || DidChangeGlobalHotkey;
+    public bool DidChangeAllowMultipleInstances =>
+        Before.AllowMultipleInstances != After.AllowMultipleInstances;
+
+    public bool HasChanges =>
+        DidChangeAlwaysOnTop ||
+        DidChangeGlobalHotkey ||
+        DidChangeAllowMultipleInstances;
 }

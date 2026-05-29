@@ -2,6 +2,7 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using OpenClaw.Helpers;
 
 namespace OpenClaw;
 
@@ -16,6 +17,10 @@ public sealed partial class MainWindow
         else if (e.PropertyName == nameof(ViewModel.WorkStatusText))
         {
             UpdateTrayStatus();
+        }
+        else if (e.PropertyName == nameof(ViewModel.LoadingVisibility))
+        {
+            UpdateLoadingRingVisibility();
         }
     }
 
@@ -45,25 +50,41 @@ public sealed partial class MainWindow
     private void OnWebViewRecreationTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
     {
         _webViewRecreationTimer.Stop();
-        _ = RecreateWebViewAsync();
+        var recreationTask = RecreateWebViewAsync(_windowLifetimeCts.Token);
+        _webViewRecreationTask = recreationTask;
+        _ = ObserveWebViewRecreationAsync(recreationTask);
     }
 
     private void RecordInstrumentationEvent(string eventName, object? context = null)
     {
+        if (_isClosing || _windowLifetimeCts.IsCancellationRequested)
+        {
+            return;
+        }
+
         _lastInstrumentationEvent = eventName;
         App.Logger.Info(eventName, context);
 
-        if (ViewModel.Coordinator is not null)
-        {
-            ViewModel.Coordinator.UpdateInstrumentation(
-                totalWebViewRecreations: _webViewRecreationService.TotalRecreations,
-                mergedWebViewRecreationRequests: _webViewRecreationService.MergedRequests,
-                lastInstrumentationEvent: _lastInstrumentationEvent);
-        }
+        ViewModel.UpdateShellInstrumentation(
+            _lastInstrumentationEvent,
+            _webViewRecreationService.TotalRecreations,
+            _webViewRecreationService.MergedRequests);
     }
 
     private void ScheduleWebViewRecreation(string reason)
     {
+        if (_isClosing || _windowLifetimeCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (!CanInitializeWebViewHost())
+        {
+            _deferredWebViewRecreationReason = reason;
+            RecordInstrumentationEvent("webview.recreation.deferred_until_visible_layout", CreateWebViewHostLayoutContext());
+            return;
+        }
+
         var scheduled = _webViewRecreationService.Schedule(reason);
 
         RecordInstrumentationEvent("webview.recreation.queued", new
@@ -86,8 +107,13 @@ public sealed partial class MainWindow
         _webViewRecreationTimer.Start();
     }
 
-    private async Task RecreateWebViewAsync()
+    private async Task RecreateWebViewAsync(CancellationToken cancellationToken)
     {
+        if (_isClosing || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         var begin = _webViewRecreationService.TryBegin(WebViewHost.Children.Count > 0);
         if (begin.IsCircuitBreakerTripped)
         {
@@ -120,6 +146,7 @@ public sealed partial class MainWindow
         {
             do
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!_webViewRecreationService.CanAttemptInLoop())
                 {
                     RecordInstrumentationEvent("webview.recreation.circuit_breaker_tripped_in_loop", new
@@ -127,6 +154,7 @@ public sealed partial class MainWindow
                         lastReason = _webViewRecreationService.LastReason,
                         total = _webViewRecreationService.TotalRecreations
                     });
+                    ViewModel.ShowCircuitBreakerError();
                     break;
                 }
 
@@ -136,6 +164,7 @@ public sealed partial class MainWindow
                     VerticalAlignment = VerticalAlignment.Stretch,
                 };
 
+                ViewModel.DetachWebViewHost();
                 foreach (var child in WebViewHost.Children.OfType<WebView2>().ToArray())
                 {
                     child.Close();
@@ -143,6 +172,14 @@ public sealed partial class MainWindow
 
                 WebViewHost.Children.Clear();
                 WebViewHost.Children.Add(nextWebView);
+                if (!await WaitForWebViewHostLayoutAsync(nextWebView, cancellationToken))
+                {
+                    _deferredWebViewRecreationReason = _webViewRecreationService.LastReason ?? begin.Reason;
+                    RecordInstrumentationEvent("webview.recreation.deferred_until_visible_layout", CreateWebViewHostLayoutContext());
+                    WebViewHost.Children.Clear();
+                    nextWebView.Close();
+                    break;
+                }
 
                 _webViewRecreationService.RecordAttempt();
                 RecordInstrumentationEvent("webview.recreation.initializing", new
@@ -151,18 +188,29 @@ public sealed partial class MainWindow
                     total = _webViewRecreationService.TotalRecreations
                 });
                 await ViewModel.InitializeWebViewAsync(nextWebView);
+                cancellationToken.ThrowIfCancellationRequested();
             }
             while (_webViewRecreationService.TryConsumeQueued(out _));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (!_isClosing)
+            {
+                App.Logger.Info("WebView2 recreation cancelled.");
+            }
+        }
         catch (Exception ex)
         {
-            App.Logger.Error($"Failed to recreate WebView2 host: {ex.Message}");
+            if (!_isClosing && !cancellationToken.IsCancellationRequested)
+            {
+                App.Logger.Error($"Failed to recreate WebView2 host: {ex.Message}");
+            }
         }
         finally
         {
             var finished = _webViewRecreationService.Finish();
 
-            if (finished.PendingReason is not null)
+            if (!_isClosing && !cancellationToken.IsCancellationRequested && finished.PendingReason is not null)
             {
                 ScheduleWebViewRecreation(finished.PendingReason);
             }
@@ -174,6 +222,127 @@ public sealed partial class MainWindow
                 total = finished.TotalRecreations,
                 merged = finished.MergedRequests
             });
+        }
+    }
+
+    private async Task<bool> WaitForWebViewHostLayoutAsync(WebView2 webView, CancellationToken cancellationToken)
+    {
+        if (webView.IsLoaded && HasUsableWebViewHostLayout())
+        {
+            RecordInstrumentationEvent("webview.host.layout_ready", CreateWebViewHostLayoutContext());
+            return true;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void TryComplete()
+        {
+            if (webView.IsLoaded && HasUsableWebViewHostLayout())
+            {
+                completion.TrySetResult();
+            }
+        }
+
+        void OnLoaded(object sender, RoutedEventArgs args) => TryComplete();
+
+        void OnSizeChanged(object sender, SizeChangedEventArgs args) => TryComplete();
+
+        webView.Loaded += OnLoaded;
+        WebViewHost.SizeChanged += OnSizeChanged;
+
+        try
+        {
+            TryComplete();
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                timeout.Token,
+                cancellationToken);
+
+            try
+            {
+                await completion.Task.WaitAsync(linkedCancellation.Token);
+                RecordInstrumentationEvent("webview.host.layout_ready", CreateWebViewHostLayoutContext());
+                return true;
+            }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                App.Logger.Warning("webview.host.layout_wait_timeout", CreateWebViewHostLayoutContext());
+                return false;
+            }
+        }
+        finally
+        {
+            webView.Loaded -= OnLoaded;
+            WebViewHost.SizeChanged -= OnSizeChanged;
+        }
+    }
+
+    private bool HasUsableWebViewHostLayout()
+    {
+        return WebViewHost.ActualSize.X > 0 &&
+            WebViewHost.ActualSize.Y > 0 &&
+            WebViewHost.Visibility == Visibility.Visible;
+    }
+
+    private bool CanInitializeWebViewHost()
+    {
+        return !_isCompactMode &&
+            !_isWindowHidden &&
+            !WindowFrameHelper.IsWindowMinimized(this) &&
+            HasUsableWebViewHostLayout();
+    }
+
+    private void OnWebViewHostSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        ResumeDeferredWebViewRecreationIfReady();
+    }
+
+    private void ResumeDeferredWebViewRecreationIfReady()
+    {
+        if (string.IsNullOrEmpty(_deferredWebViewRecreationReason) || !CanInitializeWebViewHost())
+        {
+            return;
+        }
+
+        var reason = _deferredWebViewRecreationReason;
+        _deferredWebViewRecreationReason = null;
+        ScheduleWebViewRecreation("visible_layout_ready");
+        RecordInstrumentationEvent("webview.recreation.deferred_resumed", new
+        {
+            reason
+        });
+    }
+
+    private object CreateWebViewHostLayoutContext()
+    {
+        return new
+        {
+            width = WebViewHost.ActualSize.X,
+            height = WebViewHost.ActualSize.Y,
+            visibility = WebViewHost.Visibility.ToString()
+        };
+    }
+
+    private async Task ObserveWebViewRecreationAsync(Task recreationTask)
+    {
+        try
+        {
+            await recreationTask;
+        }
+        catch (Exception ex)
+        {
+            if (!_isClosing && !_windowLifetimeCts.IsCancellationRequested)
+            {
+                App.Logger.Error($"Unobserved WebView2 recreation failure: {ex.Message}");
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_webViewRecreationTask, recreationTask))
+            {
+                _webViewRecreationTask = null;
+            }
         }
     }
 }

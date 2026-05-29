@@ -11,32 +11,54 @@ public partial class MainViewModel
 {
     private void OnConnectionStateChanged(ConnectionState state)
     {
-        _dispatchToUi(() => ApplyConnectionState(state));
+        DispatchUiUpdate(() => ApplyConnectionState(state));
     }
 
     private void OnNavigationError(string message)
     {
-        _dispatchToUi(() => ApplyNavigationError(message));
+        DispatchUiUpdate(() => ApplyNavigationError(message));
+    }
+
+    private void OnNavigationStartTimedOut(string message)
+    {
+        DispatchUiUpdate(() =>
+        {
+            _runtime.Logger.Warning("navigation.start.timeout.recovery_requested", new { message });
+            IsErrorVisible = false;
+            ShowRetryButton = false;
+            WebViewRecreationRequested?.Invoke("navigation_start_timeout");
+        });
+    }
+
+    private void OnNavigationCompletionTimedOut(string message)
+    {
+        DispatchUiUpdate(() =>
+        {
+            _runtime.Logger.Warning("navigation.completion.timeout.recovery_requested", new { message });
+            IsErrorVisible = false;
+            ShowRetryButton = false;
+            WebViewRecreationRequested?.Invoke("navigation_completion_timeout");
+        });
     }
 
     private void OnControlUiSnapshotUpdated(ControlUiProbeSnapshot snapshot)
     {
-        _dispatchToUi(() => ApplyControlUiSnapshot(snapshot));
+        DispatchUiUpdate(() => ApplyControlUiSnapshot(snapshot));
     }
 
     private void OnRecoveryStateChanged(RecoveryState state)
     {
-        _dispatchToUi(() => ApplyRecoveryState(state));
+        DispatchUiUpdate(() => ApplyRecoveryState(state));
     }
 
     private void OnTelemetryUpdated(RecoveryTelemetrySnapshot snapshot)
     {
-        if (!App.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging)
+        if (!_runtime.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging)
         {
             return;
         }
 
-        App.Logger.Info("recovery.telemetry", new
+        _runtime.Logger.Info("recovery.telemetry", new
         {
             snapshot.TotalReconnectAttempts,
             snapshot.TotalSoftResyncAttempts,
@@ -49,7 +71,7 @@ public partial class MainViewModel
     private void ApplyConnectionState(ConnectionState state)
     {
         ConnectionState = state;
-        IsLoading = state is ConnectionState.Loading or ConnectionState.GatewayConnecting;
+        IsLoading = state == ConnectionState.Loading;
         ShowRetryButton = state is ConnectionState.Error or ConnectionState.AuthFailed;
 
         RefreshResourceScheduling();
@@ -103,13 +125,10 @@ public partial class MainViewModel
 
     private static bool ShouldClearModelSummary(ControlUiProbeSnapshot snapshot)
     {
-        return snapshot.Phase is ControlUiPhase.Loading
-            or ControlUiPhase.AuthRequired
+        return snapshot.Phase is ControlUiPhase.AuthRequired
             or ControlUiPhase.PairingRequired
             or ControlUiPhase.OriginRejected
-            or ControlUiPhase.GatewayError
-            or ControlUiPhase.Unavailable
-            or ControlUiPhase.Unknown;
+            or ControlUiPhase.GatewayError;
     }
 
     private void ApplyRecoveryState(RecoveryState state)

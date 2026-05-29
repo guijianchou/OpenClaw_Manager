@@ -38,19 +38,29 @@ public sealed partial class ShellSessionCoordinator
         public CancellationToken CancellationToken => CancellationSource.Token;
     }
 
-    private RecoveryOperationContext? TryStartRecoveryOperation(RecoveryOperationKind operation, string reason)
+    private RecoveryOperationContext? TryStartRecoveryOperation(
+        RecoveryOperationKind operation,
+        string reason,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         RecoveryOperationContext context;
 
         lock (_recoveryGate)
         {
+            if (_isDisposed)
+            {
+                return null;
+            }
+
             if (ShouldThrottleRecoveryOperation(operation, reason))
             {
                 return null;
             }
 
             var startedAt = DateTimeOffset.Now;
-            var cancellationSource = PrepareRecoveryCancellationSource();
+            var cancellationSource = PrepareRecoveryCancellationSource(cancellationToken);
             var attempt = RegisterRecoveryOperationStart(operation, reason, startedAt);
             context = new RecoveryOperationContext(operation, reason, attempt, cancellationSource);
         }
@@ -60,11 +70,12 @@ public sealed partial class ShellSessionCoordinator
         return context;
     }
 
-    private CancellationTokenSource PrepareRecoveryCancellationSource()
+    private CancellationTokenSource PrepareRecoveryCancellationSource(CancellationToken cancellationToken)
     {
         _recoveryCts?.Cancel();
-        _recoveryCts?.Dispose();
-        _recoveryCts = new CancellationTokenSource();
+        _recoveryCts = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : new CancellationTokenSource();
         return _recoveryCts;
     }
 
@@ -209,7 +220,7 @@ public sealed partial class ShellSessionCoordinator
             _isRecoveryInProgress = false;
         }
 
+        // The running operation owns disposal in CompleteRecoveryOperation().
         cancellationSource?.Cancel();
-        cancellationSource?.Dispose();
     }
 }

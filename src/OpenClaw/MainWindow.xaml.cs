@@ -3,6 +3,7 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using OpenClaw.Abstractions;
 using OpenClaw.Services;
 using OpenClaw.ViewModels;
 
@@ -15,9 +16,18 @@ public sealed partial class MainWindow : Window
 {
     public MainWindow()
     {
-        ViewModel = new MainViewModel(App.Logger, DispatchToUi);
+        ViewModel = new MainViewModel(new AppRuntimeContext(App.Logger, App.Configuration), TryDispatchToUi);
         this.InitializeComponent();
-        _liveShellSettingsApplier = new LiveShellSettingsApplier(SetAlwaysOnTop, ReapplyGlobalHotkey);
+        _liveShellSettingsApplier = new LiveShellSettingsApplier(
+            SetAlwaysOnTop,
+            ReapplyGlobalHotkey,
+            allowMultipleInstances =>
+            {
+                if (Application.Current is App app)
+                {
+                    app.ApplySingleInstancePreference(allowMultipleInstances);
+                }
+            });
         ConfigureWindowChrome();
         RestoreWindowBounds();
         SubscribeToViewModelEvents();
@@ -32,11 +42,14 @@ public sealed partial class MainWindow : Window
         RestoreCompactModeIfSaved();
     }
 
-    private void DispatchToUi(Action action)
+    private bool TryDispatchToUi(Action action)
     {
-        if (!DispatcherQueue.TryEnqueue(() => action()))
+        if (DispatcherQueue.HasThreadAccess)
         {
             action();
+            return true;
         }
+
+        return DispatcherQueue.TryEnqueue(() => action());
     }
 }

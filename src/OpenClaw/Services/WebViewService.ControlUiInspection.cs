@@ -26,9 +26,11 @@ public partial class WebViewService
     /// <summary>
     /// Attempts to inspect the hosted Control UI state via the injected page bridge.
     /// </summary>
-    public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(CancellationToken cancellationToken = default)
+    public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(
+        CancellationToken cancellationToken = default,
+        bool publishSnapshot = true)
     {
-        return _statusInspector.InspectAsync(cancellationToken);
+        return _uiDispatcher.RunAsync(() => _statusInspector.InspectAsync(cancellationToken, publishSnapshot), cancellationToken);
     }
 
     private void InvalidateControlUiInspectionCache()
@@ -75,6 +77,8 @@ public partial class WebViewService
                 SetState(ConnectionState.Error);
                 break;
             case ControlUiPhase.Unavailable:
+                SetState(ConnectionState.Reconnecting);
+                break;
             case ControlUiPhase.Unknown:
             default:
                 break;

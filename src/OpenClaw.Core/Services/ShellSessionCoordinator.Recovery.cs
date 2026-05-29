@@ -9,7 +9,7 @@ public sealed partial class ShellSessionCoordinator
     /// <summary>
     /// Requests a reconnection to the gateway.
     /// </summary>
-    public async Task RequestReconnectAsync(string reason)
+    public async Task RequestReconnectAsync(string reason, CancellationToken cancellationToken = default)
     {
         var webViewService = _webViewService;
         if (webViewService is null)
@@ -17,7 +17,7 @@ public sealed partial class ShellSessionCoordinator
             return;
         }
 
-        var operation = TryStartRecoveryOperation(RecoveryOperationKind.Reconnect, reason);
+        var operation = TryStartRecoveryOperation(RecoveryOperationKind.Reconnect, reason, cancellationToken);
         if (operation is null)
         {
             return;
@@ -34,15 +34,15 @@ public sealed partial class ShellSessionCoordinator
             var handledInPage = false;
             if (bridge is not null)
             {
-                handledInPage = await bridge.NotifyReconnectIntentAsync();
-                handledInPage = await bridge.RequestSessionRefreshAsync() || handledInPage;
+                handledInPage = await bridge.NotifyReconnectIntentAsync(operation.CancellationToken);
+                handledInPage = await bridge.RequestSessionRefreshAsync(operation.CancellationToken) || handledInPage;
                 ThrowIfRecoveryCancelled(operation);
             }
 
             if (handledInPage)
             {
                 await Task.Delay(750, operation.CancellationToken);
-                var snapshot = await webViewService.InspectControlUiStateAsync();
+                var snapshot = await webViewService.InspectControlUiStateAsync(operation.CancellationToken);
                 ThrowIfRecoveryCancelled(operation);
                 if (TryResolveReloadFallback(snapshot, reason, "post_in_page_reconnect"))
                 {
@@ -50,14 +50,20 @@ public sealed partial class ShellSessionCoordinator
                 }
             }
 
-            var preReloadSnapshot = await webViewService.InspectControlUiStateAsync();
+            var preReloadSnapshot = await webViewService.InspectControlUiStateAsync(operation.CancellationToken);
             ThrowIfRecoveryCancelled(operation);
             if (TryResolveReloadFallback(preReloadSnapshot, reason, "pre_reload"))
             {
                 return;
             }
 
-            webViewService.Reload();
+            var reloadStarted = await webViewService.ReloadAsync(operation.CancellationToken);
+            if (!reloadStarted)
+            {
+                MarkRecoveryFailed("WebView reload could not be started.");
+                return;
+            }
+
             _lastTransportActivityAt = DateTimeOffset.Now;
             _logger.Info("recovery.reconnect.reload", new { attempt = operation.Attempt, handledInPage });
             MarkRecoveryConnecting();
@@ -80,7 +86,7 @@ public sealed partial class ShellSessionCoordinator
     /// <summary>
     /// Requests a soft resync (state reconciliation without full reload).
     /// </summary>
-    public async Task RequestSoftResyncAsync(string reason)
+    public async Task RequestSoftResyncAsync(string reason, CancellationToken cancellationToken = default)
     {
         var bridge = _bridge;
         if (bridge is null)
@@ -88,7 +94,7 @@ public sealed partial class ShellSessionCoordinator
             return;
         }
 
-        var operation = TryStartRecoveryOperation(RecoveryOperationKind.SoftResync, reason);
+        var operation = TryStartRecoveryOperation(RecoveryOperationKind.SoftResync, reason, cancellationToken);
         if (operation is null)
         {
             return;
@@ -96,8 +102,8 @@ public sealed partial class ShellSessionCoordinator
 
         try
         {
-            var handled = await bridge.RequestLightweightSyncAsync();
-            handled = await bridge.RequestRecentMessagesAsync() || handled;
+            var handled = await bridge.RequestLightweightSyncAsync(operation.CancellationToken);
+            handled = await bridge.RequestRecentMessagesAsync(operation.CancellationToken) || handled;
             ThrowIfRecoveryCancelled(operation);
 
             if (!handled)
@@ -112,7 +118,7 @@ public sealed partial class ShellSessionCoordinator
             var webViewService = _webViewService;
             if (webViewService is not null)
             {
-                var snapshot = await webViewService.InspectControlUiStateAsync();
+                var snapshot = await webViewService.InspectControlUiStateAsync(operation.CancellationToken);
                 ThrowIfRecoveryCancelled(operation);
                 if (IsSessionAlive(snapshot) && !snapshot.IsBusyStale)
                 {
@@ -153,7 +159,7 @@ public sealed partial class ShellSessionCoordinator
     /// <summary>
     /// Requests a hard refresh (full page reload).
     /// </summary>
-    public async Task RequestHardRefreshAsync(string reason)
+    public async Task RequestHardRefreshAsync(string reason, CancellationToken cancellationToken = default)
     {
         var webViewService = _webViewService;
         if (webViewService is null)
@@ -161,7 +167,7 @@ public sealed partial class ShellSessionCoordinator
             return;
         }
 
-        var operation = TryStartRecoveryOperation(RecoveryOperationKind.HardRefresh, reason);
+        var operation = TryStartRecoveryOperation(RecoveryOperationKind.HardRefresh, reason, cancellationToken);
         if (operation is null)
         {
             return;
@@ -169,14 +175,20 @@ public sealed partial class ShellSessionCoordinator
 
         try
         {
-            var snapshot = await webViewService.InspectControlUiStateAsync();
+            var snapshot = await webViewService.InspectControlUiStateAsync(operation.CancellationToken);
             ThrowIfRecoveryCancelled(operation);
             if (TryResolveReloadFallback(snapshot, reason, "hard_refresh"))
             {
                 return;
             }
 
-            webViewService.Reload();
+            var reloadStarted = await webViewService.ReloadAsync(operation.CancellationToken);
+            if (!reloadStarted)
+            {
+                MarkRecoveryFailed("WebView reload could not be started.");
+                return;
+            }
+
             await Task.Delay(1000, operation.CancellationToken);
             MarkRecoveryConnecting();
         }

@@ -8,11 +8,16 @@ internal sealed class LiveShellSettingsApplier
 {
     private readonly Action<bool> _setAlwaysOnTop;
     private readonly Action _reapplyGlobalHotkey;
+    private readonly Action<bool> _applySingleInstancePreference;
 
-    public LiveShellSettingsApplier(Action<bool> setAlwaysOnTop, Action reapplyGlobalHotkey)
+    public LiveShellSettingsApplier(
+        Action<bool> setAlwaysOnTop,
+        Action reapplyGlobalHotkey,
+        Action<bool> applySingleInstancePreference)
     {
         _setAlwaysOnTop = setAlwaysOnTop;
         _reapplyGlobalHotkey = reapplyGlobalHotkey;
+        _applySingleInstancePreference = applySingleInstancePreference;
     }
 
     public void Apply(LiveShellSettingsChange change)
@@ -25,6 +30,11 @@ internal sealed class LiveShellSettingsApplier
         if (change.DidChangeGlobalHotkey)
         {
             _reapplyGlobalHotkey();
+        }
+
+        if (change.DidChangeAllowMultipleInstances)
+        {
+            _applySingleInstancePreference(change.After.AllowMultipleInstances);
         }
     }
 }

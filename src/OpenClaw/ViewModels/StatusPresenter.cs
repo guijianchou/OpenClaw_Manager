@@ -49,6 +49,11 @@ internal sealed class StatusPresenter
             return new StatusPresentation($"{staleRoundtripTimeMs} ms", FormatLatencyBrush(staleRoundtripTimeMs, brushes));
         }
 
+        if (snapshot.State == ControlUiLatencyState.Failure)
+        {
+            return new StatusPresentation("ERR", brushes.Error);
+        }
+
         return new StatusPresentation(defaultLatencySummary, brushes.Neutral);
     }
 

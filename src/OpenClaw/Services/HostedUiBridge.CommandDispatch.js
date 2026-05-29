@@ -47,13 +47,17 @@ const openClawCommandDispatch = (() => {
 
   const runCommand = async (command, payload, methodNames, { inspectControlUi, postStatus, checkSessionReady }) => {
     const handled = await invokeBridgeMethod(methodNames, payload);
+    if (!handled) {
+      dispatchBridgeEvent(command, payload);
+    }
+
     const snapshot = inspectControlUi();
     postStatus(snapshot);
     if (checkSessionReady) {
       checkSessionReady(snapshot);
     }
 
-    return handled || dispatchBridgeEvent(command, payload);
+    return handled;
   };
 
   const createCommandHandler = ({ inspectControlUi, postStatus, checkSessionReady }) => {
@@ -87,7 +91,8 @@ const openClawCommandDispatch = (() => {
             ['reconnect', 'connect', 'resume', 'refreshSession'],
             { inspectControlUi, postStatus });
         default:
-          return dispatchBridgeEvent(command, payload);
+          dispatchBridgeEvent(command, payload);
+          return false;
       }
     };
   };

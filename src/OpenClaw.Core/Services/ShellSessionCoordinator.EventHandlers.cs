@@ -48,8 +48,9 @@ public sealed partial class ShellSessionCoordinator
         PublishTelemetry();
     }
 
-    private async Task HandleEventGapDetectedAsync(EventGapEventArgs args)
+    private async Task HandleEventGapDetectedAsync(EventGapEventArgs args, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_isInBackground)
         {
             LogIgnoredGap(args);
@@ -57,43 +58,55 @@ public sealed partial class ShellSessionCoordinator
         }
 
         ApplyDetectedGap(args);
-        await ExecuteGapRecoveryAsync(args);
+        await ExecuteGapRecoveryAsync(args, cancellationToken);
         PublishTelemetry();
     }
 
-    private async Task ExecuteGapRecoveryAsync(EventGapEventArgs args)
+    private async Task ExecuteGapRecoveryAsync(EventGapEventArgs args, CancellationToken cancellationToken)
     {
-        var preferredGapRecovery = await GetPreferredGapRecoveryAsync();
+        var preferredGapRecovery = await GetPreferredGapRecoveryAsync(cancellationToken);
         if (preferredGapRecovery == GapRecoveryAction.None)
         {
             return;
         }
 
-        await RequestGapRecoveryAsync(args, preferredGapRecovery);
+        await RequestGapRecoveryAsync(args, preferredGapRecovery, cancellationToken);
     }
 
-    private async Task RequestGapRecoveryAsync(EventGapEventArgs args, GapRecoveryAction preferredGapRecovery)
+    private async Task RequestGapRecoveryAsync(
+        EventGapEventArgs args,
+        GapRecoveryAction preferredGapRecovery,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (preferredGapRecovery == GapRecoveryAction.SoftResync &&
             _softResyncAttempts < _recoveryOptions.MaxSoftResyncAttempts)
         {
-            await RequestSoftResyncAsync($"Event gap detected while session remained alive (seq {args.ExpectedSeq} -> {args.GotSeq})");
+            await RequestSoftResyncAsync(
+                $"Event gap detected while session remained alive (seq {args.ExpectedSeq} -> {args.GotSeq})",
+                cancellationToken);
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (_reconnectAttempts < _recoveryOptions.MaxReconnectAttempts)
         {
-            await RequestReconnectAsync($"Event gap detected (seq {args.ExpectedSeq} -> {args.GotSeq})");
+            await RequestReconnectAsync(
+                $"Event gap detected (seq {args.ExpectedSeq} -> {args.GotSeq})",
+                cancellationToken);
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (_softResyncAttempts < _recoveryOptions.MaxSoftResyncAttempts)
         {
-            await RequestSoftResyncAsync($"Event gap persists after {_reconnectAttempts} reconnects");
+            await RequestSoftResyncAsync(
+                $"Event gap persists after {_reconnectAttempts} reconnects",
+                cancellationToken);
             return;
         }
 
-        await RequestHardRefreshAsync("Event gap persists after soft resync attempts");
+        await RequestHardRefreshAsync("Event gap persists after soft resync attempts", cancellationToken);
     }
 
     private void HandleConnectionStateChanged(ConnectionState state)
@@ -113,8 +126,9 @@ public sealed partial class ShellSessionCoordinator
         ApplyHeartbeatHealth(result);
     }
 
-    private async Task HandleHeartbeatFailedAsync(string message)
+    private async Task HandleHeartbeatFailedAsync(string message, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_isInBackground)
         {
             _logger.Info("heartbeat.recovery.deferred", new { message, reason = "background" });
@@ -122,6 +136,7 @@ public sealed partial class ShellSessionCoordinator
         }
 
         _logger.Warning("heartbeat.recovery.requested", new { message });
-        await RequestReconnectAsync($"Heartbeat recovery requested: {message}");
+        cancellationToken.ThrowIfCancellationRequested();
+        await RequestReconnectAsync($"Heartbeat recovery requested: {message}", cancellationToken);
     }
 }

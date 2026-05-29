@@ -12,12 +12,14 @@ namespace OpenClaw.Views;
 public sealed partial class LogViewerDialog : ContentDialog
 {
     private readonly string _logDirectory;
+    private CancellationTokenSource? _loadCts;
 
     public LogViewerDialog()
     {
         this.InitializeComponent();
         _logDirectory = App.Logger.LogFolderPath;
         Loaded += OnLoaded;
+        Closed += OnClosed;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -28,6 +30,11 @@ public sealed partial class LogViewerDialog : ContentDialog
 
     private async Task LoadTodayLogAsync()
     {
+        CancelPendingLoad();
+        var loadCts = new CancellationTokenSource();
+        _loadCts = loadCts;
+        var token = loadCts.Token;
+
         try
         {
             var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
@@ -36,7 +43,14 @@ public sealed partial class LogViewerDialog : ContentDialog
 
             if (File.Exists(logFile))
             {
-                var tail = await Task.Run(() => LogFileUtilities.ReadLastLines(logFile, LogFileUtilities.DefaultTailLineCount));
+                var tail = await Task.Run(
+                    () => LogFileUtilities.ReadLastLines(logFile, LogFileUtilities.DefaultTailLineCount, token),
+                    token);
+                if (!IsActiveLoad(loadCts))
+                {
+                    return;
+                }
+
                 var content = string.Join(Environment.NewLine, tail.Lines);
                 if (tail.WasTruncated)
                 {
@@ -50,12 +64,34 @@ public sealed partial class LogViewerDialog : ContentDialog
             }
             else
             {
+                if (!IsActiveLoad(loadCts))
+                {
+                    return;
+                }
+
                 LogContent.Text = StringResources.LogNotFoundToday;
             }
         }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
+            if (!IsActiveLoad(loadCts))
+            {
+                return;
+            }
+
             LogContent.Text = string.Format(StringResources.LogReadFailedFormat, ex.Message);
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadCts, loadCts))
+            {
+                _loadCts = null;
+            }
+
+            loadCts.Dispose();
         }
     }
 
@@ -80,5 +116,20 @@ public sealed partial class LogViewerDialog : ContentDialog
         {
             App.Logger.Error($"Failed to open log folder: {ex.Message}");
         }
+    }
+
+    private void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)
+    {
+        CancelPendingLoad();
+    }
+
+    private void CancelPendingLoad()
+    {
+        _loadCts?.Cancel();
+    }
+
+    private bool IsActiveLoad(CancellationTokenSource loadCts)
+    {
+        return ReferenceEquals(_loadCts, loadCts) && !loadCts.IsCancellationRequested;
     }
 }

@@ -11,12 +11,12 @@ public sealed partial class MainWindow
     {
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "WindowIcon.ico");
         var menuStrings = new TrayMenuStrings(
-            OpenLabel: StringResources.Get("TrayMenuOpen") is var open && open != "TrayMenuOpen" ? open : "Open OpenClaw",
+            OpenLabel: StringResources.TrayMenuOpen,
             ReloadLabel: StringResources.Reload,
             ViewLogsLabel: StringResources.SettingsViewLogs,
-            CompactModeLabel: StringResources.Get("TrayMenuCompactMode") is var compact && compact != "TrayMenuCompactMode" ? compact : "Compact Mode",
+            CompactModeLabel: StringResources.TrayMenuCompactMode,
             SettingsLabel: StringResources.Settings,
-            ExitLabel: StringResources.Get("TrayMenuExit") is var exit && exit != "TrayMenuExit" ? exit : "Exit");
+            ExitLabel: StringResources.TrayMenuExit);
         _trayIconService = new TrayIconService(iconPath, App.Logger, menuStrings);
         if (!_trayIconService.IsAvailable)
         {

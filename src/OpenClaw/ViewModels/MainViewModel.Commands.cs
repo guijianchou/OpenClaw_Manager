@@ -21,13 +21,21 @@ public partial class MainViewModel
 
     private void OnAsyncCommandFailed(Exception ex)
     {
-        App.Logger.Error($"Async command failed: {ex}");
+        _runtime.Logger.Error($"Async command failed: {ex}");
     }
 
     private void OnRetry()
     {
-        IsErrorVisible = false;
-        _webViewService.RetryNavigation();
+        if (_webViewService.RetryNavigation())
+        {
+            IsErrorVisible = false;
+            return;
+        }
+
+        _runtime.Logger.Warning("Manual retry was requested, but no retryable WebView navigation is available.");
+        ErrorMessage = StringResources.RetryUnavailable;
+        IsErrorVisible = true;
+        ShowRetryButton = true;
     }
 
     private void OnReload()
@@ -63,54 +71,67 @@ public partial class MainViewModel
     /// </summary>
     public void ShowCircuitBreakerError()
     {
-        ErrorMessage = "WebView2 recreation failed repeatedly. Click Reload to retry.";
+        ApplyConnectionState(ConnectionState.Error);
+        ErrorMessage = StringResources.CircuitBreakerRecreationSuppressed;
         IsErrorVisible = true;
         ShowRetryButton = true;
+        UpdateStatusPresentation();
+    }
+
+    public void UpdateShellInstrumentation(
+        string lastInstrumentationEvent,
+        int? totalWebViewRecreations = null,
+        int? mergedWebViewRecreationRequests = null)
+    {
+        _coordinator?.UpdateInstrumentation(
+            totalWebViewRecreations: totalWebViewRecreations,
+            mergedWebViewRecreationRequests: mergedWebViewRecreationRequests,
+            totalControlUiInspectionRequests: _webViewService.TotalControlUiInspectionRequests,
+            cachedControlUiInspectionRequests: _webViewService.CachedControlUiInspectionRequests,
+            coalescedControlUiInspectionRequests: _webViewService.CoalescedControlUiInspectionRequests,
+            deferredSaveRequests: _runtime.Configuration.DeferredSaveRequests,
+            deferredSaveCoalescedRequests: _runtime.Configuration.DeferredSaveCoalescedRequests,
+            heartbeatRecoveryRequests: _webViewService.HeartbeatRecoveryRequests,
+            lastInstrumentationEvent: lastInstrumentationEvent);
     }
 
     private async Task OnRunDiagnosticsAsync()
     {
-        App.Logger.Info("Running diagnostics...");
+        _runtime.Logger.Info("Running diagnostics...");
 
         var gatewayUrl = _selectedEnvironment?.GatewayUrl;
-        var report = await DiagnosticService.RunAllAsync(gatewayUrl, _webViewService);
-        _coordinator?.UpdateInstrumentation(
-            totalControlUiInspectionRequests: _webViewService.TotalControlUiInspectionRequests,
-            cachedControlUiInspectionRequests: _webViewService.CachedControlUiInspectionRequests,
-            coalescedControlUiInspectionRequests: _webViewService.CoalescedControlUiInspectionRequests,
-            deferredSaveRequests: App.Configuration.DeferredSaveRequests,
-            deferredSaveCoalescedRequests: App.Configuration.DeferredSaveCoalescedRequests,
-            heartbeatRecoveryRequests: _webViewService.HeartbeatRecoveryRequests,
+        var report = await DiagnosticService.RunAllAsync(gatewayUrl, _webViewService, _runtime.Logger);
+        UpdateShellInstrumentation(
             lastInstrumentationEvent: "diagnostics.run");
 
         DiagnosticSummary = report.ToSummary();
         IsDiagnosticVisible = true;
 
-        App.Logger.Info($"Diagnostics complete. Failures: {report.HasFailures}");
+        _runtime.Logger.Info($"Diagnostics complete. Failures: {report.HasFailures}");
     }
 
     private async Task OnExportDiagnosticBundleAsync()
     {
-        App.Logger.Info("Exporting diagnostic bundle...");
+        _runtime.Logger.Info("Exporting diagnostic bundle...");
 
-        var settingsJson = System.IO.File.Exists(App.Configuration.SettingsFilePath)
-            ? await System.IO.File.ReadAllTextAsync(App.Configuration.SettingsFilePath)
+        var settingsJson = System.IO.File.Exists(_runtime.Configuration.SettingsFilePath)
+            ? await System.IO.File.ReadAllTextAsync(_runtime.Configuration.SettingsFilePath)
             : "{}";
 
         var diagnosticSummary = DiagnosticSummary;
-        var logsDirectory = App.Configuration.LogsDirectory;
+        var logsDirectory = _runtime.Configuration.LogsDirectory;
         var outputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         var runtimeInfo = DiagnosticBundleService.CollectRuntimeInfo(
-            DiagnosticService.GetWebView2RuntimeVersion());
+            DiagnosticService.GetWebView2RuntimeVersion(_runtime.Logger));
 
-        var outputPath = await DiagnosticBundleService.ExportBundleAsync(
+        var outputPath = await Task.Run(() => DiagnosticBundleService.ExportBundleAsync(
             settingsJson,
             logsDirectory,
             diagnosticSummary,
             outputDirectory,
-            runtimeInfo);
+            runtimeInfo));
 
-        App.Logger.Info($"Diagnostic bundle exported to: {outputPath}");
+        _runtime.Logger.Info($"Diagnostic bundle exported to: {outputPath}");
         DiagnosticSummary = $"Diagnostic bundle exported to Desktop:\n{System.IO.Path.GetFileName(outputPath)}";
         IsDiagnosticVisible = true;
     }

@@ -8,6 +8,68 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### Unreleased
+
+- Hardened the WebView startup stall path: `NavigationCompleted` can now claim the current navigation when WebView2 does not deliver `NavigationStarting`, completion watchdogs require an active watchdog id before publishing timeout recovery, HostedUiBridge message handling uses host-generation plus owner/page-token ownership instead of CoreWebView2 wrapper identity, and the full-window loading ring clears after browser navigation instead of staying visible throughout `GatewayConnecting`.
+- Closed two adjacent stale-navigation windows: exhausted page-token retry now publishes `Unavailable` only for the original navigation generation, and Stop fallback cancels navigation watchdogs, probes, page ownership, and navigation cancellation so a stopped load cannot later fire stale startup-timeout recovery.
+- Documented the second-pass architecture hardening plan that follows the v3.3.6 cleanup baseline.
+- Clarified the active no-`tests/` verification replacement: restore/build/format, repository guardrails, bridge script checks, whitespace checks, and VS2026 manual debug.
+- Aligned documentation with the current runtime split: `WebViewStatusInspector`, `HeartbeatRuntime`, `WebViewRecreationService`, split embedded `HostedUiBridge` assets, compact-mode visual states, the live shell settings apply pipeline, and `StatusPresenter`.
+- Refreshed the second-pass plan to reflect the completed WebView status inspection asset, heartbeat transport/policy split, settings persistence adapter, and `AppRuntimeContext` work.
+- Split `HostedUiBridge.StatusInspection.js` into focused DOM utilities, MODEL DOM fallback, activity/stale-busy, and phase-classification assets, with bridge script verifier coverage.
+- Moved the last Settings save log out of `SettingsViewModel` and behind the settings persistence adapter boundary.
+- Hardened final stabilization paths: prewarmed Settings dialogs reload current persisted state before activation, compact mode no longer persists 480x120 as normal window bounds, heartbeat hosted-session probes honor cancellation, coalesced WebView status inspections do not let caller cancellation contaminate shared in-flight results, status inspection timeout/failure snapshots are published under current page ownership, localized bridge scripts are composed per WebView initialization, and string resources are invalidated after language override attempts.
+- Localized the Settings diagnostic bundle action and added guardrails for settings persistence boundaries, compact bounds saves, and localized bridge-script caching.
+- Added a bounded timeout around WebView status script inspection so stalled `ExecuteScriptAsync` calls cannot hold coalesced probes indefinitely, and made status probe task/cancellation ownership explicit.
+- Added bounded timeouts and post-await current-target checks around hosted bridge command dispatch and WebView stop/abort command scripts so stalled page promises cannot block native recovery or apply stale command results after WebView replacement.
+- Extended hosted bridge and WebView stop/abort command ownership checks to include accepted page versions, so same-WebView navigation cannot let an old document promise report success for the current page.
+- Routed ShellSessionCoordinator WebView2 and hosted bridge adapter calls through the UI dispatcher, covering heartbeat-triggered recovery paths that start on background threads.
+- Routed the public Control UI inspection entry, WebViewService heartbeat hosted-session inspection, and navigation-after-load status probe loop through the injected UI dispatcher before touching WebView2.
+- Classified gateway transport 5xx, missing Control UI 404, rejected heartbeat-probe 405, and unexpected 4xx responses as failures so Cloudflare/reverse-proxy error pages can trigger recovery instead of being treated as healthy transport.
+- Tightened the UI-dispatch contract so failed dispatcher enqueue no longer runs WebView2 or WinUI work inline on a background thread.
+- Added native owner/page-token validation for hosted bridge messages so stale WebView documents cannot write session/status messages back into the current page state.
+- Closed the remaining WebView ownership window by invalidating page tokens and clearing the accepted navigation id before programmatic navigation/reload/retry, re-checking generation after page-token capture awaits, and retrying page-token capture without blocking status probes.
+- Requested a native-triggered `session-ready` replay after page-token acceptance so early hosted ready messages rejected by ownership filtering can be delivered without a manual reload.
+- Linked page-token capture retry and native-triggered `session-ready` replay to a lease-owned navigation cancellation scope, so reload, detach, or a new navigation cancels stale replay work without disposing tokens still held by bounded retry/replay operations; cancellation callback failures can no longer block scope retirement.
+- Removed the status probe cancellation/disposal race by cancelling the active probe CTS before clearing ownership, while preserving probe-owned disposal.
+- Tracked and removed the hosted bridge document-created script id on WebView detach so repeated initialization does not accumulate old bridge observers and timers.
+- Reload and retry paths now publish an error state when CoreWebView2 becomes unavailable before the command starts, instead of leaving the shell stuck in Loading/Reconnecting.
+- Reload now returns whether CoreWebView2 actually accepted the command, and recovery paths treat a no-op reload as failed recovery instead of advancing to Connecting without a real refresh.
+- Manual Retry now only hides the visible error after retry navigation actually starts; if no retryable WebView navigation exists, the localized error remains visible with a Reload/environment-switch recovery hint.
+- Auto-retry continuations now re-check navigation generation and accepted target before retrying, treat changed navigation as stale, and publish Error when retries are exhausted or the retry command cannot start instead of leaving the shell in Reconnecting or letting old navigation-completed work overwrite current state.
+- Added an observed exception boundary around WebView navigation-completed async handling so failed probe startup or recovery notifications are logged instead of escaping an `async void` event handler.
+- Detached the coordinator, bridge, and WebView service before closing outgoing WebView2 controls during recreation, and tracked recreation/foreground-resume async work so shutdown does not write through disposed shell state.
+- Guarded shell ContentDialog entry points against rapid reentry, logged dialog failures, and made Settings session-reset disable its button while running with localized failure reporting.
+- Made configuration deferred-save ownership explicit by storing the worker task/cancellation source, serializing coalesced save versions under one lifetime gate, and cancelling, draining, or observing it before shutdown flushes settings.
+- Made WebView recreation and WebView/bridge initialization cancellable during shutdown, replaced ShellSessionCoordinator async event handlers with observed fire-and-forget recovery tasks, and kept recovery/probe cancellation disposal owned by the running operation.
+- Hardened Log Viewer cancellation so stale load failures cannot write over a newer refresh or a closing dialog.
+- Hardened Control UI latency probe lifetime so stop/restart only cancels the active probe while the observed probe task owns timer/CTS disposal and logs unexpected failures.
+- Hardened stale run filtering for heartbeat and latency probes: old heartbeat loops cannot publish observations or trigger recovery after stop/restart, new heartbeat loops run off the caller thread and publish an immediate first observation before waiting for the first periodic interval, and old latency probes are rejected by run id plus selected environment host before updating the UI.
+- Removed the remaining `MainViewModel` fallback to `App.MainWindow`; view-model UI dispatch now must be injected by the owning window, and repository guardrails reject reintroducing the global window dependency.
+- Hardened the final review findings: WebView status inspections now require an accepted page version before script execution and before publishing, cancelled coalesced inspection callers cannot write UI state after they leave, Stop fallback remains tied to the original WebView/page target, bridge CustomEvent fallback no longer reports soft-resync commands as handled without a real hosted method, non-chat settings/Cron busy state no longer triggers stale-chat recovery, and compact mode collapses nonessential fixed-width top-bar segments at 480px.
+- Hardened single-instance shutdown and relaunch behavior so the app waits for the named-pipe listener stop before disposing the coordinator, uses a named semaphore so async live settings and shutdown paths can release the single-instance lock from any thread, applies multiple-instance setting changes to the running coordinator, and observes listener stop/start changes asynchronously so Settings save is not blocked by named-pipe shutdown.
+- Hardened the final review follow-ups: transient `Unavailable`/`Unknown` status inspections no longer clear the last non-empty MODEL for the same accepted page, `Unavailable` downgrades stale `Connected` shell state, single-instance shutdown drains the named-pipe listener instead of using a best-effort timeout, Settings View Logs closes Settings before opening the log dialog, and the Pin tooltip uses localized resources.
+- Hardened the latest review follow-ups: heartbeat no longer treats missing Control UI paths or rejected heartbeat probes as healthy transport, unknown hosted bridge CustomEvent fallbacks return unhandled, and compact-mode documentation now reflects the current reduced control/status layout.
+- Hardened heartbeat/recovery interaction after final review: hosted-session heartbeat inspections no longer publish UI snapshots before heartbeat failure accounting, resource scheduling keeps heartbeat alive for owned `Reconnecting`/`Unavailable` hosted-session states, and stale heartbeat loops cannot stop or recover a newly started run.
+- Hardened page-token and recovery cancellation paths: exhausted native page-token capture now publishes an owned `Unavailable` snapshot, and ShellSessionCoordinator recovery inspections carry the active operation cancellation token before deciding reload fallback or recovery completion.
+- Hardened ShellSessionCoordinator observed recovery lifetime: event-gap, heartbeat-triggered, stale-busy, and foreground-resume recovery work now owns cancellable operation CTS instances, attach/detach/reset/dispose cancels pending inspections before service replacement, and cancellation is rethrown instead of becoming reconnect fallback.
+- Hardened ShellSessionCoordinator bridge-command cancellation: reconnect and soft-resync commands now pass the active recovery operation token through the Core bridge contract, the WinUI UI-dispatch adapter, and `HostedUiBridge` script execution so cancelled or replaced recovery operations do not keep old in-page commands queued or running against a newer session.
+- Hardened ShellSessionCoordinator recovery reload cancellation: reconnect and hard-refresh reloads now pass the active recovery operation token through the Core WebView contract and WinUI UI-dispatch adapter so cancelled or replaced recovery operations cannot start a queued reload against a newer session.
+- Tightened UI dispatch for recovery reloads by adding a cancellable synchronous dispatcher overload and removing the `Task.FromResult` wrapper around synchronous WebView2 reload work.
+- Hardened final-review cleanup: transient `Loading`, `Unavailable`, and `Unknown` snapshots preserve the last non-empty MODEL for the same accepted page; Settings save dirty-merges only edited fields and ignores same-value two-way binding writes so stale dialog snapshots cannot overwrite live Pin/hotkey/environment changes; public recovery requests link caller cancellation into the active operation CTS; and compact-mode loading-ring visibility is derived from compact state plus loading state so it cannot reappear in compact mode.
+- Hardened single-instance relaunch responsiveness: secondary-launch activation requests now use async named-pipe connect/write, activation-failure takeover retries use cancellable async delay with one shared takeover deadline instead of `Thread.Sleep`, and the shutdown path still drains the named-pipe listener before releasing the semaphore.
+- Hardened final UI/lifecycle cleanup: injected ViewModel UI updates now catch and log callback failures instead of letting dispatcher callbacks escape as unhandled UI-thread exceptions, and WebView process-failure handling retires navigation retry/replay cancellation before publishing the unavailable snapshot.
+- Hardened final responsiveness cleanup: long-running async commands now reject repeated execution while running, tolerate null task results defensively, export diagnostic bundles without enumerating logs or compressing zip files on the UI thread, and delete inactive WebView2 profile folders from a background thread.
+- Set current app, assembly, file, package manifest, application manifest, README, and changelog metadata to `3.0.1` for this refactor validation branch. The older `v3.0.1 (2026-04-21)` and `v3.0.0 (2026-04-21)` entries below remain historical release context.
+- Added repository guardrails that keep `3.0.1` project, assembly/file, package manifest, application manifest, README, Chinese README, and changelog metadata aligned during finalization.
+- Moved the Settings Control UI URL placeholder into localized resources and corrected the multiple-instances description text.
+- Added a repository guardrail that requires English and Chinese `.resw` resource keys to stay aligned.
+- Moved tray Open, Compact Mode, and Exit labels behind typed `StringResources` properties, added the missing Chinese Compact Mode label, and added guardrails against raw tray-menu resource fallbacks.
+- Recorded the remaining finalization target: VS2026 manual Gateway/Cloudflare checklist and final commit. Automated local verification has run, Debug outputs were cleaned after verification, and Release folders are preserved.
+- Noted that earlier changelog references to executable regression coverage are historical after the v3.3.6 harness removal.
+- Hardened `tools\verify-bridge-scripts.ps1` so Node runner failures fail PowerShell, Node is required by default unless `OPENCLAW_ALLOW_NODE_SKIP=1` is set explicitly, and an isolated full composed-bridge behavior check covers native-triggered `session-ready` replay.
+- Expanded the VS2026 manual checklist to include Cloudflare/reverse-proxy 4xx/5xx/auth/origin pages, `cf-ray` PoP parsing, DWM title-bar edges, and single-instance relaunch handoff.
+
 ### v3.3.6 (2026-05-21)
 
 - Promoted the v3.3.5 architecture cleanup after VS2026 debug validation.
@@ -208,6 +270,68 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### 未发布
+
+- 加固 WebView 启动卡住路径：当 WebView2 没有送达 `NavigationStarting` 时，`NavigationCompleted` 也可以接管当前 navigation；completion watchdog 需要匹配 active watchdog id 才能发布 timeout recovery；HostedUiBridge 消息入口改用 host generation 加 owner/page-token 归属，而不是 CoreWebView2 wrapper identity；全窗口 loading ring 也会在浏览器 navigation 结束后清除，不再贯穿整个 `GatewayConnecting` 阶段。
+- 关闭两个相邻的旧 navigation 窗口：page-token retry 耗尽时只会对原 navigation generation 发布 `Unavailable`，Stop fallback 会取消 navigation watchdog、probe、page ownership 和 navigation cancellation，避免已停止的加载稍后触发过期启动 timeout recovery。
+- 记录 v3.3.6 架构清理基线之后的第二轮 architecture hardening 计划。
+- 明确当前 no-`tests/` 验证替代方案：restore/build/format、仓库 guardrail、bridge script checks、空白差异检查和 VS2026 manual debug。
+- 将文档同步到当前 runtime 拆分：`WebViewStatusInspector`、`HeartbeatRuntime`、`WebViewRecreationService`、拆分后的 embedded `HostedUiBridge` assets、compact mode visual states、live shell settings apply pipeline 和 `StatusPresenter`。
+- 根据当前代码刷新第二轮计划，纳入已完成的 WebView status inspection asset、heartbeat transport/policy 拆分、settings persistence adapter 和 `AppRuntimeContext`。
+- 将 `HostedUiBridge.StatusInspection.js` 拆分为 DOM utilities、MODEL DOM fallback、activity/stale-busy 和 phase-classification assets，并补充 bridge script verifier 覆盖。
+- 将最后一个 Settings 保存日志从 `SettingsViewModel` 移到 settings persistence adapter 边界后面。
+- 加固最终收尾路径：预热的 Settings 对话框在激活前重新加载当前持久化状态，compact mode 不再把 480x120 写成普通窗口尺寸，heartbeat hosted-session probe 支持取消，合并的 WebView status inspection 不再让调用方取消污染共享 in-flight 结果，status inspection timeout/失败会在当前 page ownership 下发布 `Unavailable` 快照，localized bridge script 改为每次 WebView 初始化时组合，并在 language override 尝试后刷新字符串资源缓存。
+- 本地化 Settings 诊断包操作，并增加 settings persistence 边界、compact bounds 保存和 localized bridge-script 缓存 guardrail。
+- 为 WebView 状态脚本检查增加有界 timeout，避免 `ExecuteScriptAsync` 卡住后把后续 coalesced probe 一起拖住，并显式归属 status probe task/cancellation 生命周期。
+- 为 hosted bridge command dispatch 和 WebView stop/abort command scripts 增加有界 timeout 和 await 后 current-target 校验，避免页面 promise 卡住时无限阻塞 native recovery，或在 WebView 替换后写入过期 command 结果。
+- 将 hosted bridge 和 WebView stop/abort command 的归属检查扩展到已接受的 page version，避免同一个 WebView 内导航后旧 document promise 把成功结果写到当前页面。
+- 将 ShellSessionCoordinator 的 WebView2 和 hosted bridge adapter 调用切回 UI dispatcher，覆盖从后台 heartbeat 发起的 recovery 路径。
+- 将公共 Control UI inspection 入口、WebViewService heartbeat hosted-session inspection 和导航后的 status probe loop 都切回注入的 UI dispatcher 后再触碰 WebView2。
+- Gateway transport heartbeat 现在会把 5xx、缺失 Control UI 路径的 404、heartbeat probe 被拒绝的 405 和未明确允许的 4xx 识别为失败，避免 Cloudflare/反代错误页被误判为健康传输。
+- 收紧 UI dispatcher 契约，dispatcher enqueue 失败时不再把 WebView2 或 WinUI 工作退回后台线程 inline 执行。
+- 增加 hosted bridge message 的 native owner/page-token 校验，避免旧 WebView document 把 session/status 消息写回当前页面状态。
+- 关闭剩余 WebView ownership 窗口：程序主动 navigation/reload/retry 会先失效 page token 并清空已接受的 navigation id，page-token 捕获 await 之后重新校验 generation，并在不阻塞 status probe 的前提下重试 page-token 捕获。
+- page-token 被 native 接受后会主动请求一次 `session-ready` 重放，避免过早发出的 hosted ready 消息被 ownership filter 拒收后必须手动刷新。
+- page-token 捕获重试和 native-triggered `session-ready` replay 现在绑定 lease-owned navigation cancellation scope，避免 reload、detach 或新 navigation 后旧 replay 工作继续排队，同时不会 dispose 仍被有界 retry/replay 持有的 token；cancellation callback 失败也不会阻塞 scope retirement。
+- 调整 status probe 取消路径，在清空所有权前先取消 active probe CTS，同时继续由正在运行的 probe 负责释放，移除 cancel/dispose 竞态。
+- Hosted bridge 现在跟踪并移除 document-created script id，避免同一 WebView 重复初始化后累积旧 observer 和 timer。
+- Reload 和 retry 路径在 CoreWebView2 调用开始前失效时会发布 error 状态，避免外壳停在 Loading/Reconnecting。
+- Reload 现在会返回 CoreWebView2 是否真正接受了刷新命令，recovery 路径会把 no-op reload 视为恢复失败，而不是在没有真实刷新的情况下推进到 Connecting。
+- 手动 Retry 现在只有在 retry navigation 真正启动后才隐藏当前错误；如果没有可重试的 WebView navigation，会继续显示本地化错误，并提示使用刷新或切换环境恢复。
+- Auto-retry continuation 现在会在重试前重新校验 navigation generation 和目标归属，把已经切换的 navigation 当作 stale 退出；如果重试耗尽或 retry 命令无法启动，会发布 Error，避免外壳停在 Reconnecting，也避免旧 navigation-completed 工作覆盖当前状态。
+- 为 WebView navigation-completed async 处理增加可观察的异常边界，probe 启动或 recovery 通知失败时会记录日志，而不是从 `async void` event handler 逃逸。
+- WebView recreation 在关闭旧 WebView2 控件前先 detach coordinator、bridge 和 WebView service，并跟踪 recreation/foreground-resume async work，避免 shutdown 后写入已释放的 shell 状态。
+- Shell ContentDialog 入口现在防止快速重复触发，dialog 失败会写日志；Settings session-reset 运行期间会禁用按钮，并用本地化错误提示报告失败。
+- 配置延迟保存现在显式保存 worker task/cancellation source，用同一个生命周期 gate 串行化合并保存版本，并会在 shutdown flush settings 前取消、等待或观察旧 worker。
+- WebView recreation 与 WebView/bridge 初始化在 shutdown 期间支持取消，并将 ShellSessionCoordinator async event handler 改为有观察和日志的 fire-and-forget recovery task，recovery/probe cancellation 的释放由正在运行的 operation 统一负责。
+- 加固 Log Viewer 取消路径，避免过期 load 的失败结果覆盖新一次刷新或正在关闭的对话框。
+- 加固 Control UI latency probe 生命周期，stop/restart 只取消 active probe，由已观察的 probe task 统一释放 timer/CTS 并记录异常。
+- 加固 heartbeat 和 latency probe 的旧 run 过滤：旧 heartbeat loop 在 stop/restart 后不能再发布观察或触发 recovery，新 heartbeat loop 会离开调用线程运行，并在等待第一个周期 interval 前先发布一次即时观察，旧 latency probe 也会通过 run id 和当前选中环境 host 校验后才更新 UI。
+- 移除 `MainViewModel` 最后的 `App.MainWindow` fallback；ViewModel 的 UI dispatch 必须由拥有它的窗口注入，仓库 guardrail 会拒绝重新引入全局窗口依赖。
+- 加固最终 review 发现的问题：WebView status inspection 在执行脚本和发布状态前都要求 accepted page version，已取消的合并 inspection caller 离开后不能再写 UI 状态，Stop fallback 会绑定最初的 WebView/page target，bridge CustomEvent fallback 没有真实 hosted method 时不再报告 soft-resync 已处理，非 chat Settings/Cron busy 状态不再触发 stale-chat recovery，compact mode 在 480px 下会折叠非必要固定宽度顶栏段。
+- 加固 single-instance 关闭和 relaunch 行为，App 会先等待 named-pipe listener 停止再释放 coordinator，并改用 named semaphore，让异步 live settings 和 shutdown 路径可以从任意线程释放 single-instance lock；同时会把多实例设置变更应用到当前运行的 coordinator，并通过被观察的异步路径处理 listener stop/start，避免 Settings 保存被 named-pipe shutdown 阻塞。
+- 加固 single-instance 重新启动流畅度：二次启动请求 primary 激活时改用异步 named-pipe connect/write，激活失败后的接管重试改用可取消的异步 delay，并共用一个接管 deadline，不再用同步 `Thread.Sleep` 卡启动线程；关闭路径仍会等待 named-pipe listener 排空后再释放 semaphore。
+- 加固最终 review follow-up：短暂 `Unavailable`/`Unknown` status inspection 不再清空同一 accepted page 内最近一次非空 MODEL，`Unavailable` 会降级旧 `Connected` shell 状态，single-instance shutdown 不再使用 best-effort timeout 而是等待 named-pipe listener 排空，Settings View Logs 会先关闭 Settings 再打开 log dialog，Pin tooltip 也改为本地化资源。
+- 加固最新 review follow-up：heartbeat 不再把缺失 Control UI 路径或被拒绝的 heartbeat probe 当作健康 transport，未知 hosted bridge CustomEvent fallback 会返回未处理，compact-mode 文档也同步为当前的缩小控制/状态窗口。
+- 加固 heartbeat/recovery 交互：hosted-session heartbeat inspection 不再在 heartbeat 失败计数前发布 UI 快照，resource scheduling 会在自己接管的 `Reconnecting`/`Unavailable` hosted-session 状态下继续跑 heartbeat，旧 heartbeat loop 也不能停掉或 recovery 新开始的 run。
+- 加固 page-token 和 recovery cancellation 路径：native page-token 捕获耗尽后会发布归属明确的 `Unavailable` 快照，ShellSessionCoordinator recovery inspection 在判断 reload fallback 或 recovery 完成前会携带当前 operation cancellation token。
+- 加固 ShellSessionCoordinator observed recovery 生命周期：event-gap、heartbeat-triggered、stale-busy 和 foreground-resume recovery work 都有可取消的 operation CTS，attach/detach/reset/dispose 会在服务替换前取消 pending inspection，取消异常会继续抛出而不是变成 reconnect fallback。
+- 加固 ShellSessionCoordinator bridge command cancellation：reconnect 和 soft-resync command 现在会把当前 recovery operation token 传过 Core bridge contract、WinUI UI-dispatch adapter 和 `HostedUiBridge` 脚本执行链路，避免已取消或已替换的 recovery operation 继续排队或运行旧页面命令。
+- 加固 ShellSessionCoordinator recovery reload cancellation：reconnect 和 hard-refresh reload 现在会把当前 recovery operation token 传过 Core WebView contract 和 WinUI UI-dispatch adapter，避免已取消或已替换的 recovery operation 对新 session 启动排队中的旧 reload。
+- 收紧 recovery reload 的 UI dispatch：新增可取消的同步 dispatcher overload，并移除同步 WebView2 reload 外层的 `Task.FromResult` 包装。
+- 加固最终 review 收尾：短暂 `Loading`、`Unavailable` 和 `Unknown` 快照会在同一 accepted page 内保留最近一次非空 MODEL；Settings 保存只 dirty-merge 实际编辑过的字段，并忽略 two-way binding 初始化时的同值写回，避免 stale dialog snapshot 覆盖外部 Pin、hotkey 或 environment 变更；public recovery request 会把调用方 cancellation 链接进当前 operation CTS；compact-mode loading-ring visibility 由 compact 状态和 loading 状态共同派生，避免 compact 下重新显示。
+- 加固最终 UI/lifecycle 收尾：注入式 ViewModel UI 更新现在会捕获并记录回调异常，避免 dispatcher 回调变成 UI 线程未处理异常；WebView process-failure 处理会先退休 navigation retry/replay cancellation，再发布 unavailable snapshot。
+- 加固最终流畅度收尾：长耗时 async command 运行期间会拒绝重复执行，并防御性处理空 task 结果；诊断包导出不会在 UI 线程枚举日志或压缩 zip；非当前环境的 WebView2 profile 文件夹删除改到后台线程执行。
+- 将当前重构验证分支的 app、assembly、file、package manifest、application manifest、README 和 changelog 元数据同步到 `3.0.1`。下方较早的 `v3.0.1 (2026-04-21)` 和 `v3.0.0 (2026-04-21)` 条目保留为历史发布记录。
+- 新增仓库 guardrail，确保 `3.0.1` project、assembly/file、package manifest、application manifest、README、中文 README 和 changelog 元数据在收尾阶段保持一致。
+- 将 Settings 的 Control UI URL placeholder 移入本地化资源，并修正 multiple-instances 说明文案。
+- 新增仓库 guardrail，要求英文和中文 `.resw` resource key 保持一致。
+- 将托盘 Open、Compact Mode、Exit 菜单文案统一到 typed `StringResources` 属性，补齐中文 Compact Mode 菜单文案，并新增 guardrail 防止回退到 raw tray-menu resource fallback。
+- 记录剩余收尾目标：VS2026 manual Gateway/Cloudflare checklist 和 final commit。完整本地验证已运行，验证后 Debug 输出已清理，并保留 Release 文件夹。
+- 说明早期 changelog 中关于 executable regression coverage 的描述在 v3.3.6 移除 harness 后属于历史记录。
+- 加固 `tools\verify-bridge-scripts.ps1`：Node runner 失败现在会让 PowerShell 失败，默认要求 Node，除非明确设置 `OPENCLAW_ALLOW_NODE_SKIP=1`，并新增独立的完整 composed bridge 行为检查，覆盖 native-triggered `session-ready` replay。
+- 扩展 VS2026 manual checklist，纳入 Cloudflare/反代 4xx/5xx/auth/origin 页面、`cf-ray` PoP 解析、DWM title-bar 边缘和 single-instance relaunch handoff。
 
 ### v3.3.6 (2026-05-21)
 

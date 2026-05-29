@@ -5,13 +5,15 @@ namespace OpenClaw.Models;
 public sealed record LiveShellSettings(
     bool AlwaysOnTop,
     bool EnableGlobalHotkey,
-    string GlobalHotkey)
+    string GlobalHotkey,
+    bool AllowMultipleInstances)
 {
     public static LiveShellSettings From(AppSettings settings)
     {
         return new LiveShellSettings(
             settings.AlwaysOnTop,
             settings.EnableGlobalHotkey,
-            settings.GlobalHotkey.Trim());
+            settings.GlobalHotkey.Trim(),
+            settings.AllowMultipleInstances);
     }
 }

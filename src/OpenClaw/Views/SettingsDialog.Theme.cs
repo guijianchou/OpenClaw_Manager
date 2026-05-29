@@ -2,6 +2,7 @@
 
 using Microsoft.UI.Xaml;
 using OpenClaw.Helpers;
+using OpenClaw.ViewModels;
 
 namespace OpenClaw.Views;
 
@@ -19,6 +20,19 @@ public sealed partial class SettingsDialog
         ApplyTheme(App.Configuration.Settings.AppTheme);
         PopulateLanguageOptions();
         SetLanguageSelection(ViewModel.SelectedLanguage);
+    }
+
+    public void ReloadFromCurrentSettings()
+    {
+        ViewModel = new SettingsViewModel(_settingsPersistence);
+        EnvironmentList.ItemsSource = ViewModel.Environments;
+        SessionEnvironmentList.ItemsSource = ViewModel.Environments;
+        SelectFirstEnvironment();
+        PopulateLanguageOptions();
+        SetLanguageSelection(ViewModel.SelectedLanguage);
+        ValidationInfoBar.IsOpen = false;
+        SessionInfoBar.IsOpen = false;
+        Bindings.Update();
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs e)

@@ -24,9 +24,10 @@ internal sealed class HeartbeatRuntime : IDisposable
     public void Start(string key, Func<CancellationToken, Task> loop)
     {
         Stop();
+        var cancellation = new CancellationTokenSource();
         _key = key;
-        _cancellation = new CancellationTokenSource();
-        _task = RunObservedAsync(key, loop, _cancellation);
+        _cancellation = cancellation;
+        _task = Task.Run(() => RunObservedAsync(key, loop, cancellation));
     }
 
     public void Stop()

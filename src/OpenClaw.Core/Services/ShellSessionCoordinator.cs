@@ -34,6 +34,7 @@ public sealed partial class ShellSessionCoordinator : IDisposable
     private string? _lastRecoveryReason;
     private string? _degradationReason;
     private bool _isInBackground;
+    private bool _isDisposed;
 
     // Telemetry
     private int _totalReconnectAttempts;
@@ -62,6 +63,8 @@ public sealed partial class ShellSessionCoordinator : IDisposable
 
     // Throttling
     private readonly object _recoveryGate = new();
+    private readonly object _observedOperationGate = new();
+    private readonly HashSet<CancellationTokenSource> _observedOperationCancellations = new();
     private bool _isRecoveryInProgress;
     private CancellationTokenSource? _recoveryCts;
 

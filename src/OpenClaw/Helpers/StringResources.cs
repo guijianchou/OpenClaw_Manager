@@ -17,6 +17,11 @@ public static class StringResources
         _ = TryGetLoader();
     }
 
+    public static void Invalidate()
+    {
+        _loader = null;
+    }
+
     private static ResourceLoader? TryGetLoader()
     {
         try
@@ -47,6 +52,7 @@ public static class StringResources
     // --- Shared ---
     public static string Close => Get("Close");
     public static string Retry => Get("Retry");
+    public static string RetryUnavailable => Get("RetryUnavailable");
     public static string DevTools => Get("DevTools");
     public static string ConnectionIssue => Get("ConnectionIssue");
     public static string DiagnosticsTitle => Get("DiagnosticsTitle");
@@ -63,6 +69,11 @@ public static class StringResources
     public static string Settings => Get("Settings");
     public static string ClearSession => Get("ClearSession");
 
+    // --- Tray Menu ---
+    public static string TrayMenuOpen => Get("TrayMenuOpen");
+    public static string TrayMenuCompactMode => Get("TrayMenuCompactMode");
+    public static string TrayMenuExit => Get("TrayMenuExit");
+
     // --- Status Bar ---
     public static string StatusConnected => Get("StatusConnected");
     public static string StatusLoading => Get("StatusLoading");
@@ -76,6 +87,7 @@ public static class StringResources
     public static string HeartbeatWait => Get("HeartbeatWait");
     public static string HeartbeatBlocked => Get("HeartbeatBlocked");
     public static string HeartbeatFailed => Get("HeartbeatFailed");
+    public static string CircuitBreakerRecreationSuppressed => Get("CircuitBreakerRecreationSuppressed");
 
     // --- Recovery States ---
     public static string RecoveryConnecting => Get("RecoveryConnecting");
@@ -121,6 +133,7 @@ public static class StringResources
     public static string SettingsRemoveTooltip => Get("SettingsRemoveTooltip");
     public static string SettingsEnvironmentPlaceholder => Get("SettingsEnvironmentPlaceholder");
     public static string SettingsControlUiUrl => Get("SettingsControlUiUrl");
+    public static string SettingsControlUiUrlPlaceholder => Get("SettingsControlUiUrlPlaceholder");
     public static string SettingsControlUiUrlHint1 => Get("SettingsControlUiUrlHint1");
     public static string SettingsControlUiUrlHint2 => Get("SettingsControlUiUrlHint2");
     public static string SettingsControlUiUrlHint3 => Get("SettingsControlUiUrlHint3");
@@ -139,6 +152,7 @@ public static class StringResources
     public static string SettingsRunDiagnostics => Get("SettingsRunDiagnostics");
     public static string SettingsViewLogs => Get("SettingsViewLogs");
     public static string SettingsOpenDevTools => Get("SettingsOpenDevTools");
+    public static string SettingsExportDiagnosticBundle => Get("SettingsExportDiagnosticBundle");
     public static string AddEnvironment => Get("AddEnvironment");
     public static string RemoveEnvironment => Get("RemoveEnvironment");
     public static string Save => Get("Save");
@@ -146,6 +160,7 @@ public static class StringResources
     public static string NoEnvironments => Get("NoEnvironments");
     public static string SettingsSessionResetSelectEnvironment => Get("SettingsSessionResetSelectEnvironment");
     public static string SettingsSessionResetCompleted => Get("SettingsSessionResetCompleted");
+    public static string SettingsSessionResetFailedFormat => Get("SettingsSessionResetFailedFormat");
     public static string SettingsValidationDefaultMessage => Get("SettingsValidationDefaultMessage");
     public static string SettingsValidationSelectEnvironment => Get("SettingsValidationSelectEnvironment");
     public static string SettingsValidationDuplicateEnvironment => Get("SettingsValidationDuplicateEnvironment");

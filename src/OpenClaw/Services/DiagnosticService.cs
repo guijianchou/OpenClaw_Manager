@@ -2,6 +2,7 @@
 
 using Microsoft.Web.WebView2.Core;
 using OpenClaw.Helpers;
+
 namespace OpenClaw.Services;
 
 /// <summary>
@@ -16,9 +17,9 @@ public class DiagnosticService
     /// <summary>
     /// Checks whether the WebView2 runtime is installed and available.
     /// </summary>
-    public static DiagnosticResult CheckWebView2Runtime()
+    public static DiagnosticResult CheckWebView2Runtime(IAppLogger logger)
     {
-        var version = GetWebView2RuntimeVersion();
+        var version = GetWebView2RuntimeVersion(logger);
         if (string.IsNullOrEmpty(version))
         {
             return DiagnosticResult.Fail(
@@ -29,15 +30,17 @@ public class DiagnosticService
         return DiagnosticResult.Pass($"{StringResources.DiagnosticWebView2RuntimeLabel} v{version}");
     }
 
-    public static string? GetWebView2RuntimeVersion()
+    public static string? GetWebView2RuntimeVersion(IAppLogger logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
+
         try
         {
             return CoreWebView2Environment.GetAvailableBrowserVersionString();
         }
         catch (Exception ex)
         {
-            App.Logger.Warning($"WebView2 runtime version lookup failed: {ex.Message}");
+            logger.Warning("diagnostics.webview2.runtime_version.failed", new { ex.Message });
             return null;
         }
     }
@@ -188,12 +191,17 @@ public class DiagnosticService
     /// <summary>
     /// Runs all startup diagnostics and returns a summary.
     /// </summary>
-    public static async Task<DiagnosticReport> RunAllAsync(string? gatewayUrl, WebViewService? webViewService)
+    public static async Task<DiagnosticReport> RunAllAsync(
+        string? gatewayUrl,
+        WebViewService? webViewService,
+        IAppLogger logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
+
         var report = new DiagnosticReport();
         ControlUiProbeSnapshot? snapshot = null;
 
-        report.Items.Add((StringResources.DiagnosticWebView2RuntimeLabel, CheckWebView2Runtime()));
+        report.Items.Add((StringResources.DiagnosticWebView2RuntimeLabel, CheckWebView2Runtime(logger)));
 
         if (webViewService is not null)
         {

@@ -12,11 +12,13 @@ public static class ShellSessionCoordinatorAdapters
         HostedUiBridge bridge,
         RecoveryPolicyOptions recoveryOptions,
         HeartbeatOptions heartbeatOptions,
-        IAppLogger logger)
+        IAppLogger logger,
+        Func<Action, bool> dispatchToUi)
     {
+        var dispatcher = new UiTaskDispatcher(dispatchToUi);
         return coordinator.AttachAsync(
-            new ShellSessionWebViewAdapter(webViewService),
-            new ShellSessionBridgeAdapter(bridge),
+            new ShellSessionWebViewAdapter(webViewService, dispatcher),
+            new ShellSessionBridgeAdapter(bridge, dispatcher),
             recoveryOptions,
             heartbeatOptions,
             logger);
@@ -26,10 +28,12 @@ public static class ShellSessionCoordinatorAdapters
 internal sealed class ShellSessionWebViewAdapter : IShellSessionWebView
 {
     private readonly WebViewService _inner;
+    private readonly UiTaskDispatcher _dispatcher;
 
-    public ShellSessionWebViewAdapter(WebViewService inner)
+    public ShellSessionWebViewAdapter(WebViewService inner, UiTaskDispatcher dispatcher)
     {
         _inner = inner;
+        _dispatcher = dispatcher;
     }
 
     public event Action<ConnectionState>? ConnectionStateChanged
@@ -68,9 +72,11 @@ internal sealed class ShellSessionWebViewAdapter : IShellSessionWebView
         remove => _inner.ControlUiSnapshotUpdated -= value;
     }
 
-    public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync() => _inner.InspectControlUiStateAsync();
+    public Task<ControlUiProbeSnapshot> InspectControlUiStateAsync(CancellationToken cancellationToken) =>
+        _inner.InspectControlUiStateAsync(cancellationToken);
 
-    public void Reload() => _inner.Reload();
+    public Task<bool> ReloadAsync(CancellationToken cancellationToken) =>
+        _dispatcher.RunAsync(_inner.Reload, cancellationToken);
 
     public int TotalControlUiInspectionRequests => _inner.TotalControlUiInspectionRequests;
 
@@ -84,10 +90,12 @@ internal sealed class ShellSessionWebViewAdapter : IShellSessionWebView
 internal sealed class ShellSessionBridgeAdapter : IShellSessionBridge
 {
     private readonly HostedUiBridge _inner;
+    private readonly UiTaskDispatcher _dispatcher;
 
-    public ShellSessionBridgeAdapter(HostedUiBridge inner)
+    public ShellSessionBridgeAdapter(HostedUiBridge inner, UiTaskDispatcher dispatcher)
     {
         _inner = inner;
+        _dispatcher = dispatcher;
     }
 
     public event Action<SessionReadyEventArgs>? SessionReady
@@ -102,11 +110,15 @@ internal sealed class ShellSessionBridgeAdapter : IShellSessionBridge
         remove => _inner.EventGapDetected -= value;
     }
 
-    public Task<bool> RequestSessionRefreshAsync() => _inner.RequestSessionRefreshAsync();
+    public Task<bool> RequestSessionRefreshAsync(CancellationToken cancellationToken) =>
+        _dispatcher.RunAsync(() => _inner.RequestSessionRefreshAsync(cancellationToken), cancellationToken);
 
-    public Task<bool> RequestRecentMessagesAsync() => _inner.RequestRecentMessagesAsync();
+    public Task<bool> RequestRecentMessagesAsync(CancellationToken cancellationToken) =>
+        _dispatcher.RunAsync(() => _inner.RequestRecentMessagesAsync(cancellationToken), cancellationToken);
 
-    public Task<bool> RequestLightweightSyncAsync() => _inner.RequestLightweightSyncAsync();
+    public Task<bool> RequestLightweightSyncAsync(CancellationToken cancellationToken) =>
+        _dispatcher.RunAsync(() => _inner.RequestLightweightSyncAsync(cancellationToken), cancellationToken);
 
-    public Task<bool> NotifyReconnectIntentAsync() => _inner.NotifyReconnectIntentAsync();
+    public Task<bool> NotifyReconnectIntentAsync(CancellationToken cancellationToken) =>
+        _dispatcher.RunAsync(() => _inner.NotifyReconnectIntentAsync(cancellationToken), cancellationToken);
 }

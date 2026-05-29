@@ -20,9 +20,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- =========================================================== -->
-        <!-- MAIN CONTENT — Sidebar + Panels                             -->
-        <!-- =========================================================== -->
+        <!-- Main content: sidebar + panels -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="160" />
@@ -41,31 +39,31 @@
                     <ListViewItem x:Name="NavLanguage" Tag="Language">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE774;" FontSize="14" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavLanguage}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavLanguage}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
                     <ListViewItem x:Name="NavShell" Tag="Shell">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE713;" FontSize="14" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavShell}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavShell}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
                     <ListViewItem x:Name="NavEnvironments" Tag="Environments">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE909;" FontSize="14" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavEnvironments}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavEnvironments}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
                     <ListViewItem x:Name="NavSessions" Tag="Sessions">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavSessions}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavSessions}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
                     <ListViewItem x:Name="NavDevTools" Tag="DevTools">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE9D9;" FontSize="14" />
-                        <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavDevTools}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind helpers:StringResources.SettingsNavDevTools}" FontSize="13" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListViewItem>
                 </ListView>
@@ -211,7 +209,7 @@
 
                         <TextBox x:Name="UrlTextBox"
                                  Header="{x:Bind helpers:StringResources.SettingsControlUiUrl}"
-                                 PlaceholderText="https://your-gateway.example.com"
+                                 PlaceholderText="{x:Bind helpers:StringResources.SettingsControlUiUrlPlaceholder}"
                                  Text="{x:Bind ViewModel.EditUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Text="{x:Bind helpers:StringResources.SettingsControlUiUrlHint1}"
@@ -367,7 +365,7 @@
                             <Button HorizontalAlignment="Stretch" Click="OnExportDiagnosticBundleClick">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <FontIcon Glyph="&#xE896;" FontSize="14" />
-                                    <TextBlock Text="Export Diagnostic Bundle" />
+                                    <TextBlock Text="{x:Bind helpers:StringResources.SettingsExportDiagnosticBundle}" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -376,9 +374,7 @@
             </ScrollViewer>
         </Grid>
 
-        <!-- =========================================================== -->
-        <!-- BOTTOM BUTTON BAR                                           -->
-        <!-- =========================================================== -->
+        <!-- Bottom button bar -->
         <Border Grid.Row="1"
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"

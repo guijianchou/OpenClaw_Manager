@@ -2,6 +2,7 @@
 
 using OpenClaw.Helpers;
 using OpenClaw.Models;
+using OpenClaw.Services;
 using OpenClaw.ViewModels;
 
 namespace OpenClaw.Views;
@@ -16,8 +17,9 @@ public sealed partial class SettingsDialog
     private bool _hasPerformedInitialTitleBarRefresh;
     private bool _isDarkThemeActive;
     private bool _isSyncingLanguageSelection;
+    private readonly SettingsPersistenceAdapter _settingsPersistence;
 
-    public SettingsViewModel ViewModel { get; } = new();
+    public SettingsViewModel ViewModel { get; private set; }
 
     /// <summary>
     /// Gets the main view model for developer tools commands.

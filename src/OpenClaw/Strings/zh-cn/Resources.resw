@@ -46,9 +46,7 @@
   <data name="Stop" xml:space="preserve">
     <value>停止</value>
   </data>
-  <data name="OpenInBrowser" xml:space="preserve">
-    <value>在浏览器中打开</value>
-  </data>
+
   <data name="Settings" xml:space="preserve">
     <value>设置</value>
   </data>
@@ -60,6 +58,9 @@
   </data>
   <data name="Retry" xml:space="preserve">
     <value>重试</value>
+  </data>
+  <data name="RetryUnavailable" xml:space="preserve">
+    <value>当前没有可重新启动的 WebView 导航，无法重试。请使用刷新或切换环境来开始新的会话。</value>
   </data>
   <data name="DevTools" xml:space="preserve">
     <value>开发者工具</value>
@@ -121,6 +122,9 @@
   </data>
   <data name="HeartbeatFailed" xml:space="preserve">
     <value>心跳失败</value>
+  </data>
+  <data name="CircuitBreakerRecreationSuppressed" xml:space="preserve">
+    <value>WebView 连续恢复失败后已暂时暂停自动恢复。请稍后再重试。</value>
   </data>
 
   <data name="RecoveryConnecting" xml:space="preserve">
@@ -247,6 +251,9 @@
   <data name="SettingsEnvironmentPlaceholder" xml:space="preserve">
     <value>例如：Production</value>
   </data>
+  <data name="SettingsControlUiUrlPlaceholder" xml:space="preserve">
+    <value>https://your-gateway.example.com</value>
+  </data>
   <data name="SettingsControlUiUrl" xml:space="preserve">
     <value>Control UI URL</value>
   </data>
@@ -298,11 +305,17 @@
   <data name="SettingsOpenDevTools" xml:space="preserve">
     <value>打开 DevTools</value>
   </data>
+  <data name="SettingsExportDiagnosticBundle" xml:space="preserve">
+    <value>导出诊断包</value>
+  </data>
   <data name="SettingsSessionResetSelectEnvironment" xml:space="preserve">
     <value>请选择要清除会话的环境。</value>
   </data>
   <data name="SettingsSessionResetCompleted" xml:space="preserve">
     <value>已清除“{0}”的保存会话。</value>
+  </data>
+  <data name="SettingsSessionResetFailedFormat" xml:space="preserve">
+    <value>清除“{0}”的保存会话失败：{1}</value>
   </data>
   <data name="SettingsValidationDefaultMessage" xml:space="preserve">
     <value>所有环境都必须具有唯一名称和有效的 http(s) Control UI URL。对于 Cloudflare Tunnel 或反向代理部署，请使用公开的 HTTPS Control UI URL，并确保 `gateway.controlUi.allowedOrigins` 与其精确 origin 保持一致。</value>
@@ -332,25 +345,13 @@
     <value>环境 {0}</value>
   </data>
 
-  <data name="AppDisplayName" xml:space="preserve">
-    <value>OpenClaw 管理器</value>
-  </data>
 
-  <data name="QuickCommands" xml:space="preserve">
-    <value>快捷命令</value>
-  </data>
-  <data name="QuickStop" xml:space="preserve">
-    <value>/stop - 停止生成</value>
-  </data>
-  <data name="QuickStatus" xml:space="preserve">
-    <value>/status - 查看状态</value>
-  </data>
-  <data name="QuickNew" xml:space="preserve">
-    <value>/new - 新对话</value>
-  </data>
-  <data name="QuickQueue" xml:space="preserve">
-    <value>/queue - 队列中断</value>
-  </data>
+
+
+
+
+
+
 
   <data name="ConnectionIssue" xml:space="preserve">
     <value>连接问题</value>
@@ -635,6 +636,9 @@
   </data>
   <data name="TrayMenuOpen" xml:space="preserve">
     <value>打开 OpenClaw</value>
+  </data>
+  <data name="TrayMenuCompactMode" xml:space="preserve">
+    <value>紧凑模式</value>
   </data>
   <data name="TrayMenuExit" xml:space="preserve">
     <value>退出</value>

@@ -38,7 +38,9 @@ public sealed partial class SettingsDialog
 
     private void OnViewLogsClick(object sender, RoutedEventArgs e)
     {
-        MainViewModel?.ViewLogsCommand.Execute(null);
+        var mainViewModel = MainViewModel;
+        this.Close();
+        mainViewModel?.ViewLogsCommand.Execute(null);
     }
 
     private void OnDevToolsClick(object sender, RoutedEventArgs e)
@@ -70,19 +72,18 @@ public sealed partial class SettingsDialog
 
     private async void OnClearEnvironmentSessionClick(object sender, RoutedEventArgs e)
     {
-        if (MainViewModel is null ||
-            sender is not Button button ||
-            button.Tag is not string environmentName ||
-            string.IsNullOrWhiteSpace(environmentName))
+        try
         {
-            ShowSessionMessage(InfoBarSeverity.Warning, StringResources.SettingsSessionResetSelectEnvironment);
-            return;
+            await ClearEnvironmentSessionAsync(sender as Button);
         }
-
-        await MainViewModel.ClearSessionForEnvironmentAsync(environmentName);
-        ShowSessionMessage(
-            InfoBarSeverity.Informational,
-            string.Format(StringResources.SettingsSessionResetCompleted, environmentName));
+        catch (Exception ex)
+        {
+            var environmentName = GetSessionButtonEnvironmentName(sender as Button);
+            App.Logger.Warning($"Failed to clear environment session: {ex.Message}");
+            ShowSessionMessage(
+                InfoBarSeverity.Error,
+                string.Format(StringResources.SettingsSessionResetFailedFormat, environmentName, ex.Message));
+        }
     }
 
     private void ShowEnvironmentMessage(string title, InfoBarSeverity severity, string? message = null)
@@ -99,6 +100,37 @@ public sealed partial class SettingsDialog
         SessionInfoBar.Severity = severity;
         SessionInfoBar.Message = message;
         SessionInfoBar.IsOpen = true;
+    }
+
+    private async Task ClearEnvironmentSessionAsync(Button? button)
+    {
+        if (MainViewModel is null ||
+            button?.Tag is not string environmentName ||
+            string.IsNullOrWhiteSpace(environmentName))
+        {
+            ShowSessionMessage(InfoBarSeverity.Warning, StringResources.SettingsSessionResetSelectEnvironment);
+            return;
+        }
+
+        button.IsEnabled = false;
+        try
+        {
+            await MainViewModel.ClearSessionForEnvironmentAsync(environmentName);
+            ShowSessionMessage(
+                InfoBarSeverity.Informational,
+                string.Format(StringResources.SettingsSessionResetCompleted, environmentName));
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
+    private static string GetSessionButtonEnvironmentName(Button? button)
+    {
+        return button?.Tag is string environmentName && !string.IsNullOrWhiteSpace(environmentName)
+            ? environmentName
+            : StringResources.SettingsSessionReset;
     }
 
     private bool TryApplyEdit()

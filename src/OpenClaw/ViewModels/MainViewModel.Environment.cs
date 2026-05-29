@@ -10,12 +10,12 @@ public partial class MainViewModel
     {
         Environments.Clear();
 
-        foreach (var environment in App.Configuration.Settings.Environments)
+        foreach (var environment in _runtime.Configuration.Settings.Environments)
         {
             Environments.Add(environment);
         }
 
-        UpdateEnvironmentSelection(App.Configuration.GetSelectedEnvironment(), persistSelection: false);
+        UpdateEnvironmentSelection(_runtime.Configuration.GetSelectedEnvironment(), persistSelection: false);
     }
 
     private void UpdateEnvironmentSelection(EnvironmentConfig? environment, bool persistSelection)
@@ -40,8 +40,8 @@ public partial class MainViewModel
 
         if (persistSelection)
         {
-            App.Configuration.Settings.SelectedEnvironmentName = environment.Name;
-            App.Configuration.SaveDeferred();
+            _runtime.Configuration.Settings.SelectedEnvironmentName = environment.Name;
+            _runtime.Configuration.SaveDeferred();
         }
 
         if (!_webViewService.IsInitialized)

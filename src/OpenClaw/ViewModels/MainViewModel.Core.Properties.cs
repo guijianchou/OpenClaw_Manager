@@ -85,15 +85,15 @@ public partial class MainViewModel
     /// <summary>
     /// Gets the underlying WebViewService for binding to the WebView2 control.
     /// </summary>
-    public WebViewService WebViewService => _webViewService;
+    internal WebViewService WebViewService => _webViewService;
 
     /// <summary>
     /// Gets the hosted UI bridge.
     /// </summary>
-    public HostedUiBridge HostedUiBridge => _hostedUiBridge;
+    internal HostedUiBridge HostedUiBridge => _hostedUiBridge;
 
     /// <summary>
     /// Gets the shell session coordinator.
     /// </summary>
-    public ShellSessionCoordinator? Coordinator => _coordinator;
+    internal ShellSessionCoordinator? Coordinator => _coordinator;
 }
