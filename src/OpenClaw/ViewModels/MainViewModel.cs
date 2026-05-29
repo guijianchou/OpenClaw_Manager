@@ -1,7 +1,8 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
 using System.ComponentModel;
-using Microsoft.UI.Xaml.Media;
+using OpenClaw.Abstractions;
+using OpenClaw.Services;
 
 namespace OpenClaw.ViewModels;
 
@@ -11,12 +12,39 @@ namespace OpenClaw.ViewModels;
 /// </summary>
 public partial class MainViewModel : INotifyPropertyChanged, IDisposable
 {
-    public MainViewModel()
+    public MainViewModel(AppRuntimeContext runtime, Func<Action, bool> dispatchToUi)
     {
+        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _dispatchToUi = dispatchToUi ?? throw new ArgumentNullException(nameof(dispatchToUi));
+        _latencyService = new ControlUiLatencyService(runtime.Logger);
+        _webViewService = new WebViewService(runtime.Logger, _messageOwnership, _dispatchToUi);
+        _hostedUiBridge = new HostedUiBridge(runtime.Logger, _messageOwnership);
         InitializeCommands();
         SubscribeToServiceEvents();
         InitializeCoordinator();
         LoadEnvironments();
-        UpdateStatusPresentation();
+    }
+
+    private void DispatchUiUpdate(Action action)
+    {
+        if (!_dispatchToUi(() => RunUiUpdate(action)))
+        {
+            _runtime.Logger.Warning("UI dispatcher is unavailable; dropping view-model update.");
+        }
+    }
+
+    private void RunUiUpdate(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            if (!_isDisposed)
+            {
+                _runtime.Logger.Warning($"View-model UI update failed: {ex.Message}");
+            }
+        }
     }
 }

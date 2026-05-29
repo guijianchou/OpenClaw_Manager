@@ -2,6 +2,7 @@
 
 using Microsoft.Web.WebView2.Core;
 using OpenClaw.Helpers;
+
 namespace OpenClaw.Services;
 
 /// <summary>
@@ -16,25 +17,31 @@ public class DiagnosticService
     /// <summary>
     /// Checks whether the WebView2 runtime is installed and available.
     /// </summary>
-    public static DiagnosticResult CheckWebView2Runtime()
+    public static DiagnosticResult CheckWebView2Runtime(IAppLogger logger)
     {
+        var version = GetWebView2RuntimeVersion(logger);
+        if (string.IsNullOrEmpty(version))
+        {
+            return DiagnosticResult.Fail(
+                StringResources.DiagnosticWebViewRuntimeNotFound,
+                StringResources.DiagnosticWebViewRuntimeNotFoundDetail);
+        }
+
+        return DiagnosticResult.Pass($"{StringResources.DiagnosticWebView2RuntimeLabel} v{version}");
+    }
+
+    public static string? GetWebView2RuntimeVersion(IAppLogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+
         try
         {
-            var version = CoreWebView2Environment.GetAvailableBrowserVersionString();
-            if (string.IsNullOrEmpty(version))
-            {
-                return DiagnosticResult.Fail(
-                    StringResources.DiagnosticWebViewRuntimeNotFound,
-                    StringResources.DiagnosticWebViewRuntimeNotFoundDetail);
-            }
-
-            return DiagnosticResult.Pass($"{StringResources.DiagnosticWebView2RuntimeLabel} v{version}");
+            return CoreWebView2Environment.GetAvailableBrowserVersionString();
         }
         catch (Exception ex)
         {
-            return DiagnosticResult.Fail(
-                StringResources.DiagnosticWebViewRuntimeCheckFailed,
-                string.Format(StringResources.DiagnosticWebViewRuntimeCheckFailedDetailFormat, ex.Message));
+            logger.Warning("diagnostics.webview2.runtime_version.failed", new { ex.Message });
+            return null;
         }
     }
 
@@ -148,14 +155,16 @@ public class DiagnosticService
     /// Checks if common session indicators are present in the WebView2.
     /// Returns a hint about whether the session may be expired/invalid.
     /// </summary>
-    public static async Task<DiagnosticResult> CheckSessionAsync(WebViewService webViewService, ControlUiProbeSnapshot? snapshot = null)
+    public static async Task<DiagnosticResult> CheckSessionAsync(
+        IDiagnosticWebViewSession webViewSession,
+        ControlUiProbeSnapshot? snapshot = null)
     {
-        if (!webViewService.IsInitialized)
+        if (!webViewSession.IsInitialized)
         {
             return DiagnosticResult.Skip(StringResources.DiagnosticWebViewNotInitialized);
         }
 
-        snapshot ??= await webViewService.InspectControlUiStateAsync();
+        snapshot ??= await webViewSession.InspectControlUiStateAsync();
         if (snapshot.Phase == ControlUiPhase.Unavailable)
         {
             return DiagnosticResult.Skip(
@@ -184,37 +193,42 @@ public class DiagnosticService
     /// <summary>
     /// Runs all startup diagnostics and returns a summary.
     /// </summary>
-    public static async Task<DiagnosticReport> RunAllAsync(string? gatewayUrl, WebViewService? webViewService)
+    public static async Task<DiagnosticReport> RunAllAsync(
+        string? gatewayUrl,
+        IDiagnosticWebViewSession? webViewSession,
+        IAppLogger logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
+
         var report = new DiagnosticReport();
         ControlUiProbeSnapshot? snapshot = null;
 
-        report.Items.Add((StringResources.DiagnosticWebView2RuntimeLabel, CheckWebView2Runtime()));
+        report.Items.Add((StringResources.DiagnosticWebView2RuntimeLabel, CheckWebView2Runtime(logger)));
 
-        if (webViewService is not null)
+        if (webViewSession is not null)
         {
-            snapshot = await webViewService.InspectControlUiStateAsync();
+            snapshot = await webViewSession.InspectControlUiStateAsync();
         }
 
         report.Items.Add((StringResources.DiagnosticNetworkConnectivityLabel, await ProbeNetworkAsync(gatewayUrl, snapshot)));
 
-        if (webViewService is not null)
+        if (webViewSession is not null)
         {
-            report.Items.Add((StringResources.DiagnosticSessionStatusLabel, await CheckSessionAsync(webViewService, snapshot)));
-            report.Items.Add((StringResources.DiagnosticInstrumentationLabel, DescribeInstrumentation(webViewService)));
+            report.Items.Add((StringResources.DiagnosticSessionStatusLabel, await CheckSessionAsync(webViewSession, snapshot)));
+            report.Items.Add((StringResources.DiagnosticInstrumentationLabel, DescribeInstrumentation(webViewSession)));
         }
 
         return report;
     }
 
-    public static DiagnosticResult DescribeInstrumentation(WebViewService webViewService)
+    public static DiagnosticResult DescribeInstrumentation(IDiagnosticWebViewSession webViewSession)
     {
-        var snapshot = webViewService.LatestControlUiSnapshot;
+        var snapshot = webViewSession.LatestControlUiSnapshot;
         var summary =
-            $"Inspect req={webViewService.TotalControlUiInspectionRequests}, " +
-            $"cache={webViewService.CachedControlUiInspectionRequests}, " +
-            $"coalesced={webViewService.CoalescedControlUiInspectionRequests}, " +
-            $"hb reload={webViewService.HeartbeatRecoveryRequests}, " +
+            $"Inspect req={webViewSession.TotalControlUiInspectionRequests}, " +
+            $"cache={webViewSession.CachedControlUiInspectionRequests}, " +
+            $"coalesced={webViewSession.CoalescedControlUiInspectionRequests}, " +
+            $"hb reload={webViewSession.HeartbeatRecoveryRequests}, " +
             $"phase={snapshot.Phase}, " +
             $"busy={snapshot.IsBusy}, " +
             $"stale={snapshot.IsBusyStale}/{snapshot.BusyStaleSeconds}s, " +

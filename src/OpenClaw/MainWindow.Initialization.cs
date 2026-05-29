@@ -27,6 +27,7 @@ public sealed partial class MainWindow
     {
         ViewModel.OpenSettingsRequested += OnOpenSettingsRequested;
         ViewModel.WebViewRecreationRequested += OnWebViewRecreationRequested;
+        ViewModel.NavigationTimeoutRecoveryNoLongerNeeded += OnNavigationTimeoutRecoveryNoLongerNeeded;
         ViewModel.ViewLogsRequested += OnViewLogsRequested;
         ViewModel.ErrorOccurred += OnError;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
@@ -64,5 +65,6 @@ public sealed partial class MainWindow
 
         rootElement.Loaded += OnRootLoaded;
         rootElement.ActualThemeChanged += OnRootActualThemeChanged;
+        WebViewHost.SizeChanged += OnWebViewHostSizeChanged;
     }
 }

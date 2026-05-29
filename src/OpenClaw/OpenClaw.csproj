@@ -14,9 +14,9 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <ApplicationIcon>Assets\WindowIcon.ico</ApplicationIcon>
-    <Version>3.3.6</Version>
-    <AssemblyVersion>3.3.6.0</AssemblyVersion>
-    <FileVersion>3.3.6.0</FileVersion>
+    <Version>5.0.0</Version>
+    <AssemblyVersion>5.0.0.0</AssemblyVersion>
+    <FileVersion>5.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,7 +36,18 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Services\HostedUiBridge.Script.js" LogicalName="OpenClaw.Services.HostedUiBridge.Script.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.HostMessaging.js" LogicalName="OpenClaw.Services.HostedUiBridge.HostMessaging.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.MutationFilter.js" LogicalName="OpenClaw.Services.HostedUiBridge.MutationFilter.js" />
     <EmbeddedResource Include="Services\HostedUiBridge.ModelResolver.js" LogicalName="OpenClaw.Services.HostedUiBridge.ModelResolver.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.DomUtilities.js" LogicalName="OpenClaw.Services.HostedUiBridge.DomUtilities.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.ModelDomFallback.js" LogicalName="OpenClaw.Services.HostedUiBridge.ModelDomFallback.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.ActivityState.js" LogicalName="OpenClaw.Services.HostedUiBridge.ActivityState.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.PhaseClassifier.js" LogicalName="OpenClaw.Services.HostedUiBridge.PhaseClassifier.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.StatusInspection.js" LogicalName="OpenClaw.Services.HostedUiBridge.StatusInspection.js" />
+    <EmbeddedResource Include="Services\HostedUiBridge.CommandDispatch.js" LogicalName="OpenClaw.Services.HostedUiBridge.CommandDispatch.js" />
+    <EmbeddedResource Include="Services\WebViewCommands.StopInjection.js" LogicalName="OpenClaw.Services.WebViewCommands.StopInjection.js" />
+    <EmbeddedResource Include="Services\WebViewCommands.AbortRun.js" LogicalName="OpenClaw.Services.WebViewCommands.AbortRun.js" />
+    <EmbeddedResource Include="Services\WebViewStatusInspector.Inspect.js" LogicalName="OpenClaw.Services.WebViewStatusInspector.Inspect.js" />
   </ItemGroup>
 
 </Project>

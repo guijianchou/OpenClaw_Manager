@@ -16,7 +16,12 @@ public sealed partial class ShellSessionCoordinator
         HeartbeatOptions? heartbeatOptions = null,
         IAppLogger? logger = null)
     {
-        DetachServiceSubscriptions();
+        if (_isDisposed)
+        {
+            return Task.CompletedTask;
+        }
+
+        DetachServicesCore();
 
         _webViewService = webViewService;
         _bridge = bridge;
@@ -31,12 +36,25 @@ public sealed partial class ShellSessionCoordinator
     }
 
     /// <summary>
+    /// Detaches the current service adapters without disposing the coordinator.
+    /// </summary>
+    public void DetachServices()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        DetachServicesCore();
+    }
+
+    /// <summary>
     /// Cleans up coordinator resources.
     /// </summary>
     public void Dispose()
     {
-        DetachServiceSubscriptions();
-        AbortRecoveryOperation();
+        _isDisposed = true;
+        DetachServicesCore();
     }
 
     private void AttachServiceSubscriptions()
@@ -75,5 +93,14 @@ public sealed partial class ShellSessionCoordinator
             _bridge.SessionReady -= OnSessionReady;
             _bridge.EventGapDetected -= OnEventGapDetected;
         }
+    }
+
+    private void DetachServicesCore()
+    {
+        DetachServiceSubscriptions();
+        CancelObservedOperations();
+        AbortRecoveryOperation();
+        _webViewService = null;
+        _bridge = null;
     }
 }

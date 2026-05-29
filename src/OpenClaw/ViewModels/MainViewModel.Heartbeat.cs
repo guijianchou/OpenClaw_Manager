@@ -27,6 +27,14 @@ public partial class MainViewModel
         HeartbeatSummaryBrush = WarningBrush;
     }
 
+    private void ResetHeartbeatProjection()
+    {
+        HeartbeatSummary = StringResources.HeartbeatWait;
+        HeartbeatSummaryBrush = WarningBrush;
+        _lastHeartbeatStatus = null;
+        ResetHeartbeatIndicatorsToWarning();
+    }
+
     private void StartHeartbeatForSelectedEnvironment()
     {
         if (_selectedEnvironment is null)
@@ -34,17 +42,22 @@ public partial class MainViewModel
             return;
         }
 
-        var interval = App.Configuration.Settings.Heartbeat.EnableHeartbeat
-            ? App.Configuration.Settings.Heartbeat.IntervalSeconds
-            : 0;
-        _webViewService.StartHeartbeat(_selectedEnvironment.GatewayUrl, interval);
+        _webViewService.StartHeartbeat(
+            _selectedEnvironment.GatewayUrl,
+            _runtime.Configuration.Settings.Heartbeat,
+            _runtime.Configuration.Settings.RecoveryPolicy);
     }
 
     private void OnHeartbeatObserved(HeartbeatProbeResult result)
     {
-        RunOnUiThread(() =>
+        DispatchUiUpdate(() =>
         {
-            (HeartbeatSummary, HeartbeatSummaryBrush) = FormatHeartbeatSummary(result.Status);
+            var heartbeatSummary = _statusPresenter.FormatHeartbeatSummary(
+                result.Status,
+                CurrentStatusBrushes,
+                DefaultHeartbeatSummary);
+            HeartbeatSummary = heartbeatSummary.Text;
+            HeartbeatSummaryBrush = heartbeatSummary.Brush;
             UpdateHeartbeatIndicators(result.Status);
             UpdateStatusPresentation();
         });

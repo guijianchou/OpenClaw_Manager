@@ -49,6 +49,10 @@ public sealed partial class ShellSessionCoordinator
             case ControlUiPhase.OriginRejected:
                 MarkRecoveryAuthIssue(snapshot.DetailOrSummary);
                 break;
+            case ControlUiPhase.GatewayError:
+            case ControlUiPhase.Unavailable:
+                MarkRecoveryDegraded(snapshot.DetailOrSummary);
+                break;
         }
     }
 
@@ -69,12 +73,27 @@ public sealed partial class ShellSessionCoordinator
 
         if (_softResyncAttempts >= _recoveryOptions.MaxSoftResyncAttempts)
         {
-            _ = RequestHardRefreshAsync(
-                $"Hosted Control UI busy for {snapshot.BusyStaleSeconds}s without chat progress after {_softResyncAttempts} soft resync attempt(s).");
+            SafeFireAndForget(
+                async token =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    await RequestHardRefreshAsync(
+                        $"Hosted Control UI busy for {snapshot.BusyStaleSeconds}s without chat progress after {_softResyncAttempts} soft resync attempt(s).",
+                        token);
+                },
+                "stream.busy_stale.hard_refresh");
             return true;
         }
 
-        _ = RequestSoftResyncAsync($"Hosted Control UI busy for {snapshot.BusyStaleSeconds}s without chat progress.");
+        SafeFireAndForget(
+            async token =>
+            {
+                token.ThrowIfCancellationRequested();
+                await RequestSoftResyncAsync(
+                    $"Hosted Control UI busy for {snapshot.BusyStaleSeconds}s without chat progress.",
+                    token);
+            },
+            "stream.busy_stale.soft_resync");
         return true;
     }
 

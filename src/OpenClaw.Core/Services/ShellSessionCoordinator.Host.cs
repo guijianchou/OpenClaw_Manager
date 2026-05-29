@@ -20,8 +20,31 @@ public sealed partial class ShellSessionCoordinator
     /// <summary>
     /// Called when the host window returns to foreground.
     /// </summary>
-    public async Task OnHostVisibleAsync()
+    public async Task OnHostVisibleAsync(CancellationToken cancellationToken = default)
     {
+        var operationCancellation = CreateObservedOperationCancellation();
+        if (operationCancellation is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                operationCancellation.Token);
+
+            await OnHostVisibleCoreAsync(linkedCancellation.Token);
+        }
+        finally
+        {
+            ReleaseObservedOperationCancellation(operationCancellation);
+        }
+    }
+
+    private async Task OnHostVisibleCoreAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_isInBackground)
         {
             return;
@@ -48,7 +71,7 @@ public sealed partial class ShellSessionCoordinator
             _backgroundDuration.HasValue &&
             _backgroundDuration.Value.TotalSeconds >= _recoveryOptions.BackgroundResumeThresholdSeconds)
         {
-            var requiresReconnect = await RequiresBackgroundReconnectAsync();
+            var requiresReconnect = await RequiresBackgroundReconnectAsync(cancellationToken);
             _logger.Info("recovery.start", new
             {
                 reason = "background_resume",
@@ -58,7 +81,8 @@ public sealed partial class ShellSessionCoordinator
 
             if (requiresReconnect)
             {
-                await RequestReconnectAsync("Background resume threshold exceeded");
+                cancellationToken.ThrowIfCancellationRequested();
+                await RequestReconnectAsync("Background resume threshold exceeded", cancellationToken);
             }
             else
             {
@@ -85,6 +109,7 @@ public sealed partial class ShellSessionCoordinator
     /// </summary>
     public void Reset()
     {
+        CancelObservedOperations();
         AbortRecoveryOperation();
 
         _reconnectAttempts = 0;

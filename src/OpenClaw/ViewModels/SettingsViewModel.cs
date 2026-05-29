@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using OpenClaw.Helpers;
 using OpenClaw.Models;
 using OpenClaw.Services;
-using OpenClaw.Views;
 
 namespace OpenClaw.ViewModels;
 
@@ -18,11 +17,16 @@ public class SettingsViewModel : INotifyPropertyChanged
 {
     private readonly Dictionary<EnvironmentConfig, string> _originalNames = [];
     private readonly Dictionary<EnvironmentConfig, EnvironmentConfig> _originalSnapshots = [];
-    private readonly string? _originalSelectedEnvironmentName = App.Configuration.Settings.SelectedEnvironmentName;
-    private readonly string _originalLanguage;
-    private readonly bool _originalAlwaysOnTop;
-    private readonly bool _originalEnableGlobalHotkey;
-    private readonly string _originalGlobalHotkey;
+    private readonly SettingsPersistenceAdapter _settingsPersistence;
+    private readonly string? _originalSelectedEnvironmentName;
+    private bool _didEditSelectedLanguage;
+    private bool _didEditEnableDevLog;
+    private bool _didEditMinimizeToTray;
+    private bool _didEditCloseToTray;
+    private bool _didEditAllowMultipleInstances;
+    private bool _didEditEnableGlobalHotkey;
+    private bool _didEditGlobalHotkey;
+    private bool _didEditAlwaysOnTop;
     private EnvironmentConfig? _selectedEnvironment;
     private string _editName = string.Empty;
     private string _editUrl = string.Empty;
@@ -38,10 +42,14 @@ public class SettingsViewModel : INotifyPropertyChanged
     private bool _alwaysOnTop;
     private string _validationMessage = string.Empty;
 
-    public SettingsViewModel()
+    internal SettingsViewModel(SettingsPersistenceAdapter settingsPersistence)
     {
+        _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
+        var settings = _settingsPersistence.Current;
+        _originalSelectedEnvironmentName = settings.SelectedEnvironmentName;
+
         // Load a copy of environments so we can cancel without persisting
-        foreach (var env in App.Configuration.Settings.Environments)
+        foreach (var env in settings.Environments)
         {
             var clone = env.Clone();
             Environments.Add(clone);
@@ -50,18 +58,14 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
 
         // Load language preference
-        _selectedLanguage = App.Configuration.Settings.AppLanguage ?? "System";
-        _originalLanguage = _selectedLanguage;
-        _enableDevLog = App.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging;
-        _minimizeToTray = App.Configuration.Settings.MinimizeToTray;
-        _closeToTray = App.Configuration.Settings.CloseToTray;
-        _allowMultipleInstances = App.Configuration.Settings.AllowMultipleInstances;
-        _enableGlobalHotkey = App.Configuration.Settings.EnableGlobalHotkey;
-        _globalHotkey = App.Configuration.Settings.GlobalHotkey;
-        _alwaysOnTop = App.Configuration.Settings.AlwaysOnTop;
-        _originalAlwaysOnTop = _alwaysOnTop;
-        _originalEnableGlobalHotkey = _enableGlobalHotkey;
-        _originalGlobalHotkey = _globalHotkey;
+        _selectedLanguage = settings.AppLanguage ?? "System";
+        _enableDevLog = settings.Diagnostics.EnableVerboseRecoveryLogging;
+        _minimizeToTray = settings.MinimizeToTray;
+        _closeToTray = settings.CloseToTray;
+        _allowMultipleInstances = settings.AllowMultipleInstances;
+        _enableGlobalHotkey = settings.EnableGlobalHotkey;
+        _globalHotkey = settings.GlobalHotkey;
+        _alwaysOnTop = settings.AlwaysOnTop;
         _validationMessage = StringResources.SettingsValidationDefaultMessage;
     }
 
@@ -107,49 +111,129 @@ public class SettingsViewModel : INotifyPropertyChanged
     public string SelectedLanguage
     {
         get => _selectedLanguage;
-        set { _selectedLanguage = value; OnPropertyChanged(); }
+        set
+        {
+            if (string.Equals(_selectedLanguage, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _selectedLanguage = value;
+            _didEditSelectedLanguage = true;
+            OnPropertyChanged();
+        }
     }
 
     public bool EnableDevLog
     {
         get => _enableDevLog;
-        set { _enableDevLog = value; OnPropertyChanged(); }
+        set
+        {
+            if (_enableDevLog == value)
+            {
+                return;
+            }
+
+            _enableDevLog = value;
+            _didEditEnableDevLog = true;
+            OnPropertyChanged();
+        }
     }
 
     public bool MinimizeToTray
     {
         get => _minimizeToTray;
-        set { _minimizeToTray = value; OnPropertyChanged(); }
+        set
+        {
+            if (_minimizeToTray == value)
+            {
+                return;
+            }
+
+            _minimizeToTray = value;
+            _didEditMinimizeToTray = true;
+            OnPropertyChanged();
+        }
     }
 
     public bool CloseToTray
     {
         get => _closeToTray;
-        set { _closeToTray = value; OnPropertyChanged(); }
+        set
+        {
+            if (_closeToTray == value)
+            {
+                return;
+            }
+
+            _closeToTray = value;
+            _didEditCloseToTray = true;
+            OnPropertyChanged();
+        }
     }
 
     public bool AllowMultipleInstances
     {
         get => _allowMultipleInstances;
-        set { _allowMultipleInstances = value; OnPropertyChanged(); }
+        set
+        {
+            if (_allowMultipleInstances == value)
+            {
+                return;
+            }
+
+            _allowMultipleInstances = value;
+            _didEditAllowMultipleInstances = true;
+            OnPropertyChanged();
+        }
     }
 
     public bool EnableGlobalHotkey
     {
         get => _enableGlobalHotkey;
-        set { _enableGlobalHotkey = value; OnPropertyChanged(); }
+        set
+        {
+            if (_enableGlobalHotkey == value)
+            {
+                return;
+            }
+
+            _enableGlobalHotkey = value;
+            _didEditEnableGlobalHotkey = true;
+            OnPropertyChanged();
+        }
     }
 
     public string GlobalHotkey
     {
         get => _globalHotkey;
-        set { _globalHotkey = value; OnPropertyChanged(); }
+        set
+        {
+            if (string.Equals(_globalHotkey, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _globalHotkey = value;
+            _didEditGlobalHotkey = true;
+            OnPropertyChanged();
+        }
     }
 
     public bool AlwaysOnTop
     {
         get => _alwaysOnTop;
-        set { _alwaysOnTop = value; OnPropertyChanged(); }
+        set
+        {
+            if (_alwaysOnTop == value)
+            {
+                return;
+            }
+
+            _alwaysOnTop = value;
+            _didEditAlwaysOnTop = true;
+            OnPropertyChanged();
+        }
     }
 
     public string ValidationMessage
@@ -259,6 +343,7 @@ public class SettingsViewModel : INotifyPropertyChanged
     public bool SaveAll(out SettingsSaveResult result)
     {
         result = default;
+
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var env in Environments)
         {
@@ -281,46 +366,35 @@ public class SettingsViewModel : INotifyPropertyChanged
             return false;
         }
 
-        App.Configuration.Settings.Environments = [.. Environments];
+        var settings = _settingsPersistence.Current;
+        var didChangeEnvironmentState = DidChangeEnvironmentState || HasEnvironmentMetadataChanges();
+        var didChangeSessionTopology = DidChangeSessionTopology || HasEnvironmentSessionIdentityChanges();
+        var beforeLanguage = settings.AppLanguage ?? "System";
+        var beforeLiveSettings = LiveShellSettings.From(settings);
 
-        // Ensure at least one default
-        if (!App.Configuration.Settings.Environments.Any(e => e.IsDefault) &&
-            App.Configuration.Settings.Environments.Count > 0)
+        if (didChangeEnvironmentState)
         {
-            App.Configuration.Settings.Environments[0].IsDefault = true;
+            settings.Environments = Environments.Select(env => env.Clone()).ToList();
+            EnsureAtLeastOneDefault(settings.Environments);
+            settings.SelectedEnvironmentName = ResolveSelectedEnvironmentName(settings);
         }
 
-        var persistedSelection = ResolveSelectedEnvironmentName();
-        App.Configuration.Settings.SelectedEnvironmentName = persistedSelection;
+        ApplyChangedShellSettings(settings);
 
-        // Save language
-        App.Configuration.Settings.AppLanguage = SelectedLanguage;
-        App.Configuration.Settings.MinimizeToTray = MinimizeToTray;
-        App.Configuration.Settings.CloseToTray = CloseToTray;
-        App.Configuration.Settings.AllowMultipleInstances = AllowMultipleInstances;
-        App.Configuration.Settings.EnableGlobalHotkey = EnableGlobalHotkey;
-        App.Configuration.Settings.GlobalHotkey = GlobalHotkey.Trim();
-        App.Configuration.Settings.AlwaysOnTop = AlwaysOnTop;
-        App.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging = EnableDevLog;
+        if (didChangeEnvironmentState)
+        {
+            SyncRenamedEnvironmentProfiles();
+        }
 
-        SyncRenamedEnvironmentProfiles();
-
-        App.Configuration.Save();
-        App.Logger.Info("Settings saved.");
+        _settingsPersistence.Save();
         ValidationMessage = StringResources.SettingsValidationDefaultMessage;
+        var afterLiveSettings = LiveShellSettings.From(settings);
         result = new SettingsSaveResult(
-            DidChangeEnvironmentState,
-            DidChangeSessionTopology,
-            !string.Equals(_originalLanguage, SelectedLanguage, StringComparison.Ordinal),
-            DidChangeLiveShellOptions());
+            didChangeEnvironmentState,
+            didChangeSessionTopology,
+            !string.Equals(beforeLanguage, settings.AppLanguage ?? "System", StringComparison.Ordinal),
+            new LiveShellSettingsChange(beforeLiveSettings, afterLiveSettings));
         return true;
-    }
-
-    private bool DidChangeLiveShellOptions()
-    {
-        return _originalAlwaysOnTop != AlwaysOnTop ||
-            _originalEnableGlobalHotkey != EnableGlobalHotkey ||
-            !string.Equals(_originalGlobalHotkey, GlobalHotkey.Trim(), StringComparison.Ordinal);
     }
 
     private void LoadEditFields()
@@ -341,22 +415,35 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private string? ResolveSelectedEnvironmentName()
+    private string? ResolveSelectedEnvironmentName(AppSettings settings)
     {
-        if (!string.IsNullOrEmpty(_originalSelectedEnvironmentName))
+        var currentSelection = FindEnvironmentByOriginalOrCurrentName(settings.SelectedEnvironmentName);
+        if (currentSelection is not null)
         {
-            var matchedEnvironment = Environments.FirstOrDefault(env =>
-                _originalNames.TryGetValue(env, out var originalName) &&
-                string.Equals(originalName, _originalSelectedEnvironmentName, StringComparison.Ordinal));
-
-            if (matchedEnvironment is not null)
-            {
-                return matchedEnvironment.Name;
-            }
+            return currentSelection.Name;
         }
 
-        return App.Configuration.Settings.Environments.FirstOrDefault(e => e.IsDefault)?.Name
-            ?? App.Configuration.Settings.Environments.FirstOrDefault()?.Name;
+        var originalSelection = FindEnvironmentByOriginalOrCurrentName(_originalSelectedEnvironmentName);
+        if (originalSelection is not null)
+        {
+            return originalSelection.Name;
+        }
+
+        return Environments.FirstOrDefault(e => e.IsDefault)?.Name
+            ?? Environments.FirstOrDefault()?.Name;
+    }
+
+    private EnvironmentConfig? FindEnvironmentByOriginalOrCurrentName(string? environmentName)
+    {
+        if (string.IsNullOrEmpty(environmentName))
+        {
+            return null;
+        }
+
+        return Environments.FirstOrDefault(env =>
+            string.Equals(env.Name, environmentName, StringComparison.Ordinal) ||
+            (_originalNames.TryGetValue(env, out var originalName) &&
+             string.Equals(originalName, environmentName, StringComparison.Ordinal)));
     }
 
     private EnvironmentConfig CreateDraftEnvironment() => new()
@@ -379,6 +466,75 @@ public class SettingsViewModel : INotifyPropertyChanged
             _originalNames[env] = env.Name;
             _originalSnapshots[env] = env.Clone();
         }
+    }
+
+    private void ApplyChangedShellSettings(AppSettings settings)
+    {
+        if (_didEditSelectedLanguage)
+        {
+            settings.AppLanguage = SelectedLanguage;
+        }
+
+        if (_didEditMinimizeToTray)
+        {
+            settings.MinimizeToTray = MinimizeToTray;
+        }
+
+        if (_didEditCloseToTray)
+        {
+            settings.CloseToTray = CloseToTray;
+        }
+
+        if (_didEditAllowMultipleInstances)
+        {
+            settings.AllowMultipleInstances = AllowMultipleInstances;
+        }
+
+        if (_didEditEnableGlobalHotkey)
+        {
+            settings.EnableGlobalHotkey = EnableGlobalHotkey;
+        }
+
+        if (_didEditGlobalHotkey)
+        {
+            settings.GlobalHotkey = NormalizeHotkey(GlobalHotkey);
+        }
+
+        if (_didEditAlwaysOnTop)
+        {
+            settings.AlwaysOnTop = AlwaysOnTop;
+        }
+
+        if (_didEditEnableDevLog)
+        {
+            settings.Diagnostics.EnableVerboseRecoveryLogging = EnableDevLog;
+        }
+    }
+
+    private bool HasEnvironmentMetadataChanges()
+    {
+        return Environments.Count != _originalSnapshots.Count ||
+               Environments.Any(DidEnvironmentMetadataChange);
+    }
+
+    private bool HasEnvironmentSessionIdentityChanges()
+    {
+        return Environments.Count != _originalSnapshots.Count ||
+               Environments.Any(DidEnvironmentSessionIdentityChange);
+    }
+
+    private static void EnsureAtLeastOneDefault(List<EnvironmentConfig> environments)
+    {
+        if (!environments.Any(e => e.IsDefault) &&
+            environments.Count > 0)
+        {
+            environments[0].IsDefault = true;
+        }
+    }
+
+    private static string NormalizeHotkey(string? hotkey)
+    {
+        return hotkey?.Trim() ?? string.Empty;
     }
 
     private bool DidEnvironmentSessionIdentityChange(EnvironmentConfig environment)

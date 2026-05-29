@@ -10,8 +10,14 @@ public static class LogFileUtilities
 
     public static LogTailResult ReadLastLines(string path, int maxLines)
     {
+        return ReadLastLines(path, maxLines, CancellationToken.None);
+    }
+
+    public static LogTailResult ReadLastLines(string path, int maxLines, CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentOutOfRangeException.ThrowIfNegative(maxLines);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 4096);
         if (stream.Length == 0)
@@ -30,6 +36,8 @@ public static class LogFileUtilities
 
         while (position > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var readSize = (int)Math.Min(buffer.Length, position);
             position -= readSize;
             stream.Seek(position, SeekOrigin.Begin);

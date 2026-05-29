@@ -22,6 +22,9 @@ public class ConfigurationService
     private readonly Action<string, string> _writeAllText;
 
     private readonly object _lock = new();
+    private readonly object _deferredSaveGate = new();
+    private CancellationTokenSource? _deferredSaveCts;
+    private Task? _deferredSaveTask;
     private int _saveQueued;
     private int _saveVersion;
     private int _deferredSaveRequests;
@@ -144,9 +147,8 @@ public class ConfigurationService
     public void SaveDeferred()
     {
         Interlocked.Increment(ref _deferredSaveRequests);
-        Interlocked.Increment(ref _saveVersion);
 
-        if (Interlocked.CompareExchange(ref _saveQueued, 1, 0) != 0)
+        if (!TryStartDeferredSaveWorker())
         {
             Interlocked.Increment(ref _deferredSaveCoalescedRequests);
             _logger.Info("settings.save_deferred.coalesced", new
@@ -162,41 +164,190 @@ public class ConfigurationService
             requests = DeferredSaveRequests,
             coalesced = DeferredSaveCoalescedRequests
         });
-
-        _ = Task.Run(ProcessDeferredSaveQueueAsync);
     }
 
-    private async Task ProcessDeferredSaveQueueAsync()
+    private bool TryStartDeferredSaveWorker()
     {
-        while (true)
+        var cancellation = new CancellationTokenSource();
+
+        lock (_deferredSaveGate)
         {
-            var versionToFlush = Volatile.Read(ref _saveVersion);
-
-            await Task.Delay(_deferredSaveDelay).ConfigureAwait(false);
-            Save();
-            _logger.Info("settings.save_deferred.flushed", new
+            _saveVersion++;
+            if (_deferredSaveTask is { IsCompleted: false })
             {
-                requests = DeferredSaveRequests,
-                coalesced = DeferredSaveCoalescedRequests
-            });
+                cancellation.Dispose();
+                return false;
+            }
 
-            Interlocked.Exchange(ref _saveQueued, 0);
+            _saveQueued = 1;
+            _deferredSaveCts = cancellation;
+            _deferredSaveTask = Task.Run(() => ProcessDeferredSaveQueueAsync(cancellation));
+            return true;
+        }
+    }
 
-            if (Volatile.Read(ref _saveVersion) == versionToFlush)
+    private async Task ProcessDeferredSaveQueueAsync(CancellationTokenSource cancellation)
+    {
+        var token = cancellation.Token;
+        try
+        {
+            while (true)
+            {
+                var versionToFlush = GetDeferredSaveVersion(cancellation);
+                if (versionToFlush is null)
+                {
+                    return;
+                }
+
+                await Task.Delay(_deferredSaveDelay, token).ConfigureAwait(false);
+                Save();
+                _logger.Info("settings.save_deferred.flushed", new
+                {
+                    requests = DeferredSaveRequests,
+                    coalesced = DeferredSaveCoalescedRequests
+                });
+
+                if (TryCompleteDeferredSaveBatch(cancellation, versionToFlush.Value))
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Deferred settings save failed: {ex.Message}");
+        }
+        finally
+        {
+            CompleteDeferredSaveWorker(cancellation);
+        }
+    }
+
+    private int? GetDeferredSaveVersion(CancellationTokenSource cancellation)
+    {
+        lock (_deferredSaveGate)
+        {
+            if (!ReferenceEquals(_deferredSaveCts, cancellation))
+            {
+                return null;
+            }
+
+            return _saveVersion;
+        }
+    }
+
+    private bool TryCompleteDeferredSaveBatch(CancellationTokenSource cancellation, int flushedVersion)
+    {
+        lock (_deferredSaveGate)
+        {
+            if (!ReferenceEquals(_deferredSaveCts, cancellation))
+            {
+                return true;
+            }
+
+            if (_saveVersion != flushedVersion)
+            {
+                return false;
+            }
+
+            _saveQueued = 0;
+            _deferredSaveCts = null;
+            _deferredSaveTask = null;
+            cancellation.Dispose();
+            return true;
+        }
+    }
+
+    private void CompleteDeferredSaveWorker(CancellationTokenSource cancellation)
+    {
+        lock (_deferredSaveGate)
+        {
+            if (!ReferenceEquals(_deferredSaveCts, cancellation))
             {
                 return;
             }
 
-            if (Interlocked.CompareExchange(ref _saveQueued, 1, 0) != 0)
+            _saveQueued = 0;
+            _deferredSaveCts = null;
+            _deferredSaveTask = null;
+            cancellation.Dispose();
+        }
+    }
+
+    private bool CancelDeferredSaveWorker()
+    {
+        var hadQueuedSave = false;
+        CancellationTokenSource? cancellation;
+        Task? task;
+
+        lock (_deferredSaveGate)
+        {
+            hadQueuedSave = _saveQueued != 0 || _deferredSaveTask is not null;
+            cancellation = _deferredSaveCts;
+            task = _deferredSaveTask;
+            _saveQueued = 0;
+            _deferredSaveCts = null;
+            _deferredSaveTask = null;
+        }
+
+        if (cancellation is null)
+        {
+            return hadQueuedSave;
+        }
+
+        cancellation.Cancel();
+
+        var completed = true;
+        if (task is not null)
+        {
+            try
             {
-                return;
+                completed = task.Wait(TimeSpan.FromSeconds(2));
             }
+            catch
+            {
+                completed = true;
+            }
+        }
+
+        if (completed)
+        {
+            cancellation.Dispose();
+        }
+        else if (task is not null)
+        {
+            _ = ObserveDeferredSaveWorkerShutdownAsync(task, cancellation);
+        }
+
+        return hadQueuedSave;
+    }
+
+    private static async Task ObserveDeferredSaveWorkerShutdownAsync(
+        Task task,
+        CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch
+        {
+            // The worker already logs operational failures before it exits.
+        }
+        finally
+        {
+            cancellation.Dispose();
         }
     }
 
     public void FlushDeferredSave()
     {
-        if (Volatile.Read(ref _saveQueued) == 0)
+        var hadQueuedSave = CancelDeferredSaveWorker();
+
+        if (!hadQueuedSave)
         {
             return;
         }

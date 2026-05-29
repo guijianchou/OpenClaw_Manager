@@ -12,8 +12,10 @@ public sealed class ControlUiLatencyService : IDisposable
     private const int ProbeIntervalSeconds = 3;
 
     private readonly HttpClient _probeHttpClient;
+    private readonly IAppLogger _logger;
     private readonly TimeSpan _probeInterval;
     private readonly bool _disposeHttpClient;
+    private readonly object _probeGate = new();
     private PeriodicTimer? _probeTimer;
     private CancellationTokenSource? _probeCts;
     private Task? _probeTask;
@@ -21,21 +23,32 @@ public sealed class ControlUiLatencyService : IDisposable
     private string? _currentUrl;
     private ControlUiLatencySnapshot _lastSuccessSnapshot = ControlUiLatencySnapshot.Unknown;
     private ControlUiLatencySnapshot _lastPublishedSnapshot = ControlUiLatencySnapshot.Unknown;
+    private int _probeRunId;
 
     public ControlUiLatencyService()
-        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, TimeSpan.FromSeconds(ProbeIntervalSeconds), disposeHttpClient: true)
+        : this(NullAppLogger.Instance)
     {
     }
 
-    public ControlUiLatencyService(HttpMessageHandler messageHandler, TimeSpan? probeInterval = null)
-        : this(new HttpClient(messageHandler) { Timeout = TimeSpan.FromSeconds(5) }, probeInterval ?? TimeSpan.FromSeconds(ProbeIntervalSeconds), disposeHttpClient: true)
+    public ControlUiLatencyService(IAppLogger logger)
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, TimeSpan.FromSeconds(ProbeIntervalSeconds), disposeHttpClient: true, logger)
     {
     }
 
-    private ControlUiLatencyService(HttpClient probeHttpClient, TimeSpan probeInterval, bool disposeHttpClient)
+    public ControlUiLatencyService(HttpMessageHandler messageHandler, TimeSpan? probeInterval = null, IAppLogger? logger = null)
+        : this(new HttpClient(messageHandler) { Timeout = TimeSpan.FromSeconds(5) }, probeInterval ?? TimeSpan.FromSeconds(ProbeIntervalSeconds), disposeHttpClient: true, logger ?? NullAppLogger.Instance)
+    {
+    }
+
+    private ControlUiLatencyService(
+        HttpClient probeHttpClient,
+        TimeSpan probeInterval,
+        bool disposeHttpClient,
+        IAppLogger logger)
     {
         ArgumentNullException.ThrowIfNull(probeHttpClient);
         _probeHttpClient = probeHttpClient;
+        _logger = logger;
         _probeInterval = probeInterval;
         _disposeHttpClient = disposeHttpClient;
     }
@@ -52,30 +65,45 @@ public sealed class ControlUiLatencyService : IDisposable
     {
         var probeUri = TryGetProbeUri(controlUiUrl);
         var host = TryGetProbeHost(probeUri);
-        if (_probeCts is not null &&
-            !_probeCts.IsCancellationRequested &&
-            string.Equals(_currentUrl, controlUiUrl, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(_currentHost, host, StringComparison.OrdinalIgnoreCase))
+        lock (_probeGate)
         {
-            return;
+            if (_probeCts is not null &&
+                !_probeCts.IsCancellationRequested &&
+                string.Equals(_currentUrl, controlUiUrl, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(_currentHost, host, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
         }
 
         Stop();
+        var runId = Interlocked.Increment(ref _probeRunId);
 
-        _currentUrl = controlUiUrl;
-        _currentHost = host;
-        _lastSuccessSnapshot = ControlUiLatencySnapshot.Unknown;
-        _lastPublishedSnapshot = ControlUiLatencySnapshot.Unknown;
+        lock (_probeGate)
+        {
+            _currentUrl = controlUiUrl;
+            _currentHost = host;
+            _lastSuccessSnapshot = ControlUiLatencySnapshot.Unknown;
+            _lastPublishedSnapshot = ControlUiLatencySnapshot.Unknown;
+        }
 
         if (probeUri is null || string.IsNullOrWhiteSpace(host))
         {
-            PublishIfChanged(ControlUiLatencySnapshot.Unknown);
+            _logger.Warning("control_ui.latency.disabled", new { controlUiUrl });
+            PublishIfChanged(ControlUiLatencySnapshot.Unknown, runId);
             return;
         }
 
-        _probeCts = new CancellationTokenSource();
-        _probeTimer = new PeriodicTimer(_probeInterval);
-        _probeTask = RunProbeLoopAsync(probeUri, host, _probeCts.Token);
+        _logger.Info("control_ui.latency.start", new { host, probeUri });
+        var cancellation = new CancellationTokenSource();
+        var timer = new PeriodicTimer(_probeInterval);
+
+        lock (_probeGate)
+        {
+            _probeCts = cancellation;
+            _probeTimer = timer;
+            _probeTask = Task.Run(() => RunProbeLoopAsync(probeUri, host, timer, cancellation, runId));
+        }
     }
 
     /// <summary>
@@ -83,20 +111,40 @@ public sealed class ControlUiLatencyService : IDisposable
     /// </summary>
     public void Stop()
     {
-        _currentUrl = null;
-        _currentHost = null;
-        _lastSuccessSnapshot = ControlUiLatencySnapshot.Unknown;
-        _lastPublishedSnapshot = ControlUiLatencySnapshot.Unknown;
+        CancellationTokenSource? cancellation;
+        PeriodicTimer? timer;
+        Task? task;
 
-        if (_probeCts is not null)
+        lock (_probeGate)
         {
-            _probeCts.Cancel();
-            _probeCts.Dispose();
+            _probeRunId++;
+            _currentUrl = null;
+            _currentHost = null;
+            _lastSuccessSnapshot = ControlUiLatencySnapshot.Unknown;
+            _lastPublishedSnapshot = ControlUiLatencySnapshot.Unknown;
+
+            cancellation = _probeCts;
+            timer = _probeTimer;
+            task = _probeTask;
             _probeCts = null;
+            _probeTimer = null;
+            _probeTask = null;
         }
 
-        _probeTimer?.Dispose();
-        _probeTimer = null;
+        if (cancellation is null)
+        {
+            timer?.Dispose();
+            return;
+        }
+
+        cancellation.Cancel();
+        if (task is null)
+        {
+            DisposeProbeResources(cancellation, timer);
+            return;
+        }
+
+        _ = ObserveStopAsync(task);
     }
 
     public void Dispose()
@@ -108,21 +156,26 @@ public sealed class ControlUiLatencyService : IDisposable
         }
     }
 
-    private async Task RunProbeLoopAsync(Uri probeUri, string host, CancellationToken cancellationToken)
+    private async Task RunProbeLoopAsync(
+        Uri probeUri,
+        string host,
+        PeriodicTimer timer,
+        CancellationTokenSource cancellation,
+        int runId)
     {
+        var cancellationToken = cancellation.Token;
         try
         {
-            await PublishLatencyAsync(probeUri, host, cancellationToken).ConfigureAwait(false);
+            await PublishLatencyAsync(probeUri, host, cancellationToken, runId).ConfigureAwait(false);
 
-            var timer = _probeTimer;
-            if (timer is null || cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || !IsCurrentProbeRun(runId))
             {
                 return;
             }
 
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
-                await PublishLatencyAsync(probeUri, host, cancellationToken).ConfigureAwait(false);
+                await PublishLatencyAsync(probeUri, host, cancellationToken, runId).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -131,47 +184,170 @@ public sealed class ControlUiLatencyService : IDisposable
         catch (ObjectDisposedException)
         {
         }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Control UI latency probe loop failed: {ex.Message}");
+        }
+        finally
+        {
+            lock (_probeGate)
+            {
+                if (ReferenceEquals(_probeCts, cancellation))
+                {
+                    _probeCts = null;
+                    _probeTimer = null;
+                    _probeTask = null;
+                }
+            }
+
+            DisposeProbeResources(cancellation, timer);
+        }
     }
 
-    private async Task PublishLatencyAsync(Uri probeUri, string host, CancellationToken cancellationToken)
+    private async Task ObserveStopAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Control UI latency probe shutdown failed: {ex.Message}");
+        }
+    }
+
+    private static void DisposeProbeResources(CancellationTokenSource cancellation, PeriodicTimer? timer)
+    {
+        timer?.Dispose();
+        cancellation.Dispose();
+    }
+
+    private async Task PublishLatencyAsync(
+        Uri probeUri,
+        string host,
+        CancellationToken cancellationToken,
+        int runId)
     {
         var snapshot = await ProbeAsync(probeUri, host, cancellationToken).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested || !IsCurrentProbeRun(runId))
         {
             return;
         }
 
         if (snapshot.IsSuccess)
         {
-            _lastSuccessSnapshot = snapshot;
-            PublishIfChanged(snapshot);
+            lock (_probeGate)
+            {
+                if (!IsCurrentProbeRunLocked(runId))
+                {
+                    return;
+                }
+
+                _lastSuccessSnapshot = snapshot;
+            }
+
+            PublishIfChanged(snapshot, runId);
             return;
         }
 
-        if (_lastSuccessSnapshot.IsSuccess)
+        ControlUiLatencySnapshot lastSuccessSnapshot;
+        lock (_probeGate)
         {
-            PublishIfChanged(_lastSuccessSnapshot with
+            if (!IsCurrentProbeRunLocked(runId))
+            {
+                return;
+            }
+
+            lastSuccessSnapshot = _lastSuccessSnapshot;
+        }
+
+        if (lastSuccessSnapshot.IsSuccess)
+        {
+            PublishIfChanged(lastSuccessSnapshot with
             {
                 State = ControlUiLatencyState.Stale,
                 Detail = snapshot.Detail,
-            });
+            }, runId);
             return;
         }
 
-        PublishIfChanged(snapshot.State == ControlUiLatencyState.Unknown
-            ? snapshot
-            : ControlUiLatencySnapshot.Unknown with { Detail = snapshot.Detail });
+        PublishIfChanged(snapshot, runId);
     }
 
-    private void PublishIfChanged(ControlUiLatencySnapshot snapshot)
+    private void PublishIfChanged(ControlUiLatencySnapshot snapshot, int runId)
     {
-        if (_lastPublishedSnapshot.Equals(snapshot))
+        Action<ControlUiLatencySnapshot>? latencyUpdated;
+        lock (_probeGate)
         {
-            return;
+            if (!IsCurrentProbeRunLocked(runId))
+            {
+                return;
+            }
+
+            if (_lastPublishedSnapshot.Equals(snapshot))
+            {
+                return;
+            }
+
+            _lastPublishedSnapshot = snapshot;
+            latencyUpdated = LatencyUpdated;
         }
 
-        _lastPublishedSnapshot = snapshot;
-        LatencyUpdated?.Invoke(snapshot);
+        LogPublishedSnapshot(snapshot);
+        latencyUpdated?.Invoke(snapshot);
+    }
+
+    private void LogPublishedSnapshot(ControlUiLatencySnapshot snapshot)
+    {
+        switch (snapshot.State)
+        {
+            case ControlUiLatencyState.Success:
+                _logger.Info("control_ui.latency.success", new
+                {
+                    snapshot.Host,
+                    snapshot.RoundtripTimeMs,
+                    snapshot.Detail,
+                    snapshot.ProxyPoP
+                });
+                break;
+            case ControlUiLatencyState.Stale:
+                _logger.Warning("control_ui.latency.stale", new
+                {
+                    snapshot.Host,
+                    snapshot.RoundtripTimeMs,
+                    snapshot.Detail,
+                    snapshot.ProxyPoP
+                });
+                break;
+            case ControlUiLatencyState.Failure:
+                _logger.Warning("control_ui.latency.failure", new
+                {
+                    snapshot.Host,
+                    snapshot.Detail
+                });
+                break;
+            default:
+                break;
+        }
+    }
+
+    private bool IsCurrentProbeRun(int runId)
+    {
+        lock (_probeGate)
+        {
+            return IsCurrentProbeRunLocked(runId);
+        }
+    }
+
+    private bool IsCurrentProbeRunLocked(int runId)
+    {
+        return _probeRunId == runId;
     }
 
     private async Task<ControlUiLatencySnapshot> ProbeAsync(Uri probeUri, string host, CancellationToken cancellationToken)

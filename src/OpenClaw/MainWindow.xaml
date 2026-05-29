@@ -11,16 +11,43 @@
     mc:Ignorable="d"
     Title="OpenClaw">
 
-    <Grid x:Name="RootLayout"
-          Background="Transparent">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="37" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <UserControl x:Name="RootLayout"
+                 Background="Transparent">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="ShellModeStates">
+                <VisualState x:Name="FullMode" />
+                <VisualState x:Name="CompactMode">
+                    <VisualState.Setters>
+                        <Setter Target="CommandBarSurface.Padding" Value="{StaticResource CompactTopBarPadding}" />
+                        <Setter Target="EnvironmentSummaryGroup.Visibility" Value="Collapsed" />
+                        <Setter Target="LatencyBadge.Visibility" Value="Collapsed" />
+                        <Setter Target="LoadingRing.Visibility" Value="Collapsed" />
+                        <Setter Target="TopStatusPill.MinWidth" Value="{StaticResource CompactTopStatusPillMinWidth}" />
+                        <Setter Target="TopStatusPill.Margin" Value="{StaticResource CompactTopStatusPillMargin}" />
+                        <Setter Target="TopStatusPill.Padding" Value="{StaticResource CompactTopStatusPillPadding}" />
+                        <Setter Target="TopStatusContent.ColumnSpacing" Value="{StaticResource CompactTopStatusPillColumnSpacing}" />
+                        <Setter Target="HeartbeatSummarySegment.Visibility" Value="Collapsed" />
+                        <Setter Target="HeartbeatIndicatorSegment.Visibility" Value="Collapsed" />
+                        <Setter Target="ModelStatusSegment.MinWidth" Value="{StaticResource CompactTopStatusModelSegmentMinWidth}" />
+                        <Setter Target="ModelStatusSegment.Margin" Value="{StaticResource CompactTopStatusModelSegmentMargin}" />
+                        <Setter Target="AccessStatusSegment.Visibility" Value="Collapsed" />
+                        <Setter Target="RunIndicatorSegment.Visibility" Value="Collapsed" />
+                        <Setter Target="ThemeSwitcherContainer.Visibility" Value="Collapsed" />
+                        <Setter Target="AboutButton.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <Grid x:Name="ShellLayout">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="37" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
         <Grid x:Name="AppTitleBar"
               Grid.Row="0"
@@ -103,7 +130,8 @@
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="16">
-                <Grid ColumnSpacing="{StaticResource TopStatusPillColumnSpacing}"
+                <Grid x:Name="TopStatusContent"
+                      ColumnSpacing="{StaticResource TopStatusPillColumnSpacing}"
                       VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -113,7 +141,8 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Grid Grid.Column="0"
+                    <Grid x:Name="HeartbeatSummarySegment"
+                          Grid.Column="0"
                           MinWidth="56"
                           VerticalAlignment="Center">
                         <TextBlock Text="{x:Bind ViewModel.HeartbeatSummary, Mode=OneWay}"
@@ -123,7 +152,8 @@
                                     HorizontalAlignment="Center" />
                     </Grid>
 
-                    <Grid Grid.Column="1"
+                    <Grid x:Name="HeartbeatIndicatorSegment"
+                          Grid.Column="1"
                           MinWidth="88"
                           VerticalAlignment="Center">
                         <ItemsRepeater ItemsSource="{x:Bind ViewModel.HeartbeatIndicators, Mode=OneWay}"
@@ -179,7 +209,8 @@
                                    HorizontalAlignment="Center" />
                     </Grid>
 
-                    <Grid Grid.Column="4"
+                    <Grid x:Name="WorkStatusSegment"
+                          Grid.Column="4"
                           MinWidth="88"
                           ColumnSpacing="4"
                           VerticalAlignment="Center">
@@ -201,7 +232,8 @@
                                     HorizontalAlignment="Center" />
                     </Grid>
 
-                    <Grid Grid.Column="5"
+                    <Grid x:Name="RunIndicatorSegment"
+                          Grid.Column="5"
                           MinWidth="64"
                           Margin="-2,0,0,0"
                           VerticalAlignment="Center">
@@ -250,7 +282,7 @@
                         Spacing="4">
                 <Button x:Name="PinButton"
                         Click="OnPinClick"
-                        ToolTipService.ToolTip="Always on Top"
+                        ToolTipService.ToolTip="{x:Bind helpers:StringResources.SettingsAlwaysOnTop}"
                         Style="{StaticResource SubtleButtonStyle}">
                     <FontIcon Glyph="&#xE718;" FontSize="14" />
                 </Button>
@@ -353,7 +385,7 @@
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                          Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+                          Visibility="Collapsed" />
         </Grid>
 
         <Grid x:Name="StatusBarSurface"
@@ -388,5 +420,6 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="{x:Bind ViewModel.SelectedEnvironmentName, Mode=OneWay}" />
         </Grid>
-    </Grid>
+        </Grid>
+    </UserControl>
 </Window>

@@ -26,7 +26,7 @@ public interface IWebViewHost
     string? CurrentUrl { get; }
 
     void Navigate(string url);
-    void Reload();
+    bool Reload();
     void OpenDevTools();
 
     Task ClearBrowsingDataAsync();

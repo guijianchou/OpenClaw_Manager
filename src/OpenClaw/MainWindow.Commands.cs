@@ -2,6 +2,8 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using OpenClaw.Models;
+using OpenClaw.Services;
 using OpenClaw.Views;
 
 namespace OpenClaw;
@@ -58,7 +60,7 @@ public sealed partial class MainWindow
 
     private SettingsDialog CreateSettingsWindow()
     {
-        var settingsWindow = new SettingsDialog
+        var settingsWindow = new SettingsDialog(new SettingsPersistenceAdapter(App.Configuration, App.Logger))
         {
             MainViewModel = this.ViewModel,
         };
@@ -75,8 +77,14 @@ public sealed partial class MainWindow
             return;
         }
 
+        if (!_isSettingsWindowVisible)
+        {
+            _settingsWindow.ReloadFromCurrentSettings();
+        }
+
         _settingsWindow.SyncWithCurrentSettings();
         _settingsWindow.Activate();
+        _isSettingsWindowVisible = true;
     }
 
     private void OnSettingsWindowClosed(object sender, WindowEventArgs args)
@@ -89,6 +97,7 @@ public sealed partial class MainWindow
         _settingsWindow.SettingsSaved -= OnSettingsSaved;
         _settingsWindow.Closed -= OnSettingsWindowClosed;
         _settingsWindow = null;
+        _isSettingsWindowVisible = false;
         QueueSettingsWindowPrewarm();
     }
 
@@ -101,6 +110,7 @@ public sealed partial class MainWindow
 
         var settingsWindow = _settingsWindow;
         _settingsWindow = null;
+        _isSettingsWindowVisible = false;
         settingsWindow.SettingsSaved -= OnSettingsSaved;
         settingsWindow.Closed -= OnSettingsWindowClosed;
         settingsWindow.Close();
@@ -120,14 +130,8 @@ public sealed partial class MainWindow
 
         if (saveResult.DidChangeLiveShellOptions)
         {
-            ApplyLiveShellSettings();
+            _liveShellSettingsApplier.Apply(saveResult.LiveShellSettingsChange);
         }
-    }
-
-    private void ApplyLiveShellSettings()
-    {
-        SetAlwaysOnTop(App.Configuration.Settings.AlwaysOnTop);
-        ReapplyGlobalHotkey();
     }
 
     private void OnError(string message)
@@ -138,6 +142,26 @@ public sealed partial class MainWindow
     private void OnWebViewRecreationRequested(string reason)
     {
         ScheduleWebViewRecreation(reason);
+    }
+
+    private void OnNavigationTimeoutRecoveryNoLongerNeeded()
+    {
+        if (!_webViewRecreationService.TryCancelNavigationTimeoutRecovery(out var cancelled))
+        {
+            return;
+        }
+
+        if (cancelled.CancelledPending && _webViewRecreationTimer.IsRunning)
+        {
+            _webViewRecreationTimer.Stop();
+        }
+
+        RecordInstrumentationEvent("webview.recreation.cancelled_after_navigation_recovered", new
+        {
+            pendingReason = cancelled.PendingReason,
+            deferredReason = cancelled.DeferredReason,
+            activeReason = cancelled.ActiveReason
+        });
     }
 
     private void OnInfoBarClosed(InfoBar sender, InfoBarClosedEventArgs args)
@@ -152,24 +176,75 @@ public sealed partial class MainWindow
 
     private async void OnViewLogsRequested()
     {
-        await ShowLogViewerAsync();
+        try
+        {
+            await ShowLogViewerAsync();
+        }
+        catch (Exception ex)
+        {
+            if (!_isClosing)
+            {
+                App.Logger.Warning($"Log viewer dialog failed: {ex.Message}");
+            }
+        }
     }
 
     private async Task ShowLogViewerAsync()
     {
-        var dialog = new LogViewerDialog
+        if (_isClosing || _isLogViewerOpen || _isAboutDialogOpen)
         {
-            XamlRoot = this.Content.XamlRoot,
-        };
-        await dialog.ShowAsync();
+            return;
+        }
+
+        _isLogViewerOpen = true;
+        try
+        {
+            var dialog = new LogViewerDialog
+            {
+                XamlRoot = this.Content.XamlRoot,
+            };
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            _isLogViewerOpen = false;
+        }
     }
 
     private async void OnAboutClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new AboutDialog
+        try
         {
-            XamlRoot = this.Content.XamlRoot,
-        };
-        await dialog.ShowAsync();
+            await ShowAboutDialogAsync();
+        }
+        catch (Exception ex)
+        {
+            if (!_isClosing)
+            {
+                App.Logger.Warning($"About dialog failed: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task ShowAboutDialogAsync()
+    {
+        if (_isClosing || _isAboutDialogOpen || _isLogViewerOpen)
+        {
+            return;
+        }
+
+        _isAboutDialogOpen = true;
+        try
+        {
+            var dialog = new AboutDialog
+            {
+                XamlRoot = this.Content.XamlRoot,
+            };
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            _isAboutDialogOpen = false;
+        }
     }
 }

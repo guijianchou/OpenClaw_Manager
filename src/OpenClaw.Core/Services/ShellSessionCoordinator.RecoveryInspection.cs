@@ -6,7 +6,7 @@ namespace OpenClaw.Services;
 
 public sealed partial class ShellSessionCoordinator
 {
-    private async Task<GapRecoveryAction> GetPreferredGapRecoveryAsync()
+    private async Task<GapRecoveryAction> GetPreferredGapRecoveryAsync(CancellationToken cancellationToken)
     {
         var webViewService = _webViewService;
         if (webViewService is null)
@@ -16,7 +16,7 @@ public sealed partial class ShellSessionCoordinator
 
         try
         {
-            var snapshot = await webViewService.InspectControlUiStateAsync();
+            var snapshot = await webViewService.InspectControlUiStateAsync(cancellationToken);
             if (TryApplyAuthIssueFromSnapshot(snapshot))
             {
                 return GapRecoveryAction.None;
@@ -26,6 +26,10 @@ public sealed partial class ShellSessionCoordinator
                 ? GapRecoveryAction.SoftResync
                 : GapRecoveryAction.Reconnect;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.Warning("stream.gap.inspect_failed", new { ex.Message });
@@ -33,7 +37,7 @@ public sealed partial class ShellSessionCoordinator
         }
     }
 
-    private async Task<bool> RequiresBackgroundReconnectAsync()
+    private async Task<bool> RequiresBackgroundReconnectAsync(CancellationToken cancellationToken)
     {
         var webViewService = _webViewService;
         if (webViewService is null)
@@ -43,7 +47,7 @@ public sealed partial class ShellSessionCoordinator
 
         try
         {
-            var snapshot = await webViewService.InspectControlUiStateAsync();
+            var snapshot = await webViewService.InspectControlUiStateAsync(cancellationToken);
             if (snapshot.Phase == ControlUiPhase.Unavailable)
             {
                 return true;
@@ -55,6 +59,10 @@ public sealed partial class ShellSessionCoordinator
             }
 
             return !IsSessionAlive(snapshot);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

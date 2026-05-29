@@ -61,6 +61,14 @@ public sealed partial class MainWindow
             return;
         }
 
+        if (_isCompactMode)
+        {
+            SaveCompactWindowPosition();
+            App.Configuration.Save();
+            App.Logger.Info("Skipping normal window bounds save while compact mode is active.");
+            return;
+        }
+
         try
         {
             var appWindow = this.AppWindow;
@@ -126,7 +134,10 @@ public sealed partial class MainWindow
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        _isClosing = true;
+        _windowLifetimeCts.Cancel();
         AppWindow.Closing -= OnAppWindowClosing;
+        WebViewHost.SizeChanged -= OnWebViewHostSizeChanged;
         _runIndicatorTimer.Stop();
         _runIndicatorTimer.Tick -= OnRunIndicatorTick;
         _webViewRecreationTimer.Stop();
@@ -135,6 +146,7 @@ public sealed partial class MainWindow
         DisposeTrayIcon();
         ViewModel.OpenSettingsRequested -= OnOpenSettingsRequested;
         ViewModel.WebViewRecreationRequested -= OnWebViewRecreationRequested;
+        ViewModel.NavigationTimeoutRecoveryNoLongerNeeded -= OnNavigationTimeoutRecoveryNoLongerNeeded;
         ViewModel.ViewLogsRequested -= OnViewLogsRequested;
         ViewModel.ErrorOccurred -= OnError;
         ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
@@ -143,7 +155,7 @@ public sealed partial class MainWindow
         SaveWindowBounds();
         App.Configuration.FlushDeferredSave();
         App.Logger.Info("Application closing.");
-        App.Logger.Dispose();
+        _windowLifetimeCts.Dispose();
     }
 
     private void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
@@ -176,6 +188,7 @@ public sealed partial class MainWindow
 
         _hasPerformedInitialTitleBarRefresh = true;
         WindowFrameHelper.QueueFrameRefresh(this, DispatcherQueue, RefreshTitleBarVisualState, redrawWindow: true);
+        ResumeDeferredWebViewRecreationIfReady();
     }
 
     private void UpdateWindowVisibilityState()
@@ -205,6 +218,11 @@ public sealed partial class MainWindow
 
     private void OnRootLoaded(object sender, RoutedEventArgs e)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         ApplyTheme(App.Configuration.Settings.AppTheme);
         if (!_hasInitializedWebViewHost)
         {
@@ -236,7 +254,33 @@ public sealed partial class MainWindow
 
     private async void OnWindowVisibleAsync()
     {
-        await ViewModel.NotifyHostVisibleAsync();
-        UpdateRunIndicatorAnimationState();
+        if (_isClosing || _windowLifetimeCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            await ViewModel.NotifyHostVisibleAsync();
+            if (!_isClosing && !_windowLifetimeCts.IsCancellationRequested)
+            {
+                UpdateRunIndicatorAnimationState();
+                ResumeDeferredWebViewRecreationIfReady();
+            }
+        }
+        catch (OperationCanceledException) when (_windowLifetimeCts.IsCancellationRequested)
+        {
+            if (!_isClosing)
+            {
+                App.Logger.Info("Foreground resume cancelled during shutdown.");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!_isClosing)
+            {
+                App.Logger.Warning($"Foreground resume failed: {ex.Message}");
+            }
+        }
     }
 }

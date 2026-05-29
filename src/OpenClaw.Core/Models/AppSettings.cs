@@ -81,7 +81,7 @@ public class AppSettings
     public bool AlwaysOnTop { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets whether compact mode is active (reduced window showing only status).
+    /// Gets or sets whether compact mode is active (reduced control/status window).
     /// </summary>
     public bool CompactMode { get; set; } = false;
 

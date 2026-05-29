@@ -1,5 +1,7 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
+using OpenClaw.Models;
+
 namespace OpenClaw.Services;
 
 public partial class WebViewService
@@ -7,8 +9,10 @@ public partial class WebViewService
     private const int DefaultHeartbeatFailureThreshold = 3;
     private const int DefaultHeartbeatConnectingThreshold = 3;
 
-    private CancellationTokenSource? _heartbeatCts;
-    private Task? _heartbeatTask;
+    private readonly HeartbeatRuntime _heartbeatRuntime;
+    private readonly GatewayHeartbeatTransport _heartbeatTransport;
+    private readonly HostedSessionHeartbeatPolicy _hostedSessionHeartbeatPolicy;
+    private readonly object _heartbeatStateGate = new();
     private int _heartbeatFailureCount;
     private int _heartbeatConnectingCount;
     private string? _lastHeartbeatObservationKey;
@@ -17,10 +21,11 @@ public partial class WebViewService
     private int _heartbeatFailureThreshold = DefaultHeartbeatFailureThreshold;
     private int _heartbeatConnectingThreshold = DefaultHeartbeatConnectingThreshold;
     private static readonly TimeSpan DefaultHeartbeatReloadCooldown = TimeSpan.FromSeconds(75);
-    private static readonly HttpClient HeartbeatHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private int _heartbeatHardRefreshCooldownSeconds = (int)DefaultHeartbeatReloadCooldown.TotalSeconds;
     private DateTimeOffset _lastHeartbeatReloadAt = DateTimeOffset.MinValue;
     private string? _lastStartHeartbeatKey;
     private int _heartbeatRecoveryRequests;
+    private int _heartbeatRunId;
 
     /// <summary>
     /// Raised when the heartbeat decides the hosted Control UI should be refreshed.
@@ -38,50 +43,56 @@ public partial class WebViewService
     /// Starts the periodic heartbeat probe against the given gateway URL.
     /// If the interval is 0 or negative, the heartbeat is disabled.
     /// </summary>
-    public void StartHeartbeat(string gatewayUrl, int intervalSeconds)
+    public void StartHeartbeat(
+        string gatewayUrl,
+        HeartbeatOptions heartbeatSettings,
+        RecoveryPolicyOptions recoveryPolicyOptions)
     {
-        var heartbeatSettings = App.Configuration.Settings.Heartbeat;
         if (!heartbeatSettings.EnableHeartbeat)
         {
             StopHeartbeat();
-            App.Logger.Info("Heartbeat disabled in settings.");
+            _logger.Info("Heartbeat disabled in settings.");
             return;
         }
 
+        var intervalSeconds = heartbeatSettings.IntervalSeconds;
         if (intervalSeconds <= 0 || string.IsNullOrEmpty(gatewayUrl))
         {
             StopHeartbeat();
-            App.Logger.Info("Heartbeat disabled (interval=0 or no URL).");
+            _logger.Info("Heartbeat disabled (interval=0 or no URL).");
             return;
         }
 
-        if (_heartbeatCts is not null &&
-            _heartbeatTask is not null &&
-            string.Equals(_heartbeatGatewayUrl, gatewayUrl, StringComparison.OrdinalIgnoreCase) &&
-            _heartbeatIntervalSeconds == intervalSeconds)
+        var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{Math.Max(1, heartbeatSettings.FailureThreshold)}|{Math.Max(1, heartbeatSettings.ConnectingThreshold)}|{Math.Max(0, recoveryPolicyOptions.HardRefreshCooldownSeconds)}";
+        lock (_heartbeatStateGate)
         {
-            return;
+            if (_heartbeatRuntime.IsSameRun(heartbeatStartKey))
+            {
+                return;
+            }
+
+            StopHeartbeatCore();
+
+            _heartbeatFailureCount = 0;
+            _heartbeatConnectingCount = 0;
+            _lastHeartbeatObservationKey = null;
+            _heartbeatGatewayUrl = gatewayUrl;
+            _heartbeatIntervalSeconds = intervalSeconds;
+            _heartbeatFailureThreshold = Math.Max(1, heartbeatSettings.FailureThreshold);
+            _heartbeatConnectingThreshold = Math.Max(1, heartbeatSettings.ConnectingThreshold);
+            _heartbeatHardRefreshCooldownSeconds = Math.Max(0, recoveryPolicyOptions.HardRefreshCooldownSeconds);
+            var heartbeatRunId = Interlocked.Increment(ref _heartbeatRunId);
+
+            if (!string.Equals(_lastStartHeartbeatKey, heartbeatStartKey, StringComparison.Ordinal))
+            {
+                _lastStartHeartbeatKey = heartbeatStartKey;
+                _logger.Info($"Heartbeat started: interval={intervalSeconds}s, failureThreshold={_heartbeatFailureThreshold}, connectingThreshold={_heartbeatConnectingThreshold}, url={gatewayUrl}");
+            }
+
+            _heartbeatRuntime.Start(
+                heartbeatStartKey,
+                token => RunSessionAwareHeartbeatLoopAsync(gatewayUrl, TimeSpan.FromSeconds(intervalSeconds), heartbeatRunId, token));
         }
-
-        StopHeartbeat();
-
-        _heartbeatFailureCount = 0;
-        _heartbeatConnectingCount = 0;
-        _lastHeartbeatObservationKey = null;
-        _heartbeatGatewayUrl = gatewayUrl;
-        _heartbeatIntervalSeconds = intervalSeconds;
-        _heartbeatFailureThreshold = Math.Max(1, heartbeatSettings.FailureThreshold);
-        _heartbeatConnectingThreshold = Math.Max(1, heartbeatSettings.ConnectingThreshold);
-        _heartbeatCts = new CancellationTokenSource();
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
-
-        var heartbeatStartKey = $"{gatewayUrl}|{intervalSeconds}|{_heartbeatFailureThreshold}|{_heartbeatConnectingThreshold}";
-        if (!string.Equals(_lastStartHeartbeatKey, heartbeatStartKey, StringComparison.Ordinal))
-        {
-            _lastStartHeartbeatKey = heartbeatStartKey;
-            App.Logger.Info($"Heartbeat started: interval={intervalSeconds}s, failureThreshold={_heartbeatFailureThreshold}, connectingThreshold={_heartbeatConnectingThreshold}, url={gatewayUrl}");
-        }
-        _heartbeatTask = RunSessionAwareHeartbeatLoopAsync(gatewayUrl, timer, _heartbeatCts.Token);
     }
 
     /// <summary>
@@ -89,21 +100,30 @@ public partial class WebViewService
     /// </summary>
     public void StopHeartbeat()
     {
-        var heartbeatCts = _heartbeatCts;
-        var heartbeatTask = _heartbeatTask;
-        _heartbeatCts = null;
-        _heartbeatTask = null;
-
-        heartbeatCts?.Cancel();
-        if (heartbeatTask is not null)
+        lock (_heartbeatStateGate)
         {
-            _ = ObserveHeartbeatShutdownAsync(heartbeatTask, heartbeatCts);
+            StopHeartbeatCore();
         }
-        else
-        {
-            heartbeatCts?.Dispose();
-        }
+    }
 
+    private bool TryStopHeartbeatForRecovery(int runId)
+    {
+        lock (_heartbeatStateGate)
+        {
+            if (!IsCurrentHeartbeatRun(runId))
+            {
+                return false;
+            }
+
+            StopHeartbeatCore();
+            return true;
+        }
+    }
+
+    private void StopHeartbeatCore()
+    {
+        Interlocked.Increment(ref _heartbeatRunId);
+        _heartbeatRuntime.Stop();
         _heartbeatFailureCount = 0;
         _heartbeatConnectingCount = 0;
         _lastHeartbeatObservationKey = null;
@@ -111,14 +131,27 @@ public partial class WebViewService
         _heartbeatIntervalSeconds = 0;
         _heartbeatFailureThreshold = DefaultHeartbeatFailureThreshold;
         _heartbeatConnectingThreshold = DefaultHeartbeatConnectingThreshold;
+        _heartbeatHardRefreshCooldownSeconds = (int)DefaultHeartbeatReloadCooldown.TotalSeconds;
         _lastStartHeartbeatKey = null;
     }
 
-    private async Task ObserveHeartbeatShutdownAsync(Task heartbeatTask, CancellationTokenSource? heartbeatCts)
+    private async Task RunSessionAwareHeartbeatLoopAsync(string gatewayUrl, TimeSpan interval, int runId, CancellationToken token)
     {
+        using var timer = new PeriodicTimer(interval);
         try
         {
-            await heartbeatTask;
+            if (!await ProcessHeartbeatTickAsync(gatewayUrl, runId, token))
+            {
+                return;
+            }
+
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                if (!await ProcessHeartbeatTickAsync(gatewayUrl, runId, token))
+                {
+                    return;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -126,99 +159,78 @@ public partial class WebViewService
         }
         catch (Exception ex)
         {
-            App.Logger.Error($"Heartbeat loop shutdown error: {ex.Message}");
-        }
-        finally
-        {
-            heartbeatCts?.Dispose();
+            _logger.Error($"Heartbeat loop error: {ex.Message}");
         }
     }
 
-    private async Task RunSessionAwareHeartbeatLoopAsync(string gatewayUrl, PeriodicTimer timer, CancellationToken token)
+    private async Task<bool> ProcessHeartbeatTickAsync(string gatewayUrl, int runId, CancellationToken token)
     {
-        using (timer)
+        if (token.IsCancellationRequested || !IsCurrentHeartbeatRun(runId))
         {
-            try
-            {
-                while (await timer.WaitForNextTickAsync(token))
-                {
-                    if (token.IsCancellationRequested)
-                    {
-                        break;
-                    }
-
-                    var probe = await ProbeGatewayHealthAsync(gatewayUrl, token);
-                    LogHeartbeatObservation(probe);
-
-                    if (probe.Status == HeartbeatProbeStatus.Healthy)
-                    {
-                        if (_heartbeatFailureCount > 0)
-                        {
-                            App.Logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
-                        }
-
-                        _heartbeatFailureCount = 0;
-                        _heartbeatConnectingCount = 0;
-                        continue;
-                    }
-
-                    if (probe.Status == HeartbeatProbeStatus.SessionBlocked)
-                    {
-                        if (_heartbeatFailureCount > 0)
-                        {
-                            App.Logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
-                        }
-
-                        _heartbeatFailureCount = 0;
-                        _heartbeatConnectingCount = 0;
-                        continue;
-                    }
-
-                    if (probe.Status == HeartbeatProbeStatus.Connecting)
-                    {
-                        _heartbeatFailureCount = 0;
-                        _heartbeatConnectingCount++;
-
-                        if (_heartbeatConnectingCount < _heartbeatConnectingThreshold)
-                        {
-                            continue;
-                        }
-
-                        if (TryScheduleHeartbeatReload(probe.Message, preserveConnectingCounter: true))
-                        {
-                            return;
-                        }
-
-                        continue;
-                    }
-
-                    _heartbeatConnectingCount = 0;
-                    _heartbeatFailureCount++;
-                    App.Logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
-
-                    if (_heartbeatFailureCount >= _heartbeatFailureThreshold)
-                    {
-                        if (TryScheduleHeartbeatReload(probe.Message))
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected when StopHeartbeat() is called.
-            }
-            catch (Exception ex)
-            {
-                App.Logger.Error($"Heartbeat loop error: {ex.Message}");
-            }
+            return false;
         }
+
+        var probe = await ProbeGatewayHealthAsync(gatewayUrl, token);
+        token.ThrowIfCancellationRequested();
+        if (!IsCurrentHeartbeatRun(runId))
+        {
+            return false;
+        }
+
+        LogHeartbeatObservation(probe);
+
+        if (probe.Status == HeartbeatProbeStatus.Healthy)
+        {
+            if (_heartbeatFailureCount > 0)
+            {
+                _logger.Info($"Heartbeat recovered after {_heartbeatFailureCount} failure(s).");
+            }
+
+            _heartbeatFailureCount = 0;
+            _heartbeatConnectingCount = 0;
+            return true;
+        }
+
+        if (probe.Status == HeartbeatProbeStatus.SessionBlocked)
+        {
+            if (_heartbeatFailureCount > 0)
+            {
+                _logger.Info("Heartbeat failure counter reset because the hosted UI requires user action.");
+            }
+
+            _heartbeatFailureCount = 0;
+            _heartbeatConnectingCount = 0;
+            return true;
+        }
+
+        if (probe.Status == HeartbeatProbeStatus.Connecting)
+        {
+            _heartbeatFailureCount = 0;
+            _heartbeatConnectingCount++;
+
+            if (_heartbeatConnectingCount < _heartbeatConnectingThreshold)
+            {
+                return true;
+            }
+
+            return !TryScheduleHeartbeatReload(probe.Message, runId, preserveConnectingCounter: true);
+        }
+
+        _heartbeatConnectingCount = 0;
+        _heartbeatFailureCount++;
+        _logger.Warning($"Heartbeat failure {_heartbeatFailureCount}/{_heartbeatFailureThreshold}.");
+
+        if (_heartbeatFailureCount >= _heartbeatFailureThreshold)
+        {
+            return !TryScheduleHeartbeatReload(probe.Message, runId);
+        }
+
+        return true;
     }
 
     private async Task<HeartbeatProbeResult> ProbeGatewayHealthAsync(string url, CancellationToken token)
     {
-        var hostedSessionResult = await ProbeHostedSessionAsync();
+        var hostedSessionResult = await ProbeHostedSessionAsync(token);
         if (hostedSessionResult is not null)
         {
             if (hostedSessionResult.Status is HeartbeatProbeStatus.Failure or HeartbeatProbeStatus.Connecting)
@@ -239,74 +251,38 @@ public partial class WebViewService
         return await ProbeGatewayTransportAsync(url, token);
     }
 
-    private static async Task<HeartbeatProbeResult> ProbeGatewayTransportAsync(string url, CancellationToken token)
+    private Task<HeartbeatProbeResult> ProbeGatewayTransportAsync(string url, CancellationToken token)
     {
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache, no-store, max-age=0");
-            request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
-            request.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml");
-
-            using var response = await HeartbeatHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-            var statusCode = (int)response.StatusCode;
-            var proxyHint = response.Headers.TryGetValues("cf-ray", out _) ? " via Cloudflare" : string.Empty;
-
-            return statusCode switch
-            {
-                >= 200 and < 300 => HeartbeatProbeResult.Healthy($"Gateway reachable over HTTP{proxyHint} ({statusCode})."),
-                301 or 302 or 303 or 307 or 308 => HeartbeatProbeResult.Healthy(
-                    $"Gateway reachable over HTTP{proxyHint} but redirected ({statusCode})."),
-                401 or 403 => HeartbeatProbeResult.Healthy(
-                    $"Gateway reachable over HTTP{proxyHint} but requires authentication or origin approval ({statusCode})."),
-                404 => HeartbeatProbeResult.Healthy(
-                    $"Gateway reachable over HTTP{proxyHint} but the configured Control UI path returned 404."),
-                405 => HeartbeatProbeResult.Healthy(
-                    $"Gateway reachable over HTTP{proxyHint} but the proxy rejected the probe method ({statusCode})."),
-                _ => HeartbeatProbeResult.Healthy(
-                    $"Gateway reachable over HTTP{proxyHint} ({statusCode} {response.ReasonPhrase}).")
-            };
-        }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return HeartbeatProbeResult.Failure($"Gateway heartbeat request failed: {ex.Message}");
-        }
+        return _heartbeatTransport.ProbeAsync(url, token);
     }
 
-    private async Task<HeartbeatProbeResult?> ProbeHostedSessionAsync()
+    private async Task<HeartbeatProbeResult?> ProbeHostedSessionAsync(CancellationToken token)
     {
-        if (!_isInitialized || GetCoreWebView() is null)
+        token.ThrowIfCancellationRequested();
+
+        if (!_isInitialized)
         {
             return null;
         }
 
-        var snapshot = await InspectControlUiStateAsync();
-        return snapshot.Phase switch
-        {
-            ControlUiPhase.Connected =>
-                HeartbeatProbeResult.Healthy("Hosted Control UI reports an active Gateway session."),
-            ControlUiPhase.AuthRequired or ControlUiPhase.PairingRequired or ControlUiPhase.OriginRejected =>
-                HeartbeatProbeResult.SessionBlocked(snapshot.DetailOrSummary),
-            ControlUiPhase.PageLoaded or ControlUiPhase.GatewayConnecting =>
-                HeartbeatProbeResult.Connecting("Hosted Control UI is still reconnecting to the Gateway."),
-            ControlUiPhase.GatewayError =>
-                HeartbeatProbeResult.Failure(snapshot.DetailOrSummary),
-            _ => null,
-        };
+        var snapshot = await InspectControlUiStateAsync(token, publishSnapshot: false);
+        token.ThrowIfCancellationRequested();
+        return _hostedSessionHeartbeatPolicy.Map(snapshot);
     }
 
-    private bool TryScheduleHeartbeatReload(string message, bool preserveConnectingCounter = false)
+    private bool TryScheduleHeartbeatReload(string message, int runId, bool preserveConnectingCounter = false)
     {
+        if (!IsCurrentHeartbeatRun(runId))
+        {
+            return true;
+        }
+
         var heartbeatReloadCooldown = GetHeartbeatReloadCooldown();
         var elapsed = DateTimeOffset.UtcNow - _lastHeartbeatReloadAt;
         if (elapsed < heartbeatReloadCooldown)
         {
             var remaining = heartbeatReloadCooldown - elapsed;
-            App.Logger.Warning($"Heartbeat auto-refresh suppressed for another {Math.Ceiling(remaining.TotalSeconds)}s to avoid reverse-proxy thrash.");
+            _logger.Warning($"Heartbeat auto-refresh suppressed for another {Math.Ceiling(remaining.TotalSeconds)}s to avoid reverse-proxy thrash.");
             _heartbeatFailureCount = _heartbeatFailureThreshold - 1;
 
             if (preserveConnectingCounter)
@@ -317,21 +293,32 @@ public partial class WebViewService
             return false;
         }
 
+        // Stop heartbeat first; coordinator-driven recovery will restart it after the session stabilizes.
+        if (!TryStopHeartbeatForRecovery(runId))
+        {
+            return true;
+        }
+
         _lastHeartbeatReloadAt = DateTimeOffset.UtcNow;
         Interlocked.Increment(ref _heartbeatRecoveryRequests);
-        App.Logger.Warning($"Heartbeat threshold reached, requesting session recovery. Reason: {message}");
-        App.Logger.Info("heartbeat.recovery.count", new { total = HeartbeatRecoveryRequests, message });
+        _logger.Warning($"Heartbeat threshold reached, requesting session recovery. Reason: {message}");
+        _logger.Info("heartbeat.recovery.count", new { total = HeartbeatRecoveryRequests, message });
         HeartbeatFailed?.Invoke(message);
-
-        // Stop heartbeat; coordinator-driven recovery will restart it after the session stabilizes.
-        StopHeartbeat();
         return true;
     }
 
-    private static TimeSpan GetHeartbeatReloadCooldown()
+    private TimeSpan GetHeartbeatReloadCooldown()
     {
-        var seconds = App.Configuration.Settings.RecoveryPolicy.HardRefreshCooldownSeconds;
+        var seconds = _heartbeatHardRefreshCooldownSeconds;
         return TimeSpan.FromSeconds(Math.Max(0, seconds));
+    }
+
+    private bool IsCurrentHeartbeatRun(int runId)
+    {
+        lock (_heartbeatStateGate)
+        {
+            return !_isDisposed && Volatile.Read(ref _heartbeatRunId) == runId;
+        }
     }
 
     private void LogHeartbeatObservation(HeartbeatProbeResult result)
@@ -349,16 +336,16 @@ public partial class WebViewService
         switch (result.Status)
         {
             case HeartbeatProbeStatus.Healthy:
-                App.Logger.Info(result.Message);
+                _logger.Info(result.Message);
                 break;
             case HeartbeatProbeStatus.SessionBlocked:
-                App.Logger.Warning($"Heartbeat detected a session issue that requires user action: {result.Message}");
+                _logger.Warning($"Heartbeat detected a session issue that requires user action: {result.Message}");
                 break;
             case HeartbeatProbeStatus.Connecting:
-                App.Logger.Info(result.Message);
+                _logger.Info(result.Message);
                 break;
             case HeartbeatProbeStatus.Failure:
-                App.Logger.Warning(result.Message);
+                _logger.Warning(result.Message);
                 break;
         }
     }

@@ -46,9 +46,7 @@
   <data name="Stop" xml:space="preserve">
     <value>Stop</value>
   </data>
-  <data name="OpenInBrowser" xml:space="preserve">
-    <value>Open in Browser</value>
-  </data>
+
   <data name="Settings" xml:space="preserve">
     <value>Settings</value>
   </data>
@@ -60,6 +58,12 @@
   </data>
   <data name="Retry" xml:space="preserve">
     <value>Retry</value>
+  </data>
+  <data name="RetryUnavailable" xml:space="preserve">
+    <value>Retry is not available because no active WebView navigation can be restarted. Use Reload or switch environments to start a fresh session.</value>
+  </data>
+  <data name="WebViewRecreationFailedFormat" xml:space="preserve">
+    <value>WebView recovery failed while recreating the browser host: {0}</value>
   </data>
   <data name="DevTools" xml:space="preserve">
     <value>Developer Tools</value>
@@ -107,6 +111,9 @@
   <data name="StatusOffline" xml:space="preserve">
     <value>Offline</value>
   </data>
+  <data name="StatusConfigureGateway" xml:space="preserve">
+    <value>Configure a Gateway URL in Settings</value>
+  </data>
   <data name="StatusHeartbeatFailed" xml:space="preserve">
     <value>Gateway heartbeat lost - refreshing...</value>
   </data>
@@ -121,6 +128,9 @@
   </data>
   <data name="HeartbeatFailed" xml:space="preserve">
     <value>HB FAIL</value>
+  </data>
+  <data name="CircuitBreakerRecreationSuppressed" xml:space="preserve">
+    <value>WebView recovery is temporarily paused after repeated failures. Please wait a moment before retrying.</value>
   </data>
 
   <data name="RecoveryConnecting" xml:space="preserve">
@@ -212,7 +222,7 @@
     <value>Multiple instances</value>
   </data>
   <data name="SettingsAllowMultipleInstancesDescription" xml:space="preserve">
-    <value>Allow multiple instance of Openclaw for windows</value>
+    <value>Allow multiple instances of OpenClaw on Windows.</value>
   </data>
   <data name="SettingsAlwaysOnTop" xml:space="preserve">
     <value>Always on top</value>
@@ -246,6 +256,9 @@
   </data>
   <data name="SettingsEnvironmentPlaceholder" xml:space="preserve">
     <value>e.g. Production</value>
+  </data>
+  <data name="SettingsControlUiUrlPlaceholder" xml:space="preserve">
+    <value>https://your-gateway.example.com</value>
   </data>
   <data name="SettingsControlUiUrl" xml:space="preserve">
     <value>Control UI URL</value>
@@ -298,11 +311,17 @@
   <data name="SettingsOpenDevTools" xml:space="preserve">
     <value>Open DevTools</value>
   </data>
+  <data name="SettingsExportDiagnosticBundle" xml:space="preserve">
+    <value>Export Diagnostic Bundle</value>
+  </data>
   <data name="SettingsSessionResetSelectEnvironment" xml:space="preserve">
     <value>Select an environment to clear its session.</value>
   </data>
   <data name="SettingsSessionResetCompleted" xml:space="preserve">
     <value>Cleared the saved session for '{0}'.</value>
+  </data>
+  <data name="SettingsSessionResetFailedFormat" xml:space="preserve">
+    <value>Failed to clear the saved session for '{0}': {1}</value>
   </data>
   <data name="SettingsValidationDefaultMessage" xml:space="preserve">
     <value>All environments must have a unique name and a valid http(s) Control UI URL. For Cloudflare Tunnel or reverse-proxy deployments, use the public HTTPS Control UI URL and keep gateway.controlUi.allowedOrigins in sync with its exact origin.</value>
@@ -332,25 +351,13 @@
     <value>Environment {0}</value>
   </data>
 
-  <data name="AppDisplayName" xml:space="preserve">
-    <value>OpenClaw Manager</value>
-  </data>
 
-  <data name="QuickCommands" xml:space="preserve">
-    <value>Quick Commands</value>
-  </data>
-  <data name="QuickStop" xml:space="preserve">
-    <value>/stop - Stop generation</value>
-  </data>
-  <data name="QuickStatus" xml:space="preserve">
-    <value>/status - Check status</value>
-  </data>
-  <data name="QuickNew" xml:space="preserve">
-    <value>/new - New conversation</value>
-  </data>
-  <data name="QuickQueue" xml:space="preserve">
-    <value>/queue - Queue interrupt</value>
-  </data>
+
+
+
+
+
+
 
   <data name="ConnectionIssue" xml:space="preserve">
     <value>Connection Issue</value>
@@ -635,6 +642,9 @@
   </data>
   <data name="TrayMenuOpen" xml:space="preserve">
     <value>Open OpenClaw</value>
+  </data>
+  <data name="TrayMenuCompactMode" xml:space="preserve">
+    <value>Compact Mode</value>
   </data>
   <data name="TrayMenuExit" xml:space="preserve">
     <value>Exit</value>

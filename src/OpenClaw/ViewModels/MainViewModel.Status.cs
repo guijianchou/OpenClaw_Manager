@@ -9,39 +9,64 @@ namespace OpenClaw.ViewModels;
 
 public partial class MainViewModel
 {
-    private static void RunOnUiThread(Action action)
-    {
-        App.MainWindow?.DispatcherQueue.TryEnqueue(() => action());
-    }
-
     private void OnConnectionStateChanged(ConnectionState state)
     {
-        RunOnUiThread(() => ApplyConnectionState(state));
+        DispatchUiUpdate(() => ApplyConnectionState(state));
     }
 
     private void OnNavigationError(string message)
     {
-        RunOnUiThread(() => ApplyNavigationError(message));
+        DispatchUiUpdate(() => ApplyNavigationError(message));
+    }
+
+    private void OnNavigationStartTimedOut(string message)
+    {
+        DispatchUiUpdate(() =>
+        {
+            _runtime.Logger.Warning("navigation.start.timeout.recovery_requested", new { message });
+            IsErrorVisible = false;
+            ShowRetryButton = false;
+            WebViewRecreationRequested?.Invoke("navigation_start_timeout");
+        });
+    }
+
+    private void OnNavigationCompletionTimedOut(string message)
+    {
+        DispatchUiUpdate(() =>
+        {
+            _runtime.Logger.Warning("navigation.completion.timeout.recovery_requested", new { message });
+            IsErrorVisible = false;
+            ShowRetryButton = false;
+            WebViewRecreationRequested?.Invoke("navigation_completion_timeout");
+        });
+    }
+
+    private void OnNavigationTimeoutRecovered()
+    {
+        DispatchUiUpdate(() =>
+        {
+            NavigationTimeoutRecoveryNoLongerNeeded?.Invoke();
+        });
     }
 
     private void OnControlUiSnapshotUpdated(ControlUiProbeSnapshot snapshot)
     {
-        RunOnUiThread(() => ApplyControlUiSnapshot(snapshot));
+        DispatchUiUpdate(() => ApplyControlUiSnapshot(snapshot));
     }
 
     private void OnRecoveryStateChanged(RecoveryState state)
     {
-        RunOnUiThread(() => ApplyRecoveryState(state));
+        DispatchUiUpdate(() => ApplyRecoveryState(state));
     }
 
     private void OnTelemetryUpdated(RecoveryTelemetrySnapshot snapshot)
     {
-        if (!App.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging)
+        if (!_runtime.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging)
         {
             return;
         }
 
-        App.Logger.Info("recovery.telemetry", new
+        _runtime.Logger.Info("recovery.telemetry", new
         {
             snapshot.TotalReconnectAttempts,
             snapshot.TotalSoftResyncAttempts,
@@ -54,7 +79,7 @@ public partial class MainViewModel
     private void ApplyConnectionState(ConnectionState state)
     {
         ConnectionState = state;
-        IsLoading = state is ConnectionState.Loading or ConnectionState.GatewayConnecting;
+        IsLoading = state == ConnectionState.Loading;
         ShowRetryButton = state is ConnectionState.Error or ConnectionState.AuthFailed;
 
         RefreshResourceScheduling();
@@ -72,7 +97,9 @@ public partial class MainViewModel
     private void ApplyControlUiSnapshot(ControlUiProbeSnapshot snapshot)
     {
         ApplyModelSummary(snapshot);
-        (AccessSummaryText, AccessSummaryBrush) = FormatAccessSummary(snapshot);
+        var accessSummary = _statusPresenter.FormatAccessSummary(snapshot, CurrentStatusBrushes, DefaultAccessSummary);
+        AccessSummaryText = accessSummary.Text;
+        AccessSummaryBrush = accessSummary.Brush;
 
         ApplyWorkStatus(snapshot);
         ApplySnapshotErrorState(snapshot);
@@ -83,7 +110,7 @@ public partial class MainViewModel
 
     private void ApplyModelSummary(ControlUiProbeSnapshot snapshot)
     {
-        var modelSummary = FormatModelSummary(snapshot.CurrentModel);
+        var modelSummary = _statusPresenter.FormatModelSummary(snapshot.CurrentModel, DefaultModelSummary);
         if (modelSummary != DefaultModelSummary)
         {
             _lastKnownModelSummaryText = modelSummary;
@@ -106,29 +133,26 @@ public partial class MainViewModel
 
     private static bool ShouldClearModelSummary(ControlUiProbeSnapshot snapshot)
     {
-        return snapshot.Phase is ControlUiPhase.Loading
-            or ControlUiPhase.AuthRequired
+        return snapshot.Phase is ControlUiPhase.AuthRequired
             or ControlUiPhase.PairingRequired
             or ControlUiPhase.OriginRejected
-            or ControlUiPhase.GatewayError
-            or ControlUiPhase.Unavailable
-            or ControlUiPhase.Unknown;
+            or ControlUiPhase.GatewayError;
     }
 
     private void ApplyRecoveryState(RecoveryState state)
     {
         ShellConnectionState = state;
         IsRecovering = state is RecoveryState.Reconnecting or RecoveryState.Resyncing or RecoveryState.Refreshing;
-        RecoveryMessage = FormatRecoveryMessage(state);
+        RecoveryMessage = _statusPresenter.FormatRecoveryMessage(state);
         UpdateStatusPresentation();
     }
 
     private void ApplyWorkStatus(ControlUiProbeSnapshot snapshot)
     {
-        var (workStatusText, workStatusBrush, runIndicatorMode) = FormatWorkStatus(snapshot);
-        WorkStatusText = workStatusText;
-        WorkStatusBrush = workStatusBrush;
-        SetRunIndicatorMode(runIndicatorMode);
+        var presentation = _statusPresenter.FormatWorkStatus(snapshot, CurrentStatusBrushes, DefaultWorkStatus);
+        WorkStatusText = presentation.Text;
+        WorkStatusBrush = presentation.Brush;
+        SetRunIndicatorMode(presentation.Mode);
     }
 
     private void ApplySnapshotErrorState(ControlUiProbeSnapshot snapshot)
@@ -136,6 +160,13 @@ public partial class MainViewModel
         if (snapshot.IsIssue && ConnectionState is ConnectionState.Error or ConnectionState.AuthFailed or ConnectionState.Reconnecting)
         {
             ErrorMessage = snapshot.DetailOrSummary;
+            IsErrorVisible = true;
+        }
+        else if (snapshot.Phase == ControlUiPhase.Unavailable &&
+            ConnectionState == ConnectionState.Reconnecting)
+        {
+            ErrorMessage = snapshot.DetailOrSummary;
+            IsErrorVisible = true;
         }
         else if (ConnectionState is not ConnectionState.Error and not ConnectionState.AuthFailed)
         {
