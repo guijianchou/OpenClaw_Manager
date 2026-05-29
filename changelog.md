@@ -8,7 +8,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
-### Unreleased
+### v5.0.0 (2026-05-29)
 
 - Hardened terminal hosted-session failure projection: `Unavailable` snapshots now show a visible InfoBar while reconnecting, `GatewayError`/`Unavailable` move ShellSessionCoordinator out of stale Ready/Healthy recovery state, and WebView recreation exceptions surface a localized actionable error instead of only logging after timeout recovery hid the InfoBar.
 - Hardened late completion-timeout recovery: a still-current successful `NavigationCompleted` that arrives after completion-timeout recovery recreates navigation cancellation ownership and runs the normal page-token/status-probe path instead of returning before cleanup notifications.
@@ -287,7 +287,7 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## 简体中文
 
-### 未发布
+### v5.0.0 (2026-05-29)
 
 - 继续加固 terminal hosted-session failure 投影：`Unavailable` 会在 Reconnecting 时显示可见 InfoBar，`GatewayError` / `Unavailable` 会把 ShellSessionCoordinator 从旧的 Ready/Healthy recovery state 移出，WebView 重建异常会显示本地化可操作错误，而不是在 timeout recovery 隐藏 InfoBar 后只写日志。
 - 加固 completion-timeout 后的迟到成功 completion：仍属于当前 navigation 的成功 `NavigationCompleted` 会重新建立 navigation cancellation ownership，并继续正常 page-token/status-probe 路径，而不是在清理通知前提前返回。
