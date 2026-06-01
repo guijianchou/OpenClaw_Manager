@@ -347,6 +347,12 @@
   <data name="SettingsValidationControlUiUrlScheme" xml:space="preserve">
     <value>Control UI URL 必须使用 http 或 https。</value>
   </data>
+  <data name="SettingsValidationSaveFailedFormat" xml:space="preserve">
+    <value>保存设置失败：{0}</value>
+  </data>
+  <data name="SettingsValidationSaveFailedUnknown" xml:space="preserve">
+    <value>未知写入错误</value>
+  </data>
   <data name="SettingsGeneratedEnvironmentName" xml:space="preserve">
     <value>环境 {0}</value>
   </data>
@@ -509,6 +515,9 @@
   </data>
   <data name="DiagnosticGatewayReturnedFormat" xml:space="preserve">
     <value>Gateway 返回 {0} {1}</value>
+  </data>
+  <data name="DiagnosticCloudflareTunnelUnavailableDetail" xml:space="preserve">
+    <value>Cloudflare 无法连到这个主机名对应的 cloudflared 隧道。请确认 VPS 上的 cloudflared 正在运行、隧道路由指向 Gateway 服务，并且 public hostname 与 Control UI URL 一致。</value>
   </data>
   <data name="DiagnosticGatewayReturnedServerFailureDetail" xml:space="preserve">
     <value>远程端点在托管 UI 建立会话之前就返回了服务端错误。</value>

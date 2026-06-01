@@ -366,12 +366,19 @@ public sealed class ControlUiLatencyService : IDisposable
                 cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
-            var proxyHint = response.Headers.TryGetValues("cf-ray", out var cfRayValues) ? " via Cloudflare" : string.Empty;
+            var viaCloudflare = response.Headers.TryGetValues("cf-ray", out var cfRayValues);
             var proxyPoP = cfRayValues is not null ? CloudflareRayParser.ParsePoP(cfRayValues.FirstOrDefault()) : null;
+            var classification = GatewayHttpStatusClassifier.Classify(response.StatusCode, response.ReasonPhrase, viaCloudflare);
+            var detail = $"{classification.Detail} {stopwatch.ElapsedMilliseconds} ms";
+            if (!classification.IsReachable)
+            {
+                return ControlUiLatencySnapshot.Failure(host, detail, proxyPoP);
+            }
+
             return ControlUiLatencySnapshot.Success(
                 host,
                 stopwatch.ElapsedMilliseconds,
-                $"HTTP {(int)response.StatusCode}{proxyHint}",
+                detail,
                 proxyPoP);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -415,7 +422,7 @@ public sealed class ControlUiLatencyService : IDisposable
             basePath += "/";
         }
 
-        builder.Path = $"{basePath}__openclaw/control-ui-config.json";
+        builder.Path = $"{basePath}__openclaw__/a2ui/";
         return builder.Uri;
     }
 
@@ -459,8 +466,8 @@ public readonly record struct ControlUiLatencySnapshot(
     public static ControlUiLatencySnapshot Success(string host, long roundtripTimeMs, string? detail = null, string? proxyPoP = null) =>
         new(ControlUiLatencyState.Success, host, roundtripTimeMs, detail, proxyPoP);
 
-    public static ControlUiLatencySnapshot Failure(string host, string? detail = null) =>
-        new(ControlUiLatencyState.Failure, host, null, detail);
+    public static ControlUiLatencySnapshot Failure(string host, string? detail = null, string? proxyPoP = null) =>
+        new(ControlUiLatencyState.Failure, host, null, detail, proxyPoP);
 
     public bool IsSuccess => State == ControlUiLatencyState.Success && RoundtripTimeMs is not null;
 }

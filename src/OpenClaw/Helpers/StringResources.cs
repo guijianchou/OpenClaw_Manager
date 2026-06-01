@@ -171,6 +171,8 @@ public static class StringResources
     public static string SettingsValidationControlUiUrlAbsolute => Get("SettingsValidationControlUiUrlAbsolute");
     public static string SettingsValidationControlUiUrlWs => Get("SettingsValidationControlUiUrlWs");
     public static string SettingsValidationControlUiUrlScheme => Get("SettingsValidationControlUiUrlScheme");
+    public static string SettingsValidationSaveFailedFormat => Get("SettingsValidationSaveFailedFormat");
+    public static string SettingsValidationSaveFailedUnknown => Get("SettingsValidationSaveFailedUnknown");
     public static string SettingsValidationGlobalHotkeyRequired => Get("SettingsValidationGlobalHotkeyRequired");
     public static string SettingsValidationGlobalHotkeyInvalid => Get("SettingsValidationGlobalHotkeyInvalid");
     public static string SettingsGeneratedEnvironmentName => Get("SettingsGeneratedEnvironmentName");
@@ -229,6 +231,7 @@ public static class StringResources
     public static string DiagnosticPathNotFound => Get("DiagnosticPathNotFound");
     public static string DiagnosticPathNotFoundDetail => Get("DiagnosticPathNotFoundDetail");
     public static string DiagnosticGatewayReturnedFormat => Get("DiagnosticGatewayReturnedFormat");
+    public static string DiagnosticCloudflareTunnelUnavailableDetail => Get("DiagnosticCloudflareTunnelUnavailableDetail");
     public static string DiagnosticGatewayReturnedServerFailureDetail => Get("DiagnosticGatewayReturnedServerFailureDetail");
     public static string DiagnosticGatewayReturnedDetail => Get("DiagnosticGatewayReturnedDetail");
     public static string DiagnosticGatewayTimeout => Get("DiagnosticGatewayTimeout");

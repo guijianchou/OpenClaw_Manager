@@ -95,39 +95,47 @@ public class DiagnosticService
         try
         {
             using var response = await SharedHttpClient.GetAsync(gatewayUrl, HttpCompletionOption.ResponseHeadersRead);
-            var statusCode = (int)response.StatusCode;
+            var classification = GatewayHttpStatusClassifier.Classify(
+                response.StatusCode,
+                response.ReasonPhrase,
+                response.Headers.TryGetValues("cf-ray", out _));
+            var statusCode = classification.StatusCode;
 
-            return statusCode switch
+            return classification.Kind switch
             {
-                >= 200 and < 300 =>
+                GatewayHttpStatusKind.Reachable =>
                     DiagnosticResult.Warn(
                         string.Format(StringResources.DiagnosticHttpReachableFormat, statusCode),
                         StringResources.DiagnosticHttpReachableDetail),
-                401 or 403 =>
+                GatewayHttpStatusKind.AccessRequired =>
                     DiagnosticResult.Warn(
                         string.Format(StringResources.DiagnosticAccessRejectedFormat, statusCode),
                         StringResources.DiagnosticAccessRejectedDetail),
-                409 =>
+                GatewayHttpStatusKind.GatewayWaitingApproval =>
                     DiagnosticResult.Warn(
                         StringResources.DiagnosticGatewayWaitingApproval,
                         StringResources.DiagnosticGatewayWaitingApprovalDetail),
-                429 =>
+                GatewayHttpStatusKind.AuthRateLimited =>
                     DiagnosticResult.Warn(
                         StringResources.DiagnosticAuthRateLimited,
                         StringResources.DiagnosticAuthRateLimitedDetail),
-                405 =>
+                GatewayHttpStatusKind.MethodRejected =>
                     DiagnosticResult.Warn(
                         StringResources.DiagnosticMethodRejected,
                         StringResources.DiagnosticMethodRejectedDetail),
-                301 or 302 or 303 or 307 or 308 =>
+                GatewayHttpStatusKind.Redirected =>
                     DiagnosticResult.Warn(
                         string.Format(StringResources.DiagnosticRedirectedFormat, statusCode),
                         StringResources.DiagnosticRedirectedDetail),
-                404 =>
+                GatewayHttpStatusKind.MissingPath =>
                     DiagnosticResult.Warn(
                         StringResources.DiagnosticPathNotFound,
                         StringResources.DiagnosticPathNotFoundDetail),
-                >= 500 =>
+                GatewayHttpStatusKind.CloudflareTunnelUnavailable =>
+                    DiagnosticResult.Fail(
+                        string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, response.ReasonPhrase),
+                        StringResources.DiagnosticCloudflareTunnelUnavailableDetail),
+                GatewayHttpStatusKind.ServerOrProxyError =>
                     DiagnosticResult.Fail(
                         string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, response.ReasonPhrase),
                         StringResources.DiagnosticGatewayReturnedServerFailureDetail),

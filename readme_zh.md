@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 5.0.0
+**当前版本：** 5.0.1
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,15 +26,17 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 5.0.0 注意事项
+## 当前 5.0.1 注意事项
 
+- `5.0.1` 针对 VPS + Cloudflare Tunnel 部署更新 Gateway/Cloudflare 状态模型：heartbeat、diagnostics 和 latency probe 现在共用同一套 HTTP 状态分类，latency probe 改为探测文档中的 `__openclaw__/a2ui/` Control UI 路径，404、405、5xx、Cloudflare Tunnel 1033 等代理或路径故障不会再显示成健康延迟。
+- Settings 持久化失败现在会回传到 Settings 对话框，不再只写日志却让对话框像保存成功一样关闭。
 - 本轮收尾继续加固 timeout / `Unavailable` 恢复路径：terminal `Unavailable` 会在 `Reconnecting` 时显示可见 InfoBar，`GatewayError` / `Unavailable` 不会让 ShellSessionCoordinator 停留在旧的 Ready/Healthy 投影，completion timeout 后迟到但仍属当前导航的成功 completion 会重新建立 navigation cancellation ownership 并继续正常 page-token/probe 路径。
 - 动态 WebView 重建如果抛出异常，会显示本地化的可操作错误和 Retry，而不是在 timeout recovery 先隐藏 InfoBar 后只写日志。
 - 迟到但已恢复的导航现在也能取消已经排队、延后或正在执行的 timeout-only WebView 重建，避免重建流程拆掉已经恢复的 WebView。
 - WebView2 子控件 layout timeout 会计入 recreation circuit breaker，不再无限重试。
 - WebView detach / recreation 和资源 probe stop 会同步清理顶部可见状态，避免旧 `HB OK`、ping、`AUTH OK`、`LIVE` / `IDLE` 或 MODEL 看起来仍属于当前会话。
 
-- `5.0.0` 是当前重构验证分支的元数据。v3.3.6 架构清理仍是本分支 review baseline；这不表示要改写 [changelog.md](changelog.md) 中历史 `v3.0.5` / `v3.0.1` / `v3.0.0` 发布条目。
+- `5.0.0` 保留为上一轮重构验证基线。v3.3.6 架构清理仍是本分支 review baseline；这不表示要改写 [changelog.md](changelog.md) 中历史 `v3.0.5` / `v3.0.1` / `v3.0.0` 发布条目。
 - [docs/code-style.md](docs/code-style.md) 是本分支统一的代码规范和架构边界入口。
 - solution 会把当前 `x64`/`x86`/`ARM64` solution platform 下的 `OpenClaw.Core` 映射到 Core project 自身的平台无关 `AnyCPU` 配置，避免 VS2026 打开 Debug/Release x64 时要求手动修 Configuration Manager。
 - 默认的 `https://example.com` 环境会被当作首次运行占位符，而不是真实 Control UI。选中该环境时，MainWindow 会跳过 WebView2 host 创建、停止 heartbeat/latency probe、清理旧 WebView host，并显示本地化的“请在设置中配置 Gateway URL”状态，不会继续导航到 `example.com` 或让 loading ring 保持转圈。
@@ -51,7 +53,7 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 动态 WebView 重建现在会等待 window shell、host panel 和新 WebView2 子控件都可见且尺寸非零后才初始化/导航；compact、隐藏到托盘或最小化启动状态会延后重建且不丢失原始的高优先级原因，WebView2 子控件 layout timeout 会通过正常 recreation timer/circuit-breaker 路径重新排队，避免一直等下一个窗口事件；延后重建归属也由 `WebViewRecreationService` 持有，不再对不可呈现的 WebView 发起导航并在 12 秒后触发 start watchdog。
 - Hosted bridge 的 session/status 消息使用 host generation 和 owner/page-token 归属校验，不再依赖 CoreWebView2 wrapper reference identity，避免 WebView2 暴露不同 COM wrapper 对象时吞掉有效的 `session-ready` 或 status post。
 - WebView process failure 会先退休 navigation retry/replay cancellation，再发布 unavailable 状态；注入式 ViewModel UI 更新会捕获并记录回调异常，避免 dispatcher 回调变成 UI 线程未处理异常。
-- Gateway heartbeat 会把 5xx、缺失 Control UI 路径的 404、heartbeat probe 被拒绝的 405 和未预期 4xx transport 响应识别为失败，也会把 hosted-session inspection `Unavailable` 识别为失败，避免页面 bridge/status probe 不可用时误回落到健康 HTTP transport；并在 stop/restart 后拒绝旧 heartbeat run 的观察和 recovery 请求，触发 recovery 前只会停掉当前 run，同时保持自己接管的 `Reconnecting`/`Unavailable` hosted-session 状态继续跑 heartbeat；heartbeat loop 会离开调用线程调度，同时启动时会先发布一次即时观察，再进入周期探测；native 接受 page-token 后也可以请求 hosted `session-ready` replay。
+- Gateway heartbeat、diagnostics 和 latency probe 现在为 Cloudflare Tunnel / 反向代理部署共用 Gateway HTTP 状态分类。Heartbeat 会把代理、路径和服务端故障识别为失败，把设备 approval 或限流响应识别为需要用户动作的 session-blocked 状态，并把 hosted-session inspection `Unavailable` 当作失败而不是回落到健康 HTTP transport；latency probe 使用文档中的 `__openclaw__/a2ui/` Control UI 路径，且不会把 404/405/5xx/1033 响应记录为健康延迟样本。
 - ShellSessionCoordinator 的 recovery work 现在覆盖 event gap、stale-busy recovery、heartbeat-triggered recovery、foreground resume、in-page bridge command 和 UI-dispatched reload 的取消链；public recovery request 会先把调用方 cancellation token 链接到当前 operation，再排队 inspection、bridge command 或 reload；attach/detach/reset/dispose 会在替换 WebView 或 bridge 服务前取消 pending work，避免旧 recovery 决策写到新的 hosted session。
 - Settings 中的全局热键、Always on Top 和多实例行为保存后会影响当前进程；Settings 保存只合并当前打开对话框中实际编辑过的字段，避免 stale snapshot 覆盖外部 Pin、hotkey 或 environment 变更，并且 two-way binding 初始化时的同值写回不会把字段误标为 dirty；多实例 listener 变更会走被观察的异步路径，Settings 保存不会同步等待 named-pipe shutdown，二次启动的 primary 激活和失败接管等待也走异步路径，并共用一个有界接管 deadline，避免重新启动接力卡住启动线程；跨进程 single-instance lock 使用 named semaphore，并且 shutdown 会等待 named-pipe listener 停止后再释放所有权；compact mode 使用 visual states 并在 480px 折叠非必要固定宽度顶栏段，compact 下 loading ring 会保持折叠，同时会按当前显示器 work area 校验已保存的 compact 位置；Log Viewer 和 latency probe 的 refresh/stop 竞态也已通过 run-id 和 selected-host 校验加固；长耗时 async command 运行中会拒绝重复触发，诊断包导出的日志枚举/zip 压缩移出 UI 线程，非当前环境的 WebView2 profile 删除也改到后台线程执行。
 - 当前 checkpoint 有意不保留本地 C# 回归 harness；本地自动验证由 restore/build/format、仓库 guardrail、bridge script checks、空白差异检查和 VS2026 manual debug 组成。

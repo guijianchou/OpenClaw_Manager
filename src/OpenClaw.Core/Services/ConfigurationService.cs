@@ -126,7 +126,7 @@ public class ConfigurationService
     /// <summary>
     /// Saves current settings to disk.
     /// </summary>
-    public void Save()
+    public SettingsWriteResult Save()
     {
         lock (_lock)
         {
@@ -136,10 +136,12 @@ public class ConfigurationService
                 Directory.CreateDirectory(_appDataFolder);
                 var json = JsonSerializer.Serialize(Settings, AppSettingsJsonContext.Default.AppSettings);
                 _writeAllText(_settingsFilePath, json);
+                return SettingsWriteResult.Success();
             }
             catch (Exception ex)
             {
                 _logger.Error($"Failed to save settings: {ex.Message}");
+                return SettingsWriteResult.Failure(ex.Message);
             }
         }
     }
@@ -200,11 +202,12 @@ public class ConfigurationService
                 }
 
                 await Task.Delay(_deferredSaveDelay, token).ConfigureAwait(false);
-                Save();
+                var saveResult = Save();
                 _logger.Info("settings.save_deferred.flushed", new
                 {
                     requests = DeferredSaveRequests,
-                    coalesced = DeferredSaveCoalescedRequests
+                    coalesced = DeferredSaveCoalescedRequests,
+                    saveResult.Succeeded
                 });
 
                 if (TryCompleteDeferredSaveBatch(cancellation, versionToFlush.Value))
@@ -352,11 +355,12 @@ public class ConfigurationService
             return;
         }
 
-        Save();
+        var saveResult = Save();
         _logger.Info("settings.save_deferred.flush_on_shutdown", new
         {
             requests = DeferredSaveRequests,
-            coalesced = DeferredSaveCoalescedRequests
+            coalesced = DeferredSaveCoalescedRequests,
+            saveResult.Succeeded
         });
     }
 

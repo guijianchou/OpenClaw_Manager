@@ -8,6 +8,14 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v5.0.1 (2026-06-01)
+
+- Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.0.1`.
+- Unified Gateway HTTP status classification across heartbeat, diagnostics, and latency probes for Cloudflare Tunnel / reverse-proxy deployments. Proxy, path, server, and Cloudflare Tunnel 1033 failures now report as failures instead of healthy transport or latency samples.
+- Moved Control UI latency probing to the documented `__openclaw__/a2ui/` hosted Control UI path and stopped recording 404/405/5xx/1033 responses in latency history.
+- Surfaced Settings persistence failures back to the Settings dialog so file-lock, permission, disk, or atomic-write failures no longer close the dialog as if settings were saved.
+- Added repository guardrails that prevent reverting latency probes to the stale `control-ui-config.json` path, prevent unclassified HTTP success publishing, and require Settings write failures to flow through the persistence adapter.
+
 ### v5.0.0 (2026-05-29)
 
 - Hardened terminal hosted-session failure projection: `Unavailable` snapshots now show a visible InfoBar while reconnecting, `GatewayError`/`Unavailable` move ShellSessionCoordinator out of stale Ready/Healthy recovery state, and WebView recreation exceptions surface a localized actionable error instead of only logging after timeout recovery hid the InfoBar.
@@ -286,6 +294,14 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v5.0.1 (2026-06-01)
+
+- 将 app、assembly、file、package manifest、application manifest、README、中文 README 和 changelog 元数据同步到 `5.0.1`。
+- 为 Cloudflare Tunnel / 反向代理部署统一 Gateway HTTP 状态分类，heartbeat、diagnostics 和 latency probe 共用同一套语义；代理、路径、服务端和 Cloudflare Tunnel 1033 故障现在会报告为失败，而不是健康 transport 或健康延迟样本。
+- 将 Control UI latency probe 改到文档中的 `__openclaw__/a2ui/` 托管 Control UI 路径，并停止把 404/405/5xx/1033 响应写入 latency history。
+- Settings 持久化失败现在会回传到 Settings 对话框；文件锁定、权限、磁盘或原子写入失败不会再让对话框像保存成功一样关闭。
+- 新增仓库 guardrail，防止 latency probe 回退到旧 `control-ui-config.json` 路径、防止未分类 HTTP 状态被发布为成功，并要求 Settings 写入失败经由 persistence adapter 传回 UI。
 
 ### v5.0.0 (2026-05-29)
 

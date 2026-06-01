@@ -386,7 +386,15 @@ public class SettingsViewModel : INotifyPropertyChanged
             SyncRenamedEnvironmentProfiles();
         }
 
-        _settingsPersistence.Save();
+        var saveResult = _settingsPersistence.Save();
+        if (!saveResult.Succeeded)
+        {
+            ValidationMessage = string.Format(
+                StringResources.SettingsValidationSaveFailedFormat,
+                saveResult.ErrorMessage ?? StringResources.SettingsValidationSaveFailedUnknown);
+            return false;
+        }
+
         ValidationMessage = StringResources.SettingsValidationDefaultMessage;
         var afterLiveSettings = LiveShellSettings.From(settings);
         result = new SettingsSaveResult(

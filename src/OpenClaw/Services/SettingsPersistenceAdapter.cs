@@ -17,14 +17,31 @@ internal sealed class SettingsPersistenceAdapter
 
     public AppSettings Current => _configuration.Settings;
 
-    public void Save()
+    public SettingsPersistenceSaveResult Save()
     {
-        _configuration.Save();
-        _logger.Info("Settings saved.");
+        var result = _configuration.Save();
+        if (result.Succeeded)
+        {
+            _logger.Info("Settings saved.");
+            return SettingsPersistenceSaveResult.Success();
+        }
+
+        var message = string.IsNullOrWhiteSpace(result.ErrorMessage)
+            ? "Unknown settings write failure."
+            : result.ErrorMessage;
+        _logger.Error($"Settings save failed: {message}");
+        return SettingsPersistenceSaveResult.Failure(message);
     }
 
     public EnvironmentConfig? GetSelectedEnvironment()
     {
         return _configuration.GetSelectedEnvironment();
     }
+}
+
+internal readonly record struct SettingsPersistenceSaveResult(bool Succeeded, string? ErrorMessage)
+{
+    public static SettingsPersistenceSaveResult Success() => new(true, null);
+
+    public static SettingsPersistenceSaveResult Failure(string errorMessage) => new(false, errorMessage);
 }

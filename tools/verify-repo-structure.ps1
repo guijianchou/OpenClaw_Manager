@@ -104,7 +104,7 @@ foreach ($linkedCompileItem in $linkedCompileItems) {
     }
 }
 
-$currentVersion = '5.0.0'
+$currentVersion = '5.0.1'
 $currentFileVersion = "$currentVersion.0"
 if ($project -notmatch [regex]::Escape("<Version>$currentVersion</Version>") -or
     $project -notmatch [regex]::Escape("<AssemblyVersion>$currentFileVersion</AssemblyVersion>") -or
@@ -307,6 +307,13 @@ if ($latencyService -notmatch '_probeTask' -or
     throw 'ControlUiLatencyService stop paths must cancel active probes, reject stale publications, preserve first-failure state, log start/result diagnostics, and let the observed probe task dispose CTS/timer resources.'
 }
 
+if ($latencyService -match 'control-ui-config\.json' -or
+    $latencyService -notmatch '__openclaw__/a2ui/' -or
+    $latencyService -notmatch 'GatewayHttpStatusClassifier\.Classify' -or
+    $latencyService -match 'ControlUiLatencySnapshot\.Success\([\s\S]*HTTP \{\(int\)response\.StatusCode\}') {
+    throw 'Control UI latency probes must target the documented Gateway A2UI HTTP path and classify HTTP status before publishing success.'
+}
+
 $singleInstanceCoordinator = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/SingleInstanceCoordinator.cs') -Raw
 $app = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/App.xaml.cs') -Raw
 
@@ -368,10 +375,8 @@ if ($heartbeat -match 'HttpClient|new\(\) \{ Timeout = TimeSpan\.FromSeconds\(10
 }
 
 $gatewayHeartbeatTransport = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/GatewayHeartbeatTransport.cs') -Raw
-if ($gatewayHeartbeatTransport -notmatch '>= 500 => HeartbeatProbeResult\.Failure' -or
-    $gatewayHeartbeatTransport -notmatch '404 => HeartbeatProbeResult\.Failure' -or
-    $gatewayHeartbeatTransport -notmatch '405 => HeartbeatProbeResult\.Failure' -or
-    $gatewayHeartbeatTransport -notmatch '_ => HeartbeatProbeResult\.Failure') {
+if ($gatewayHeartbeatTransport -notmatch 'GatewayHttpStatusClassifier\.Classify' -or
+    $gatewayHeartbeatTransport -match 'statusCode switch') {
     throw 'Gateway heartbeat transport must classify Cloudflare/proxy 5xx, missing Control UI paths, rejected probes, and unexpected responses as failures.'
 }
 
@@ -1107,6 +1112,15 @@ if ($settingsPersistenceAdapter -match 'App\.Configuration|App\.Logger') {
     throw 'SettingsPersistenceAdapter must receive ConfigurationService and logger explicitly.'
 }
 
+$settingsViewModel = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/SettingsViewModel.cs') -Raw
+if ($settingsPersistenceAdapter -notmatch 'public SettingsPersistenceSaveResult Save\(\)' -or
+    $settingsPersistenceAdapter -match 'void Save\(\)' -or
+    $settingsViewModel -notmatch 'var saveResult = _settingsPersistence\.Save\(\)' -or
+    $settingsViewModel -notmatch 'if \(!saveResult\.Succeeded\)' -or
+    $settingsViewModel -match '_settingsPersistence\.Save\(\);\s*ValidationMessage') {
+    throw 'Settings save failures must flow from persistence to SettingsViewModel instead of being reported as successful saves.'
+}
+
 $configurationService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/ConfigurationService.cs') -Raw
 if ($configurationService -match '_ = Task\.Run\(ProcessDeferredSaveQueueAsync\)' -or
     $configurationService -match 'Interlocked\.CompareExchange\(ref _saveQueued' -or
@@ -1119,6 +1133,13 @@ if ($configurationService -match '_ = Task\.Run\(ProcessDeferredSaveQueueAsync\)
     $configurationService -notmatch 'ProcessDeferredSaveQueueAsync\(CancellationToken' -or
     $configurationService -notmatch 'ObserveDeferredSaveWorkerShutdownAsync') {
     throw 'ConfigurationService deferred-save worker must own and cancel its task, and serialize coalesced save versions under one lifetime gate.'
+}
+
+if ($configurationService -notmatch 'public SettingsWriteResult Save\(\)' -or
+    $configurationService -notmatch 'return SettingsWriteResult\.Success' -or
+    $configurationService -notmatch 'return SettingsWriteResult\.Failure' -or
+    $configurationService -match 'public void Save\(\)') {
+    throw 'ConfigurationService.Save must return a write result so callers can surface persistence failures.'
 }
 
 $settingsDialogShared = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Views/SettingsDialog.Shared.cs') -Raw

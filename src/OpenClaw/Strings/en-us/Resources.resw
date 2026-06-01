@@ -347,6 +347,12 @@
   <data name="SettingsValidationControlUiUrlScheme" xml:space="preserve">
     <value>Control UI URL must use http or https.</value>
   </data>
+  <data name="SettingsValidationSaveFailedFormat" xml:space="preserve">
+    <value>Failed to save settings: {0}</value>
+  </data>
+  <data name="SettingsValidationSaveFailedUnknown" xml:space="preserve">
+    <value>unknown write error</value>
+  </data>
   <data name="SettingsGeneratedEnvironmentName" xml:space="preserve">
     <value>Environment {0}</value>
   </data>
@@ -509,6 +515,9 @@
   </data>
   <data name="DiagnosticGatewayReturnedFormat" xml:space="preserve">
     <value>Gateway returned {0} {1}</value>
+  </data>
+  <data name="DiagnosticCloudflareTunnelUnavailableDetail" xml:space="preserve">
+    <value>Cloudflare could not reach a connected cloudflared tunnel for this hostname. Confirm cloudflared is running on the VPS, the tunnel route points at the Gateway service, and the public hostname matches the Control UI URL.</value>
   </data>
   <data name="DiagnosticGatewayReturnedServerFailureDetail" xml:space="preserve">
     <value>The remote endpoint is responding with a server-side failure before the hosted UI can establish its session.</value>

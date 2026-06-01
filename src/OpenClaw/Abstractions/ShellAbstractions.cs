@@ -3,6 +3,8 @@
 // These isolate the generic shell/hosting concepts from OpenClaw-specific logic,
 // enabling potential reuse in OpenClaw Control or other WebView2-based shells.
 
+using OpenClaw.Models;
+
 namespace OpenClaw.Abstractions;
 
 /// <summary>
@@ -64,5 +66,5 @@ public interface IConfigurationStore<T> where T : class, new()
 {
     T Settings { get; }
     void Load();
-    void Save();
+    SettingsWriteResult Save();
 }

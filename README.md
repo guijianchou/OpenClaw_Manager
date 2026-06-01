@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
-**Current version:** 5.0.0
+**Current version:** 5.0.1
 
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
@@ -26,9 +26,11 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
-## Current 5.0.0 Notes
+## Current 5.0.1 Notes
 
-- `5.0.0` is the active refactor-validation branch metadata. The v3.3.6 cleanup remains the reviewed baseline; this is not intended to rewrite the historical `v3.0.5` / `v3.0.1` / `v3.0.0` release entries in [changelog.md](changelog.md).
+- `5.0.1` updates the Gateway/Cloudflare status model for VPS deployments behind Cloudflare Tunnel: heartbeat, diagnostics, and latency probes now share one HTTP status classifier, the latency probe targets the documented `__openclaw__/a2ui/` Control UI path, and proxy/path failures such as 404, 405, 5xx, and Cloudflare Tunnel 1033 no longer publish as healthy latency.
+- Settings persistence failures now flow back to the Settings dialog instead of being logged while the dialog closes as if the save succeeded.
+- `5.0.0` remains the previous refactor-validation baseline. The v3.3.6 cleanup remains the reviewed baseline; this is not intended to rewrite the historical `v3.0.5` / `v3.0.1` / `v3.0.0` release entries in [changelog.md](changelog.md).
 - [docs/code-style.md](docs/code-style.md) is the canonical code-style and architecture guide for this branch.
 - The solution maps `OpenClaw.Core` from the active `x64`/`x86`/`ARM64` solution platform to the Core project's platform-independent `AnyCPU` configuration, so VS2026 can load Debug/Release x64 without configuration-manager repair.
 - The default `https://example.com` environment is treated as a first-run placeholder, not as a real Control UI. While it is selected, MainWindow skips WebView2 host creation, stops heartbeat/latency probes, clears any previous WebView host, and shows the localized "Configure a Gateway URL in Settings" status instead of navigating to `example.com` or leaving the loading ring active.
@@ -46,7 +48,7 @@ It is best suited for users who:
 - WebView detach/recreation and resource-stop paths now reset visible heartbeat, latency, MODEL, access, work, and shell projections before the replacement session reports state, so a stopped probe or failed recreation cannot leave stale `HB OK`, ping, `AUTH OK`, `LIVE`/`IDLE`, or previous MODEL values visible as if the old session were still current.
 - Hosted bridge session/status messages use host-generation and owner/page-token ownership checks instead of CoreWebView2 wrapper reference identity, so valid `session-ready` and status posts are not dropped because WebView2 exposes a different COM wrapper object.
 - WebView process failures retire navigation retry/replay cancellation before publishing the unavailable state, and injected ViewModel UI updates catch/log callback failures so dispatcher callbacks do not escape as unhandled UI-thread exceptions.
-- Gateway heartbeat now treats 5xx, missing Control UI 404, rejected heartbeat-probe 405, and unexpected 4xx transport responses as failures, treats hosted-session inspection `Unavailable` as a failure instead of falling through to healthy HTTP transport, rejects stale heartbeat-run observations after stop/restart, stops only the current run before recovery, keeps heartbeat alive for owned `Reconnecting`/`Unavailable` hosted-session states, schedules heartbeat loops off the caller thread while still publishing an immediate first observation on heartbeat start, and can replay hosted `session-ready` after native page-token acceptance.
+- Gateway heartbeat, diagnostics, and latency probes now share Gateway HTTP status classification for Cloudflare Tunnel and reverse-proxy deployments. Heartbeat treats proxy/path/server failures as failures, device approval or rate-limit responses as session-blocked user-action states, and hosted-session inspection `Unavailable` as a failure instead of falling through to healthy HTTP transport; latency probes use the documented `__openclaw__/a2ui/` Control UI path and do not record 404/405/5xx/1033 responses as healthy samples.
 - ShellSessionCoordinator recovery work is cancellable across event gaps, stale-busy recovery, heartbeat-triggered recovery, foreground resume, in-page bridge commands, and UI-dispatched reloads; public recovery requests link caller cancellation into the active operation before queueing inspections, bridge commands, or reloads, and attach/detach/reset/dispose cancels pending work before replacing WebView or bridge services so old recovery decisions cannot run against a new hosted session.
 - Settings changes for global hotkey, always-on-top, and multiple-instance behavior apply to the running process; Settings save merges only fields edited in the open dialog so stale snapshots do not overwrite live Pin/hotkey/environment changes, same-value two-way binding writes do not mark settings fields dirty, multiple-instance listener changes are observed asynchronously so Settings save does not wait on named-pipe shutdown, secondary-launch activation/takeover waits are async and share one bounded takeover deadline so relaunch handoff does not block startup, and the cross-process single-instance lock uses a named semaphore while shutdown waits for the named-pipe listener to stop before releasing ownership; compact mode uses visual states that collapse nonessential fixed-width top-bar segments at 480px, keeps the loading ring collapsed while compact, and validates saved compact positions against current display work areas; Log Viewer plus latency-probe refresh/stop races are guarded with run-id and selected-host checks; long-running async commands reject repeat activation while running, diagnostic bundle export moves log enumeration/zip work off the UI thread, and inactive WebView2 profile deletion runs on a background thread.
 - The local C# regression harness is intentionally absent in this checkpoint; active local verification is restore/build/format, repository guardrails, bridge script checks, whitespace checks, and VS2026 manual debug.
