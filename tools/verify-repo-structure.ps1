@@ -16,13 +16,13 @@ if ($solution -match 'OpenClaw\.Tests|tests\\OpenClaw\.Tests') {
 $coreProjectId = '{BC4C7184-C8DD-4748-AC82-D26123568BD1}'
 $coreProject = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/OpenClaw.Core.csproj') -Raw
 if ($coreProject -match '<Platforms>') {
-        throw 'OpenClaw.Core.csproj must stay platform-independent. Do not declare x64/x86/ARM64 platforms on the pure SDK class library; map solution platforms to Debug/Release|AnyCPU instead.'
+        throw 'OpenClaw.Core.csproj must stay platform-independent. Do not declare x64/x86/ARM64 platforms on the pure SDK class library; map solution platforms to Debug/Release|Any CPU instead.'
 }
 
 $coreSolutionMappingPattern = [regex]::Escape($coreProjectId) + '\.(Debug|Release)\|(x64|x86|ARM64)\.(ActiveCfg|Build\.0) = (Debug|Release)\|([^`\r\n]+)'
 foreach ($coreSolutionMapping in [regex]::Matches($solution, $coreSolutionMappingPattern)) {
-    if ($coreSolutionMapping.Groups[5].Value -ne 'AnyCPU') {
-        throw "OpenClaw.Core solution platform mappings must target the pure class-library AnyCPU configuration; invalid mapping: $($coreSolutionMapping.Value)"
+    if ($coreSolutionMapping.Groups[5].Value -ne 'Any CPU') {
+        throw "OpenClaw.Core solution platform mappings must target the pure class-library Any CPU configuration; invalid mapping: $($coreSolutionMapping.Value)"
     }
 }
 
@@ -31,15 +31,15 @@ foreach ($coreSolutionMapping in [regex]::Matches($solution, $allCoreSolutionMap
     if ($coreSolutionMapping.Groups['configuration'].Value -notin @('Debug', 'Release') -or
         $coreSolutionMapping.Groups['projectConfiguration'].Value -ne $coreSolutionMapping.Groups['configuration'].Value -or
         $coreSolutionMapping.Groups['solutionPlatform'].Value -notin @('x64', 'x86', 'ARM64') -or
-        $coreSolutionMapping.Groups['projectPlatform'].Value -ne 'AnyCPU') {
-        throw "OpenClaw.Core solution mappings must map Debug/Release x64/x86/ARM64 solution platforms to the matching Debug/Release|AnyCPU project configuration: $($coreSolutionMapping.Value)"
+        $coreSolutionMapping.Groups['projectPlatform'].Value -ne 'Any CPU') {
+        throw "OpenClaw.Core solution mappings must map Debug/Release x64/x86/ARM64 solution platforms to the matching Debug/Release|Any CPU project configuration: $($coreSolutionMapping.Value)"
     }
 }
 
 foreach ($configuration in @('Debug', 'Release')) {
     foreach ($platform in @('x64', 'x86', 'ARM64')) {
         foreach ($mapping in @('ActiveCfg', 'Build.0')) {
-            $expectedCoreMapping = "$coreProjectId.$configuration|$platform.$mapping = $configuration|AnyCPU"
+            $expectedCoreMapping = "$coreProjectId.$configuration|$platform.$mapping = $configuration|Any CPU"
             if ($solution -notmatch [regex]::Escape($expectedCoreMapping)) {
                 throw "OpenClaw.Core solution platform mapping is missing or invalid: $expectedCoreMapping"
             }
