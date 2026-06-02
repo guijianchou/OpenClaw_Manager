@@ -8,16 +8,23 @@ public static class WindowBoundsUtilities
     public const int DefaultWindowHeight = 800;
     public const int MinimumPersistedWindowWidth = 640;
     public const int MinimumPersistedWindowHeight = 480;
+    public const int DefaultSettingsWindowWidth = 720;
+    public const int DefaultSettingsWindowHeight = 520;
+    public const int MinimumPersistedSettingsWindowWidth = 360;
+    public const int MinimumPersistedSettingsWindowHeight = 240;
 
     private const int HiddenWindowCoordinateThreshold = -30000;
     private const int MinimumVisibleWidth = 96;
     private const int MinimumVisibleHeight = 64;
 
     public static bool HasPersistableSize(double width, double height) =>
+        HasPersistableSize(width, height, MinimumPersistedWindowWidth, MinimumPersistedWindowHeight);
+
+    public static bool HasPersistableSize(double width, double height, int minimumWidth, int minimumHeight) =>
         IsFinite(width) &&
         IsFinite(height) &&
-        width >= MinimumPersistedWindowWidth &&
-        height >= MinimumPersistedWindowHeight;
+        width >= minimumWidth &&
+        height >= minimumHeight;
 
     public static bool HasMinimizedSentinelPosition(double left, double top) =>
         IsFinite(left) &&
@@ -31,8 +38,14 @@ public static class WindowBoundsUtilities
         top != -1 &&
         !HasMinimizedSentinelPosition(left, top);
 
-    public static bool CanPersistWindowBounds(int left, int top, int width, int height) =>
-        HasPersistableSize(width, height) &&
+    public static bool CanPersistWindowBounds(
+        int left,
+        int top,
+        int width,
+        int height,
+        int minimumWidth = MinimumPersistedWindowWidth,
+        int minimumHeight = MinimumPersistedWindowHeight) =>
+        HasPersistableSize(width, height, minimumWidth, minimumHeight) &&
         !HasMinimizedSentinelPosition(left, top);
 
     public static bool IsVisibleWithinAnyWorkArea(

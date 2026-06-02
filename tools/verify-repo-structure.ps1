@@ -1152,6 +1152,23 @@ if ($settingsDialogTheme -notmatch 'ReloadFromCurrentSettings') {
     throw 'Prewarmed SettingsDialog must reload its ViewModel from current persisted settings before activation.'
 }
 
+$appSettings = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Models/AppSettings.cs') -Raw
+$settingsDialogInitialization = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Views/SettingsDialog.Initialization.cs') -Raw
+if ($appSettings -notmatch 'SettingsWindowWidth' -or
+    $appSettings -notmatch 'SettingsWindowHeight' -or
+    $appSettings -notmatch 'SettingsWindowLeft' -or
+    $appSettings -notmatch 'SettingsWindowTop' -or
+    $configurationService -notmatch 'NormalizeSettingsWindowBounds' -or
+    $settingsDialogInitialization -notmatch 'RestoreSettingsWindowBounds' -or
+    $settingsDialogInitialization -notmatch 'SaveSettingsWindowBounds' -or
+    $settingsDialogInitialization -notmatch 'WindowFrameHelper\.TryGetWindowRect' -or
+    $settingsDialogInitialization -notmatch 'WindowFrameHelper\.TrySetWindowRect' -or
+    $settingsDialogInitialization -notmatch 'WindowFrameHelper\.IsNativeWindowRectVisibleWithinAnyMonitor' -or
+    $settingsDialogInitialization -notmatch 'WindowFrameHelper\.TryCenterNativeWindowRectInNearestMonitor' -or
+    $settingsDialogInitialization -notmatch 'WindowBoundsUtilities\.CanPersistWindowBounds') {
+    throw 'SettingsDialog must persist and restore its own window bounds instead of reopening at the default size and position.'
+}
+
 $compact = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.CompactMode.cs') -Raw
 if ($compact -match 'TopStatusPill\.MinWidth|ModelStatusSegment\.MinWidth|EnvironmentSummaryGroup\.Visibility|LatencyBadge\.Visibility') {
     throw 'Compact top-bar layout should be driven by XAML visual states, not code-behind property patching.'

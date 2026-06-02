@@ -15,6 +15,7 @@ public sealed partial class SettingsDialog
     private const string SessionsPanelTag = "Sessions";
     private const string DevToolsPanelTag = "DevTools";
     private bool _hasPerformedInitialTitleBarRefresh;
+    private bool _hasRestoredSettingsBoundsAfterActivation;
     private bool _isDarkThemeActive;
     private bool _isSyncingLanguageSelection;
     private readonly SettingsPersistenceAdapter _settingsPersistence;

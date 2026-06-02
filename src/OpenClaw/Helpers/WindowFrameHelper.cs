@@ -29,6 +29,7 @@ internal static class WindowFrameHelper
     private const int ShowWindowHide = 0;
     private const int ShowWindowShowNormal = 1;
     private const int ShowWindowRestore = 9;
+    private const uint MonitorDefaultToNearest = 0x00000002;
     private static readonly IntPtr WindowTopMost = new(-1);
     private static readonly IntPtr WindowNoTopMost = new(-2);
 
@@ -210,6 +211,71 @@ internal static class WindowFrameHelper
         return hwnd != IntPtr.Zero && IsIconic(hwnd);
     }
 
+    public static bool TryGetWindowRect(Window window, out int left, out int top, out int width, out int height)
+    {
+        left = 0;
+        top = 0;
+        width = 0;
+        height = 0;
+
+        var hwnd = WindowNative.GetWindowHandle(window);
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var rect))
+        {
+            return false;
+        }
+
+        left = rect.Left;
+        top = rect.Top;
+        width = rect.Right - rect.Left;
+        height = rect.Bottom - rect.Top;
+        return true;
+    }
+
+    public static bool TrySetWindowRect(Window window, int left, int top, int width, int height)
+    {
+        var hwnd = WindowNative.GetWindowHandle(window);
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        return SetWindowPos(
+            hwnd,
+            IntPtr.Zero,
+            left,
+            top,
+            width,
+            height,
+            SetWindowPosNoZOrder | SetWindowPosNoActivate);
+    }
+
+    public static bool IsNativeWindowRectVisibleWithinAnyMonitor(int left, int top, int width, int height) =>
+        WindowBoundsUtilities.IsVisibleWithinAnyWorkArea(left, top, width, height, GetNativeMonitorWorkAreas());
+
+    public static bool TryCenterNativeWindowRectInNearestMonitor(
+        int left,
+        int top,
+        int width,
+        int height,
+        out int centeredLeft,
+        out int centeredTop)
+    {
+        centeredLeft = 0;
+        centeredTop = 0;
+
+        var rect = new NativeRect
+        {
+            Left = left,
+            Top = top,
+            Right = left + width,
+            Bottom = top + height,
+        };
+        var monitor = MonitorFromRect(ref rect, MonitorDefaultToNearest);
+        return monitor != IntPtr.Zero &&
+            TryGetMonitorWorkArea(monitor, out var workArea) &&
+            WindowBoundsUtilities.TryCenterInWorkArea(width, height, workArea, out centeredLeft, out centeredTop);
+    }
+
     public static void HideWindow(Window window)
     {
         var hwnd = WindowNative.GetWindowHandle(window);
@@ -353,6 +419,50 @@ internal static class WindowFrameHelper
         DwmFlush();
     }
 
+    private static IReadOnlyList<WindowWorkArea> GetNativeMonitorWorkAreas()
+    {
+        var workAreas = new List<WindowWorkArea>();
+        EnumDisplayMonitors(
+            IntPtr.Zero,
+            IntPtr.Zero,
+            (monitor, _, _, _) =>
+            {
+                if (TryGetMonitorWorkArea(monitor, out var workArea))
+                {
+                    workAreas.Add(workArea);
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+        return workAreas;
+    }
+
+    private static bool TryGetMonitorWorkArea(IntPtr monitor, out WindowWorkArea workArea)
+    {
+        workArea = default;
+        var monitorInfo = new NativeMonitorInfo
+        {
+            Size = Marshal.SizeOf<NativeMonitorInfo>(),
+        };
+
+        if (!GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            return false;
+        }
+
+        var rect = monitorInfo.WorkArea;
+        var width = rect.Right - rect.Left;
+        var height = rect.Bottom - rect.Top;
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        workArea = new WindowWorkArea(rect.Left, rect.Top, width, height);
+        return true;
+    }
+
     private static uint ToColorRef(Windows.UI.Color color)
     {
         return (uint)(color.R | (color.G << 8) | (color.B << 16));
@@ -397,6 +507,25 @@ internal static class WindowFrameHelper
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplayMonitors(
+        IntPtr hdc,
+        IntPtr lprcClip,
+        MonitorEnumProc lpfnEnum,
+        IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect(ref NativeRect lprc, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref NativeMonitorInfo lpmi);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     [DllImport("user32.dll")]
@@ -405,6 +534,28 @@ internal static class WindowFrameHelper
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmFlush();
+
+    private delegate bool MonitorEnumProc(
+        IntPtr hMonitor,
+        IntPtr hdcMonitor,
+        IntPtr lprcMonitor,
+        IntPtr dwData);
+
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    private struct NativeMonitorInfo
+    {
+        public int Size;
+        public NativeRect MonitorArea;
+        public NativeRect WorkArea;
+        public uint Flags;
+    }
 }
 
 internal readonly record struct WindowThemePalette

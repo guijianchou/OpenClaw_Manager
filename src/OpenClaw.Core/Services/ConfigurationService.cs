@@ -421,6 +421,7 @@ public class ConfigurationService
         }
 
         changed |= NormalizeWindowBounds(settings);
+        changed |= NormalizeSettingsWindowBounds(settings);
 
         var normalizedHeartbeatInterval = Math.Max(0, settings.Heartbeat.IntervalSeconds);
         changed |= normalizedHeartbeatInterval != settings.Heartbeat.IntervalSeconds;
@@ -497,6 +498,33 @@ public class ConfigurationService
         {
             settings.WindowLeft = -1;
             settings.WindowTop = -1;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool NormalizeSettingsWindowBounds(AppSettings settings)
+    {
+        if (!WindowBoundsUtilities.HasPersistableSize(
+                settings.SettingsWindowWidth,
+                settings.SettingsWindowHeight,
+                WindowBoundsUtilities.MinimumPersistedSettingsWindowWidth,
+                WindowBoundsUtilities.MinimumPersistedSettingsWindowHeight) ||
+            WindowBoundsUtilities.HasMinimizedSentinelPosition(settings.SettingsWindowLeft, settings.SettingsWindowTop))
+        {
+            settings.SettingsWindowWidth = WindowBoundsUtilities.DefaultSettingsWindowWidth;
+            settings.SettingsWindowHeight = WindowBoundsUtilities.DefaultSettingsWindowHeight;
+            settings.SettingsWindowLeft = -1;
+            settings.SettingsWindowTop = -1;
+            return true;
+        }
+
+        if (!WindowBoundsUtilities.HasSavedPosition(settings.SettingsWindowLeft, settings.SettingsWindowTop) &&
+            (settings.SettingsWindowLeft != -1 || settings.SettingsWindowTop != -1))
+        {
+            settings.SettingsWindowLeft = -1;
+            settings.SettingsWindowTop = -1;
             return true;
         }
 

@@ -40,6 +40,26 @@ public class AppSettings
     public double WindowTop { get; set; } = -1;
 
     /// <summary>
+    /// Gets or sets the remembered Settings window width.
+    /// </summary>
+    public double SettingsWindowWidth { get; set; } = 720;
+
+    /// <summary>
+    /// Gets or sets the remembered Settings window height.
+    /// </summary>
+    public double SettingsWindowHeight { get; set; } = 520;
+
+    /// <summary>
+    /// Gets or sets the remembered Settings window left position.
+    /// </summary>
+    public double SettingsWindowLeft { get; set; } = -1;
+
+    /// <summary>
+    /// Gets or sets the remembered Settings window top position.
+    /// </summary>
+    public double SettingsWindowTop { get; set; } = -1;
+
+    /// <summary>
     /// Gets or sets the preferred application theme (System, Light, Dark).
     /// </summary>
     public string AppTheme { get; set; } = "System";

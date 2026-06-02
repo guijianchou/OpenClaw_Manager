@@ -43,6 +43,7 @@ public sealed partial class SettingsDialog
         }
 
         SyncWithCurrentSettings();
+        RestoreSettingsWindowBoundsAfterActivation();
 
         if (_hasPerformedInitialTitleBarRefresh)
         {
