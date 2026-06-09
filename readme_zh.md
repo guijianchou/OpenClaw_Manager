@@ -120,6 +120,9 @@ OpenClaw Manager
 
 ```text
 Claw_winui3/
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml
 |-- OpenClaw.sln
 |-- Directory.Build.props
 |-- NuGet.config
@@ -189,6 +192,21 @@ git diff --check
 ```
 
 `tests\OpenClaw.Core.Tests` 仍是 executable Core harness，因此 `dotnet run` 是纯 Core 行为最快的定向信号。该项目也支持 `dotnet test` discoverability，两条命令都是当前支持的验证流程。
+
+## Continuous Integration
+
+GitHub Actions 会在 Windows 上运行当前支持的非交互式验证集合：
+
+- locked NuGet restore
+- Core executable harness
+- VSTest solution workflow
+- Debug x64 WinUI build
+- formatting verification
+- repository guardrails
+- embedded bridge script checks with Node.js
+- whitespace checks
+
+CI workflow 明确保持 x64-only，并且不声明覆盖真实应用启动。WinUI startup、WebView2 runtime 行为、Gateway access、tray、hotkey 以及 display/windowing 行为仍需要本地 Windows debug 验证。
 
 仍需 VS2026 手工调试覆盖：
 

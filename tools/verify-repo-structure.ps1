@@ -3,6 +3,33 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 
+$ciWorkflowPath = Join-Path $repoRoot '.github/workflows/ci.yml'
+if (-not (Test-Path -LiteralPath $ciWorkflowPath)) {
+    throw 'GitHub Actions CI workflow must exist at .github/workflows/ci.yml.'
+}
+
+$ciWorkflow = Get-Content -LiteralPath $ciWorkflowPath -Raw -Encoding UTF8
+foreach ($requiredCiSnippet in @(
+    'runs-on: windows-latest',
+    'actions/checkout@v4',
+    'actions/setup-dotnet@v4',
+    'dotnet-version: 10.0.x',
+    'actions/setup-node@v4',
+    'node-version: 24.x',
+    'dotnet restore OpenClaw.sln --locked-mode',
+    'dotnet run --no-restore --project tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj',
+    'dotnet test OpenClaw.sln -c Debug -p:Platform=x64 --no-restore',
+    'dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore',
+    'dotnet format OpenClaw.sln --verify-no-changes --no-restore',
+    'tools\verify-repo-structure.ps1',
+    'tools\verify-bridge-scripts.ps1',
+    'git diff --check'
+)) {
+    if ($ciWorkflow -notmatch [regex]::Escape($requiredCiSnippet)) {
+        throw "GitHub Actions CI workflow is missing required verification step: $requiredCiSnippet"
+    }
+}
+
 $testsPath = Join-Path $repoRoot 'tests'
 $coreTestsProjectPath = Join-Path $testsPath 'OpenClaw.Core.Tests/OpenClaw.Core.Tests.csproj'
 if (-not (Test-Path -LiteralPath $coreTestsProjectPath)) {

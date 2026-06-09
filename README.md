@@ -120,6 +120,9 @@ Runtime installs still need the .NET 10 Desktop Runtime and WebView2 Runtime on 
 
 ```text
 Claw_winui3/
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml
 |-- OpenClaw.sln
 |-- Directory.Build.props
 |-- NuGet.config
@@ -189,6 +192,21 @@ git diff --check
 ```
 
 `tests\OpenClaw.Core.Tests` remains an executable Core harness, so `dotnet run` is the fastest targeted signal for pure Core behavior. The project is also discoverable by `dotnet test`, and both commands are part of the supported verification workflow.
+
+## Continuous Integration
+
+GitHub Actions runs the supported non-interactive verification set on Windows:
+
+- locked NuGet restore
+- Core executable harness
+- VSTest solution workflow
+- Debug x64 WinUI build
+- formatting verification
+- repository guardrails
+- embedded bridge script checks with Node.js
+- whitespace checks
+
+The CI workflow is intentionally x64-only and does not claim real app launch coverage. WinUI startup, WebView2 runtime behavior, Gateway access, tray, hotkey, and display/windowing behavior still require local Windows debug validation.
 
 Manual VS2026 debug remains required for:
 
