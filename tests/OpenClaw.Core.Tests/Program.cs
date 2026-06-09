@@ -43,6 +43,7 @@ internal static class Program
             ("Control UI probe key distinguishes base paths and ports", () => Run(ProbeKeyDistinguishesBasePathsAndPorts)),
             ("Control UI probe URI strips userinfo before publishing probe URL or key", () => Run(ProbeUriStripsUserInfo)),
             ("Control UI probe URI rejects non-http schemes and relative URLs", () => Run(ProbeUriRejectsInvalidUrls)),
+            ("Gateway profile identity separates query and userinfo without readable secrets", () => Run(GatewayProfileIdentitySeparatesQueryAndUserInfoWithoutReadableSecrets)),
             ("Settings window bounds use the dedicated persisted width floor", () => Run(SettingsWindowBoundsUseDedicatedPersistedWidthFloor)),
             ("Settings window bounds reject unsafe narrow persisted widths", () => Run(SettingsWindowBoundsRejectUnsafeNarrowPersistedWidths)),
             ("Tray menu strings expose localized status and tooltip formats", () => Run(TrayMenuStringsExposeLocalizedStatusAndTooltipFormats)),
@@ -61,16 +62,27 @@ internal static class Program
             ("Diagnostics mapper distinguishes pass, warning, and failure states", () => Run(DiagnosticsMapperDistinguishesPassWarningAndFailureStates)),
             ("Diagnostics mapper marks redirects as failures", () => Run(DiagnosticsMapperMarksRedirectsAsFailures)),
             ("Diagnostic bundle redacts copied log files", DiagnosticBundleRedactsCopiedLogFilesAsync),
+            ("Diagnostic bundle redacts inline authorization credentials", DiagnosticBundleRedactsInlineAuthorizationCredentialsAsync),
             ("Diagnostic bundle uses unique paths for repeated exports", DiagnosticBundleUsesUniquePathsForRepeatedExportsAsync),
             ("Diagnostic network probe downgrades reachable non-local HTTP to warning", DiagnosticProbeDowngradesReachableNonLocalHttpToWarningAsync),
             ("Heartbeat resolver preserves hosted connecting state when transport fails", () => Run(HeartbeatResolverPreservesHostedConnectingStateWhenTransportFails)),
             ("Heartbeat resolver maps transport session-blocked to user action while preserving hosted detail", () => Run(HeartbeatResolverMapsTransportSessionBlockedToUserAction)),
             ("Session ready clears terminal recovery states", SessionReadyClearsTerminalRecoveryStatesAsync),
+            ("Session ready cancels in-flight recovery operations", SessionReadyCancelsInFlightRecoveryOperationsAsync),
+            ("Session ready accepts deep routes under current gateway base path", SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync),
+            ("Session ready rejects case-mismatched gateway base paths", SessionReadyRejectsCaseMismatchedGatewayBasePathAsync),
             ("Stale session ready does not clear current environment recovery state", StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync),
             ("Hard refresh cooldown starts only after reload succeeds", HardRefreshCooldownStartsOnlyAfterReloadSucceedsAsync),
+            ("Hard refresh reloads transitional hosted UI states", HardRefreshReloadsTransitionalHostedUiStatesAsync),
             ("Successful soft resync resets consecutive recovery attempts", SuccessfulSoftResyncResetsConsecutiveAttemptsAsync),
             ("Configuration normalizes invalid recovery policy values", ConfigurationNormalizesInvalidRecoveryPolicyValuesAsync),
             ("Configuration normalizes invalid environment entries", ConfigurationNormalizesInvalidEnvironmentEntriesAsync),
+            ("Configuration normalizes case-only duplicate environment names", ConfigurationNormalizesCaseOnlyDuplicateEnvironmentNamesAsync),
+            ("Configuration candidate save replaces live settings only after write success", ConfigurationCandidateSaveReplacesLiveSettingsOnlyAfterWriteSuccessAsync),
+            ("Live shell settings tolerate nullable persisted hotkey", () => Run(LiveShellSettingsTolerateNullablePersistedHotkey)),
+            ("Configuration rejects invalid gateway URL schemes", ConfigurationRejectsInvalidGatewayUrlSchemesAsync),
+            ("Configuration backs up corrupt settings before writing defaults", ConfigurationBacksUpCorruptSettingsBeforeWritingDefaultsAsync),
+            ("Configuration preserves deferred save queue after write failure", ConfigurationPreservesDeferredSaveQueueAfterWriteFailureAsync),
             ("Diagnostic bundle limits oversized log entries", DiagnosticBundleLimitsOversizedLogEntriesAsync),
             ("Diagnostic bundle limits total log payload and redacts headers", DiagnosticBundleLimitsTotalLogPayloadAndRedactsHeadersAsync),
         };
@@ -312,6 +324,34 @@ internal static class Program
         AssertNull(ControlUiProbeUriFactory.TryCreateConfigUri("wss://gateway.example.com/manager"), "webSocketProbeUri");
         AssertNull(ControlUiProbeUriFactory.TryCreateConfigUri("/manager"), "relativeProbeUri");
         AssertNull(ControlUiProbeUriFactory.TryCreateConfigUri("file:///tmp/control-ui.html"), "fileProbeUri");
+    }
+
+    private static void GatewayProfileIdentitySeparatesQueryAndUserInfoWithoutReadableSecrets()
+    {
+        var firstHash = GatewayUrlIdentity.CreateProfileIdentityHash(
+            "https://user-one:secret-one@gateway.example.com/manager?tenant=alpha#fragment");
+        var secondHash = GatewayUrlIdentity.CreateProfileIdentityHash(
+            "https://user-two:secret-two@gateway.example.com/manager?tenant=alpha#fragment");
+        var thirdHash = GatewayUrlIdentity.CreateProfileIdentityHash(
+            "https://user-one:secret-one@gateway.example.com/manager?tenant=beta#fragment");
+        var firstMarker = GatewayUrlIdentity.CreateProfileIdentityMarker(
+            "https://user-one:secret-one@gateway.example.com/manager?tenant=alpha#fragment");
+
+        AssertNotEqual(firstHash, secondHash, "userinfoHash");
+        AssertNotEqual(firstHash, thirdHash, "queryHash");
+        AssertTrue(
+            GatewayUrlIdentity.ProfileIdentityMarkerMatches(
+                firstMarker,
+                "https://user-one:secret-one@gateway.example.com/manager?tenant=alpha"),
+            "markerMatchesSameIdentity");
+        AssertFalse(
+            GatewayUrlIdentity.ProfileIdentityMarkerMatches(
+                firstMarker,
+                "https://user-one:secret-one@gateway.example.com/manager?tenant=beta"),
+            "markerRejectsDifferentQuery");
+        AssertNotContains("secret-one", firstMarker, "marker");
+        AssertNotContains("tenant=alpha", firstMarker, "marker");
+        AssertNotContains("user-one", firstMarker, "marker");
     }
 
     private static void SettingsWindowBoundsUseDedicatedPersistedWidthFloor()
@@ -576,6 +616,42 @@ internal static class Program
         }
     }
 
+    private static async Task DiagnosticBundleRedactsInlineAuthorizationCredentialsAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        var logsDirectory = Path.Combine(tempRoot, "logs");
+        var outputDirectory = Path.Combine(tempRoot, "out");
+        Directory.CreateDirectory(logsDirectory);
+
+        try
+        {
+            var logPath = Path.Combine(logsDirectory, "openclaw-20260608.log");
+            await File.WriteAllTextAsync(
+                logPath,
+                "{\"message\":\"retry Authorization: Bearer inline-log-secret\",\"context\":\"Authorization: Basic inline-basic-secret\"}");
+
+            var outputPath = await DiagnosticBundleService.ExportBundleAsync(
+                "{}",
+                logsDirectory,
+                "{\"message\":\"summary Authorization: Bearer inline-summary-secret\"}",
+                outputDirectory,
+                CreateRuntimeInfo());
+
+            var logEntry = await ReadZipEntryAsync(outputPath, "logs/openclaw-20260608.log");
+            var summaryEntry = await ReadZipEntryAsync(outputPath, "diagnostic-summary.txt");
+
+            AssertNotContains("inline-log-secret", logEntry, "logEntry");
+            AssertNotContains("inline-basic-secret", logEntry, "logEntry");
+            AssertNotContains("inline-summary-secret", summaryEntry, "summaryEntry");
+            AssertContains("Authorization: Bearer <redacted>", logEntry, "logEntry");
+            AssertContains("Authorization: Bearer <redacted>", summaryEntry, "summaryEntry");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
     private static async Task DiagnosticBundleUsesUniquePathsForRepeatedExportsAsync()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
@@ -682,6 +758,72 @@ internal static class Program
         await hardRefreshTask;
     }
 
+    private static async Task SessionReadyCancelsInFlightRecoveryOperationsAsync()
+    {
+        var webView = new FakeShellSessionWebView
+        {
+            Snapshot = ControlUiProbeSnapshot.Unavailable("proxy unavailable"),
+        };
+        var bridge = new FakeShellSessionBridge();
+        using var coordinator = await CreateAttachedCoordinatorAsync(webView, bridge);
+
+        var hardRefreshTask = coordinator.RequestHardRefreshAsync("test hard refresh");
+        await EventuallyAsync(
+            () => webView.ReloadRequests > 0,
+            "hard refresh should start reload before ready event");
+
+        bridge.RaiseSessionReady();
+        await hardRefreshTask;
+
+        AssertEqual(RecoveryState.Ready, coordinator.CurrentRecoveryState, "stateAfterInFlightRecoveryCompletes");
+    }
+
+    private static async Task SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync()
+    {
+        var webView = new FakeShellSessionWebView();
+        var bridge = new FakeShellSessionBridge();
+        using var coordinator = await CreateAttachedCoordinatorAsync(webView, bridge);
+        coordinator.SetEnvironment("Manager", "https://gateway.example.com/manager");
+
+        webView.RaiseControlUiSnapshot(new ControlUiProbeSnapshot(
+            ControlUiPhase.AuthRequired,
+            "auth",
+            "auth required",
+            "https://gateway.example.com/manager",
+            true,
+            false,
+            false,
+            "idle",
+            string.Empty));
+
+        AssertEqual(RecoveryState.AuthIssue, coordinator.CurrentRecoveryState, "stateBeforeDeepRouteReady");
+        bridge.RaiseSessionReady("https://gateway.example.com/manager/chat/123?conversation=abc");
+        AssertEqual(RecoveryState.Ready, coordinator.CurrentRecoveryState, "stateAfterDeepRouteReady");
+    }
+
+    private static async Task SessionReadyRejectsCaseMismatchedGatewayBasePathAsync()
+    {
+        var webView = new FakeShellSessionWebView();
+        var bridge = new FakeShellSessionBridge();
+        using var coordinator = await CreateAttachedCoordinatorAsync(webView, bridge);
+        coordinator.SetEnvironment("Manager", "https://gateway.example.com/manager");
+
+        webView.RaiseControlUiSnapshot(new ControlUiProbeSnapshot(
+            ControlUiPhase.AuthRequired,
+            "auth",
+            "auth required",
+            "https://gateway.example.com/manager",
+            true,
+            false,
+            false,
+            "idle",
+            string.Empty));
+
+        AssertEqual(RecoveryState.AuthIssue, coordinator.CurrentRecoveryState, "stateBeforeCaseMismatchReady");
+        bridge.RaiseSessionReady("https://gateway.example.com/Manager/chat/123");
+        AssertEqual(RecoveryState.AuthIssue, coordinator.CurrentRecoveryState, "stateAfterCaseMismatchReady");
+    }
+
     private static async Task StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync()
     {
         var webView = new FakeShellSessionWebView();
@@ -737,6 +879,33 @@ internal static class Program
         webView.Snapshot = ControlUiProbeSnapshot.Unavailable("proxy unavailable");
         await coordinator.RequestHardRefreshAsync("actual hard refresh");
         AssertEqual(1, webView.ReloadRequests, "reloadRequestsAfterActualRefresh");
+    }
+
+    private static async Task HardRefreshReloadsTransitionalHostedUiStatesAsync()
+    {
+        foreach (var phase in new[] { ControlUiPhase.PageLoaded, ControlUiPhase.GatewayConnecting })
+        {
+            var webView = new FakeShellSessionWebView
+            {
+                Snapshot = new ControlUiProbeSnapshot(
+                    phase,
+                    "connecting",
+                    "connecting",
+                    "https://gateway.example.com",
+                    true,
+                    false,
+                    false,
+                    "idle",
+                    string.Empty),
+            };
+            var bridge = new FakeShellSessionBridge();
+            using var coordinator = await CreateAttachedCoordinatorAsync(webView, bridge);
+
+            await coordinator.RequestHardRefreshAsync($"transitional {phase}");
+
+            AssertEqual(1, webView.ReloadRequests, $"reloadRequests:{phase}");
+            AssertEqual(RecoveryState.Connecting, coordinator.CurrentRecoveryState, $"recoveryState:{phase}");
+        }
     }
 
     private static async Task SuccessfulSoftResyncResetsConsecutiveAttemptsAsync()
@@ -868,7 +1037,7 @@ internal static class Program
             AssertFalse(configuration.Settings.Environments.Any(env => string.IsNullOrWhiteSpace(env.GatewayUrl)), "blankUrlsRemoved");
             AssertEqual(
                 configuration.Settings.Environments.Count,
-                configuration.Settings.Environments.Select(env => env.Name).Distinct(StringComparer.Ordinal).Count(),
+                configuration.Settings.Environments.Select(env => env.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
                 "distinctNames");
             AssertEqual(1, configuration.Settings.Environments.Count(env => env.IsDefault), "defaultCount");
             AssertTrue(
@@ -877,6 +1046,254 @@ internal static class Program
             AssertTrue(
                 configuration.Settings.Environments.All(env => env.Name == env.Name.Trim() && env.GatewayUrl == env.GatewayUrl.Trim()),
                 "namesAndUrlsTrimmed");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    private static async Task ConfigurationNormalizesCaseOnlyDuplicateEnvironmentNamesAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(tempRoot, "settings.json"),
+                """
+                {
+                    "environments": [
+                        {
+                            "name": "Prod",
+                            "gatewayUrl": "https://prod.example.com",
+                            "isDefault": true
+                        },
+                        {
+                            "name": "prod",
+                            "gatewayUrl": "https://prod-copy.example.com",
+                            "isDefault": false
+                        }
+                    ],
+                    "selectedEnvironmentName": "prod"
+                }
+                """);
+
+            var configuration = new ConfigurationService(tempRoot);
+            configuration.Load();
+
+            AssertEqual(2, configuration.Settings.Environments.Count, "environmentCount");
+            AssertEqual("Prod", configuration.Settings.Environments[0].Name, "firstName");
+            AssertEqual("prod (2)", configuration.Settings.Environments[1].Name, "secondName");
+            AssertEqual("prod (2)", configuration.Settings.SelectedEnvironmentName, "selectedEnvironmentName");
+            AssertEqual(
+                configuration.Settings.Environments.Count,
+                configuration.Settings.Environments.Select(env => env.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+                "caseInsensitiveDistinctNames");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    private static async Task ConfigurationRejectsInvalidGatewayUrlSchemesAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(tempRoot, "settings.json"),
+                """
+                {
+                    "environments": [
+                        {
+                            "name": "File",
+                            "gatewayUrl": "file:///tmp/control-ui.html",
+                            "isDefault": true
+                        },
+                        {
+                            "name": "Relative",
+                            "gatewayUrl": "/manager",
+                            "isDefault": false
+                        },
+                        {
+                            "name": "Socket",
+                            "gatewayUrl": "wss://gateway.example.com/manager",
+                            "isDefault": false
+                        },
+                        {
+                            "name": "Prod",
+                            "gatewayUrl": " https://prod.example.com/app ",
+                            "isDefault": false
+                        }
+                    ],
+                    "selectedEnvironmentName": "File"
+                }
+                """);
+
+            var configuration = new ConfigurationService(tempRoot);
+            configuration.Load();
+
+            AssertEqual(1, configuration.Settings.Environments.Count, "environmentCount");
+            AssertEqual("Prod", configuration.Settings.Environments[0].Name, "environmentName");
+            AssertEqual("https://prod.example.com/app", configuration.Settings.Environments[0].GatewayUrl, "gatewayUrl");
+            AssertEqual("Prod", configuration.Settings.SelectedEnvironmentName, "selectedEnvironmentName");
+            AssertTrue(configuration.Settings.Environments[0].IsDefault, "isDefault");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    private static async Task ConfigurationCandidateSaveReplacesLiveSettingsOnlyAfterWriteSuccessAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        var failWrites = true;
+        try
+        {
+            var configuration = new ConfigurationService(
+                tempRoot,
+                writeAllText: (path, text) =>
+                {
+                    if (failWrites)
+                    {
+                        throw new IOException("simulated write failure");
+                    }
+
+                    File.WriteAllText(path, text);
+                });
+            configuration.Settings.Environments =
+            [
+                new EnvironmentConfig
+                {
+                    Name = "Prod",
+                    GatewayUrl = "https://prod.example.com",
+                    IsDefault = true,
+                },
+            ];
+            configuration.Settings.SelectedEnvironmentName = "Prod";
+
+            var candidate = new AppSettings
+            {
+                Environments =
+                [
+                    new EnvironmentConfig
+                    {
+                        Name = "Stage",
+                        GatewayUrl = "https://stage.example.com",
+                        IsDefault = true,
+                    },
+                ],
+                SelectedEnvironmentName = "Stage",
+            };
+
+            var failed = configuration.Save(candidate);
+            AssertFalse(failed.Succeeded, "failedSave");
+            AssertEqual("Prod", configuration.Settings.Environments[0].Name, "liveNameAfterFailedSave");
+            AssertEqual("Prod", configuration.Settings.SelectedEnvironmentName, "selectedAfterFailedSave");
+
+            failWrites = false;
+            var succeeded = configuration.Save(candidate);
+            AssertTrue(succeeded.Succeeded, "successfulSave");
+            AssertEqual("Stage", configuration.Settings.Environments[0].Name, "liveNameAfterSuccessfulSave");
+            AssertEqual("Stage", configuration.Settings.SelectedEnvironmentName, "selectedAfterSuccessfulSave");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    private static void LiveShellSettingsTolerateNullablePersistedHotkey()
+    {
+        var settings = new AppSettings
+        {
+            GlobalHotkey = null!,
+        };
+
+        var liveSettings = LiveShellSettings.From(settings);
+
+        AssertEqual(string.Empty, liveSettings.GlobalHotkey, "globalHotkey");
+    }
+
+    private static async Task ConfigurationBacksUpCorruptSettingsBeforeWritingDefaultsAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        var settingsPath = Path.Combine(tempRoot, "settings.json");
+        var corruptJson = "{\"environments\":[";
+
+        try
+        {
+            await File.WriteAllTextAsync(settingsPath, corruptJson);
+
+            var configuration = new ConfigurationService(tempRoot);
+            configuration.Load();
+
+            var backupPath = Directory
+                .EnumerateFiles(tempRoot, "settings.json.invalid-*.bak")
+                .SingleOrDefault();
+
+            AssertNotNull(backupPath, "backupPath");
+            AssertEqual(corruptJson, await File.ReadAllTextAsync(backupPath!), "backupContent");
+            AssertNotEqual(corruptJson, await File.ReadAllTextAsync(settingsPath), "settingsContent");
+            AssertTrue(configuration.Settings.Environments.Count > 0, "defaultSettingsLoaded");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    private static async Task ConfigurationPreservesDeferredSaveQueueAfterWriteFailureAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        var writeAttempts = 0;
+        var failWrites = true;
+        var settingsPath = Path.Combine(tempRoot, "settings.json");
+
+        try
+        {
+            var configuration = new ConfigurationService(
+                tempRoot,
+                deferredSaveDelay: TimeSpan.FromMilliseconds(10),
+                writeAllText: (path, text) =>
+                {
+                    writeAttempts++;
+                    if (failWrites)
+                    {
+                        throw new IOException("simulated write failure");
+                    }
+
+                    File.WriteAllText(path, text);
+                });
+
+            configuration.Settings.Environments =
+            [
+                new EnvironmentConfig
+                {
+                    Name = "Prod",
+                    GatewayUrl = "https://prod.example.com",
+                    IsDefault = true,
+                },
+            ];
+            configuration.Settings.SelectedEnvironmentName = "Prod";
+            configuration.SaveDeferred();
+
+            await EventuallyAsync(
+                () => writeAttempts >= 1,
+                "deferred save should attempt the first write");
+
+            failWrites = false;
+            configuration.FlushDeferredSave();
+
+            AssertTrue(writeAttempts >= 2, "writeAttempts");
+            AssertTrue(File.Exists(settingsPath), "settingsFileWrittenAfterFlush");
         }
         finally
         {
@@ -1155,7 +1572,17 @@ internal static class Program
             {
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 _inspectionCancellation = linked;
-                await Task.Delay(InspectDelay, linked.Token);
+                try
+                {
+                    await Task.Delay(InspectDelay, linked.Token);
+                }
+                finally
+                {
+                    if (ReferenceEquals(_inspectionCancellation, linked))
+                    {
+                        _inspectionCancellation = null;
+                    }
+                }
             }
 
             return Snapshot;
@@ -1176,6 +1603,7 @@ internal static class Program
         public void CancelInspection()
         {
             _inspectionCancellation?.Cancel();
+            _inspectionCancellation = null;
             InspectDelay = TimeSpan.Zero;
         }
 

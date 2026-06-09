@@ -13,7 +13,7 @@ public sealed record LiveShellSettings(
         return new LiveShellSettings(
             settings.AlwaysOnTop,
             settings.EnableGlobalHotkey,
-            settings.GlobalHotkey.Trim(),
+            settings.GlobalHotkey?.Trim() ?? string.Empty,
             settings.AllowMultipleInstances);
     }
 }

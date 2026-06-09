@@ -13,6 +13,8 @@ $phaseClassifierPath = Join-Path $servicesRoot 'HostedUiBridge.PhaseClassifier.j
 $statusInspectionPath = Join-Path $servicesRoot 'HostedUiBridge.StatusInspection.js'
 $commandDispatchPath = Join-Path $servicesRoot 'HostedUiBridge.CommandDispatch.js'
 $bridgeScriptPath = Join-Path $servicesRoot 'HostedUiBridge.Script.js'
+$stopInjectionPath = Join-Path $servicesRoot 'WebViewCommands.StopInjection.js'
+$abortRunPath = Join-Path $servicesRoot 'WebViewCommands.AbortRun.js'
 
 $bridgeScriptTemplate = Get-Content -LiteralPath $bridgeScriptPath -Raw
 if ($bridgeScriptTemplate -notmatch 'nextPollAt' -or $bridgeScriptTemplate -notmatch 'scheduleNextPoll') {
@@ -32,14 +34,38 @@ if ($bridgeScriptTemplate -notmatch 'const postSessionReady' -or
 }
 Write-Host 'PASS: session-ready replay is native-callable'
 
+$stopInjectionScript = Get-Content -LiteralPath $stopInjectionPath -Raw
+if ($stopInjectionScript -match 'querySelectorAll\(''textarea, input\[type="text"\], input:not\(\[type\]\)''' -or
+    $stopInjectionScript -match 'form\.submit\(\)' -or
+    $stopInjectionScript -match 'dispatchEvent\(submitEvent\)' -or
+    $stopInjectionScript -notmatch 'findChatComposer' -or
+    $stopInjectionScript -notmatch 'requestSubmit') {
+    throw 'Stop command fallback must target a known chat composer and must not submit arbitrary first-page inputs or bypass hosted UI validation.'
+}
+Write-Host 'PASS: stop command fallback is chat-scoped'
+
+$abortRunScript = Get-Content -LiteralPath $abortRunPath -Raw
+if ($abortRunScript -match 'querySelectorAll\(''button, \[role="button"\], \[aria-label\], \[title\]''' -or
+    $abortRunScript -notmatch 'findChatActionSurface' -or
+    $abortRunScript -notmatch 'chat\.abort') {
+    throw 'Abort fallback must target a known chat/run action surface and prefer the hosted chat.abort API.'
+}
+Write-Host 'PASS: abort fallback is chat-scoped'
+
 function Resolve-NodeCommand {
     if (-not [string]::IsNullOrWhiteSpace($env:OPENCLAW_NODE)) {
         return $env:OPENCLAW_NODE
     }
 
-    $command = Get-Command node -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
+    $commands = @(Get-Command node -All -ErrorAction SilentlyContinue)
+    foreach ($command in $commands) {
+        try {
+            & $command.Source --version | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                return $command.Source
+            }
+        } catch {
+        }
     }
 
     return $null

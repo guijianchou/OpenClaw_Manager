@@ -407,6 +407,12 @@
   <data name="SettingsEnableDevLogDescription" xml:space="preserve">
     <value>When enabled, the app writes verbose recovery telemetry and internal diagnostics to the log file.</value>
   </data>
+  <data name="SettingsEnableDevTools" xml:space="preserve">
+    <value>Enable DevTools</value>
+  </data>
+  <data name="SettingsEnableDevToolsDescription" xml:space="preserve">
+    <value>Allows the active WebView to open DevTools. DevTools can expose cookies, local storage, and session data.</value>
+  </data>
   <data name="SettingsRunDiagnostics" xml:space="preserve">
     <value>Run Diagnostics</value>
   </data>
@@ -432,7 +438,7 @@
     <value>No active WebView is available for DevTools.</value>
   </data>
   <data name="SettingsDevToolsDisabled" xml:space="preserve">
-    <value>DevTools are disabled in this build. Enable verbose recovery diagnostics and reopen the WebView.</value>
+    <value>DevTools are disabled. Enable DevTools in diagnostics settings.</value>
   </data>
   <data name="SettingsDevToolsOpenFailedFormat" xml:space="preserve">
     <value>DevTools could not be opened: {0}</value>

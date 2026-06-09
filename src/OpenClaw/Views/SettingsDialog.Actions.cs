@@ -17,11 +17,6 @@ public sealed partial class SettingsDialog
             return;
         }
 
-        if (saveResult.DidChangeLanguage)
-        {
-            App.ApplyLanguage(ViewModel.SelectedLanguage);
-        }
-
         SettingsSaved?.Invoke(saveResult);
         this.Close();
     }

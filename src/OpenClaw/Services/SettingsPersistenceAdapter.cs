@@ -18,8 +18,11 @@ internal sealed class SettingsPersistenceAdapter
     public AppSettings Current => _configuration.Settings;
 
     public SettingsPersistenceSaveResult Save()
+        => Save(_configuration.Settings);
+
+    public SettingsPersistenceSaveResult Save(AppSettings settings)
     {
-        var result = _configuration.Save();
+        var result = _configuration.Save(settings);
         if (result.Succeeded)
         {
             _logger.Info("Settings saved.");

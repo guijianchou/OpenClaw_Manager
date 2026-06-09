@@ -21,6 +21,7 @@ public class SettingsViewModel : INotifyPropertyChanged
     private readonly string? _originalSelectedEnvironmentName;
     private bool _didEditSelectedLanguage;
     private bool _didEditEnableDevLog;
+    private bool _didEditEnableDevTools;
     private bool _didEditMinimizeToTray;
     private bool _didEditCloseToTray;
     private bool _didEditAllowMultipleInstances;
@@ -34,6 +35,7 @@ public class SettingsViewModel : INotifyPropertyChanged
     private bool _isEditing;
     private string _selectedLanguage = "System";
     private bool _enableDevLog;
+    private bool _enableDevTools;
     private bool _minimizeToTray;
     private bool _closeToTray;
     private bool _allowMultipleInstances;
@@ -60,6 +62,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         // Load language preference
         _selectedLanguage = settings.AppLanguage ?? "System";
         _enableDevLog = settings.Diagnostics.EnableVerboseRecoveryLogging;
+        _enableDevTools = settings.Diagnostics.EnableDevTools;
         _minimizeToTray = settings.MinimizeToTray;
         _closeToTray = settings.CloseToTray;
         _allowMultipleInstances = settings.AllowMultipleInstances;
@@ -136,6 +139,22 @@ public class SettingsViewModel : INotifyPropertyChanged
 
             _enableDevLog = value;
             _didEditEnableDevLog = true;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool EnableDevTools
+    {
+        get => _enableDevTools;
+        set
+        {
+            if (_enableDevTools == value)
+            {
+                return;
+            }
+
+            _enableDevTools = value;
+            _didEditEnableDevTools = true;
             OnPropertyChanged();
         }
     }
@@ -366,27 +385,24 @@ public class SettingsViewModel : INotifyPropertyChanged
             return false;
         }
 
-        var settings = _settingsPersistence.Current;
+        var currentSettings = _settingsPersistence.Current;
+        var candidateSettings = currentSettings.Clone();
         var didChangeEnvironmentState = DidChangeEnvironmentState || HasEnvironmentMetadataChanges();
         var didChangeSessionTopology = DidChangeSessionTopology || HasEnvironmentSessionIdentityChanges();
-        var beforeLanguage = settings.AppLanguage ?? "System";
-        var beforeLiveSettings = LiveShellSettings.From(settings);
+        var beforeLanguage = currentSettings.AppLanguage ?? "System";
+        var beforeDevTools = currentSettings.Diagnostics.EnableDevTools;
+        var beforeLiveSettings = LiveShellSettings.From(currentSettings);
 
         if (didChangeEnvironmentState)
         {
-            settings.Environments = Environments.Select(env => env.Clone()).ToList();
-            EnsureAtLeastOneDefault(settings.Environments);
-            settings.SelectedEnvironmentName = ResolveSelectedEnvironmentName(settings);
+            candidateSettings.Environments = Environments.Select(env => env.Clone()).ToList();
+            EnsureAtLeastOneDefault(candidateSettings.Environments);
+            candidateSettings.SelectedEnvironmentName = ResolveSelectedEnvironmentName(candidateSettings);
         }
 
-        ApplyChangedShellSettings(settings);
+        ApplyChangedShellSettings(candidateSettings);
 
-        if (didChangeEnvironmentState)
-        {
-            SyncRenamedEnvironmentProfiles();
-        }
-
-        var saveResult = _settingsPersistence.Save();
+        var saveResult = _settingsPersistence.Save(candidateSettings);
         if (!saveResult.Succeeded)
         {
             ValidationMessage = string.Format(
@@ -396,11 +412,12 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
 
         ValidationMessage = StringResources.SettingsValidationDefaultMessage;
-        var afterLiveSettings = LiveShellSettings.From(settings);
+        var afterLiveSettings = LiveShellSettings.From(candidateSettings);
         result = new SettingsSaveResult(
             didChangeEnvironmentState,
             didChangeSessionTopology,
-            !string.Equals(beforeLanguage, settings.AppLanguage ?? "System", StringComparison.Ordinal),
+            !string.Equals(beforeLanguage, candidateSettings.AppLanguage ?? "System", StringComparison.Ordinal),
+            beforeDevTools != candidateSettings.Diagnostics.EnableDevTools,
             new LiveShellSettingsChange(beforeLiveSettings, afterLiveSettings));
         return true;
     }
@@ -461,26 +478,6 @@ public class SettingsViewModel : INotifyPropertyChanged
         IsDefault = EditIsDefault,
     };
 
-    private void SyncRenamedEnvironmentProfiles()
-    {
-        foreach (var env in Environments)
-        {
-            if (!_originalNames.TryGetValue(env, out var originalName))
-            {
-                continue;
-            }
-
-            if (_originalSnapshots.TryGetValue(env, out var original) &&
-                string.Equals(original.GatewayUrl, env.GatewayUrl, StringComparison.Ordinal))
-            {
-                WebViewService.TryMoveUserDataFolderToRenamedEnvironment(originalName, env.Name, env.GatewayUrl);
-            }
-
-            _originalNames[env] = env.Name;
-            _originalSnapshots[env] = env.Clone();
-        }
-    }
-
     private void ApplyChangedShellSettings(AppSettings settings)
     {
         if (_didEditSelectedLanguage)
@@ -521,6 +518,11 @@ public class SettingsViewModel : INotifyPropertyChanged
         if (_didEditEnableDevLog)
         {
             settings.Diagnostics.EnableVerboseRecoveryLogging = EnableDevLog;
+        }
+
+        if (_didEditEnableDevTools)
+        {
+            settings.Diagnostics.EnableDevTools = EnableDevTools;
         }
     }
 

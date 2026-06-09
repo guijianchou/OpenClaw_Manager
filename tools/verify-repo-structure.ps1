@@ -9,25 +9,41 @@ if (-not (Test-Path -LiteralPath $ciWorkflowPath)) {
 }
 
 $ciWorkflow = Get-Content -LiteralPath $ciWorkflowPath -Raw -Encoding UTF8
-foreach ($requiredCiSnippet in @(
-    'runs-on: windows-latest',
-    'actions/checkout@v4',
-    'actions/setup-dotnet@v4',
-    'dotnet-version: 10.0.x',
-    'actions/setup-node@v4',
-    'node-version: 24.x',
-    'dotnet restore OpenClaw.sln --locked-mode',
-    'dotnet run --no-restore --project tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj',
-    'dotnet test OpenClaw.sln -c Debug -p:Platform=x64 --no-restore',
-    'dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore',
-    'dotnet format OpenClaw.sln --verify-no-changes --no-restore',
-    'tools\verify-repo-structure.ps1',
-    'tools\verify-bridge-scripts.ps1',
-    'git diff --check'
-)) {
-    if ($ciWorkflow -notmatch [regex]::Escape($requiredCiSnippet)) {
-        throw "GitHub Actions CI workflow is missing required verification step: $requiredCiSnippet"
+function Assert-CiPattern {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Pattern,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    if ($ciWorkflow -notmatch $Pattern) {
+        throw $Message
     }
+}
+
+Assert-CiPattern '(?m)^\s*runs-on:\s*windows-2025-vs2026\s*$' 'GitHub Actions CI must pin the Windows runner to windows-2025-vs2026.'
+Assert-CiPattern '(?ms)- name:\s*Checkout\s+uses:\s*actions/checkout@v4' 'GitHub Actions CI must check out the repository.'
+Assert-CiPattern '(?ms)- name:\s*Setup \.NET\s+uses:\s*actions/setup-dotnet@v4\s+with:\s+dotnet-version:\s*10\.0\.300' 'GitHub Actions CI must install the pinned .NET SDK 10.0.300.'
+Assert-CiPattern '(?ms)- name:\s*Setup Node\.js\s+uses:\s*actions/setup-node@v4\s+with:\s+node-version:\s*24\.x' 'GitHub Actions CI must install Node.js 24.x for bridge verification.'
+Assert-CiPattern '(?ms)- name:\s*Restore locked packages\s+shell:\s*pwsh\s+run:\s*dotnet restore OpenClaw\.sln --locked-mode' 'GitHub Actions CI must restore locked packages.'
+Assert-CiPattern '(?ms)- name:\s*Run Core executable harness\s+shell:\s*pwsh\s+run:\s*dotnet run --no-restore --project tests\\OpenClaw\.Core\.Tests\\OpenClaw\.Core\.Tests\.csproj' 'GitHub Actions CI must run the Core executable harness.'
+Assert-CiPattern '(?ms)- name:\s*Run VSTest workflow\s+shell:\s*pwsh\s+run:\s*dotnet test OpenClaw\.sln -c Debug -p:Platform=x64 --no-restore' 'GitHub Actions CI must run VSTest for x64.'
+Assert-CiPattern '(?ms)- name:\s*Build WinUI x64\s+shell:\s*pwsh\s+run:\s*dotnet build OpenClaw\.sln -c Debug -p:Platform=x64 --no-restore' 'GitHub Actions CI must build WinUI x64.'
+Assert-CiPattern '(?ms)- name:\s*Verify formatting\s+shell:\s*pwsh\s+run:\s*\|\s*\r?\n\s*\$env:Platform = ''x64''\s*\r?\n\s*dotnet format OpenClaw\.sln --verify-no-changes --no-restore' 'GitHub Actions CI must verify formatting with Platform=x64.'
+Assert-CiPattern '(?ms)- name:\s*Verify repository guardrails\s+shell:\s*pwsh\s+run:\s*powershell -NoProfile -ExecutionPolicy Bypass -File tools\\verify-repo-structure\.ps1' 'GitHub Actions CI must run repository guardrails.'
+Assert-CiPattern '(?ms)- name:\s*Verify embedded bridge scripts\s+shell:\s*pwsh\s+run:\s*powershell -NoProfile -ExecutionPolicy Bypass -File tools\\verify-bridge-scripts\.ps1' 'GitHub Actions CI must verify embedded bridge scripts.'
+Assert-CiPattern '(?ms)- name:\s*Verify whitespace\s+shell:\s*pwsh\s+run:\s*git diff --check' 'GitHub Actions CI must verify whitespace.'
+
+$globalJsonPath = Join-Path $repoRoot 'global.json'
+if (-not (Test-Path -LiteralPath $globalJsonPath)) {
+    throw 'global.json must pin the supported .NET SDK feature band.'
+}
+
+$globalJson = Get-Content -LiteralPath $globalJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($globalJson.sdk.version -ne '10.0.300' -or $globalJson.sdk.rollForward -ne 'latestPatch') {
+    throw 'global.json must pin SDK 10.0.300 with rollForward latestPatch.'
 }
 
 $testsPath = Join-Path $repoRoot 'tests'
@@ -89,9 +105,15 @@ foreach ($testName in @(
     'HeartbeatResolverPreservesHostedConnectingStateWhenTransportFails',
     'HeartbeatResolverMapsTransportSessionBlockedToUserAction',
     'LatencyServiceDoesNotPublishAuthRequiredAsSuccessAsync',
+    'SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync',
+    'SessionReadyRejectsCaseMismatchedGatewayBasePathAsync',
     'StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync',
     'HardRefreshCooldownStartsOnlyAfterReloadSucceedsAsync',
-    'ConfigurationNormalizesInvalidEnvironmentEntriesAsync'
+    'HardRefreshReloadsTransitionalHostedUiStatesAsync',
+    'ConfigurationNormalizesInvalidEnvironmentEntriesAsync',
+    'ConfigurationNormalizesCaseOnlyDuplicateEnvironmentNamesAsync',
+    'ConfigurationCandidateSaveReplacesLiveSettingsOnlyAfterWriteSuccessAsync',
+    'LiveShellSettingsTolerateNullablePersistedHotkey'
 )) {
     if ($coreTests -notmatch [regex]::Escape($testName)) {
         throw "Core regression harness is missing required Gateway/Control UI test: $testName"
@@ -228,7 +250,7 @@ foreach ($linkedCompileItem in $linkedCompileItems) {
     }
 }
 
-$currentVersion = '5.1.1'
+$currentVersion = '5.1.2'
 $currentFileVersion = "$currentVersion.0"
 if ($project -notmatch [regex]::Escape("<Version>$currentVersion</Version>") -or
     $project -notmatch [regex]::Escape("<AssemblyVersion>$currentFileVersion</AssemblyVersion>") -or
@@ -434,10 +456,13 @@ if ($webViewProfile -notmatch 'ProfileIdentityFileName' -or
     $webViewProfile -notmatch 'MigrateLegacyUserDataFolderIfNeededAsync' -or
     $webViewProfile -notmatch 'WriteProfileIdentityMarkerAsync' -or
     $webViewProfile -notmatch 'TryReadProfileIdentityMarkerAsync' -or
-    $webViewProfile -notmatch 'NormalizeGatewayUrlForProfileIdentity' -or
+    $webViewProfile -notmatch 'GatewayUrlIdentity\.CreateProfileIdentityHash' -or
+    $webViewProfile -notmatch 'GatewayUrlIdentity\.CreateProfileIdentityMarker' -or
+    $webViewProfile -notmatch 'GatewayUrlIdentity\.ProfileIdentityMarkerMatches' -or
+    $webViewProfile -notmatch 'EnumerateLegacyProfileFolders' -or
     $webViewProfile -notmatch 'Directory\.Move\(legacyFolder, profileFolder\)' -or
     $webViewProfile -notmatch 'Skipped legacy WebView2 profile migration') {
-    throw 'WebView2 legacy profile migration must be URL-identity-marker gated before moving environment-only profile folders.'
+    throw 'WebView2 profile folders must use stable hashed Gateway URL identity and marker-aware legacy migration.'
 }
 
 if ($webViewService -notmatch 'public bool Reload\(\)' -or
@@ -1107,6 +1132,13 @@ if ($hostedBridgeMain -notmatch '_documentCreatedScriptId' -or
     throw 'HostedUiBridge must remove its document-created script when detaching a WebView2 instance.'
 }
 
+$bridgeScriptInstallPrelude = [regex]::Match(
+    $hostedBridgeMain,
+    'var scriptId = await coreWebView\.AddScriptToExecuteOnDocumentCreatedAsync[\s\S]*?if \(_isDisposed').Value
+if ($bridgeScriptInstallPrelude -match '_documentCreatedScriptId = scriptId') {
+    throw 'HostedUiBridge must assign _documentCreatedScriptId only after stale initialization checks pass.'
+}
+
 $hostMessagingScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedUiBridge.HostMessaging.js') -Raw
 if ($hostMessagingScript -notmatch 'nativeOwnerToken' -or
     $hostMessagingScript -notmatch 'nativePageToken' -or
@@ -1118,6 +1150,22 @@ foreach ($asset in @('WebViewCommands.StopInjection.js', 'WebViewCommands.AbortR
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "src/OpenClaw/Services/$asset"))) {
         throw "Missing WebView command script asset: $asset"
     }
+}
+
+$stopInjectionScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewCommands.StopInjection.js') -Raw
+if ($stopInjectionScript -match 'querySelectorAll\(''textarea, input\[type="text"\], input:not\(\[type\]\)''' -or
+    $stopInjectionScript -match 'form\.submit\(\)' -or
+    $stopInjectionScript -match 'dispatchEvent\(submitEvent\)' -or
+    $stopInjectionScript -notmatch 'findChatComposer' -or
+    $stopInjectionScript -notmatch 'requestSubmit') {
+    throw 'Stop command fallback must target a known chat composer and must not submit arbitrary first-page inputs or bypass hosted UI validation.'
+}
+
+$abortRunScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewCommands.AbortRun.js') -Raw
+if ($abortRunScript -match 'querySelectorAll\(''button, \[role="button"\], \[aria-label\], \[title\]''' -or
+    $abortRunScript -notmatch 'findChatActionSurface' -or
+    $abortRunScript -notmatch 'chat\.abort') {
+    throw 'Abort fallback must target a known chat/run action surface and prefer the hosted chat.abort API.'
 }
 
 $mainWindowWebView = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.WebView.cs') -Raw
@@ -1330,17 +1378,20 @@ if ($settingsViewModel -notmatch '_didEditAlwaysOnTop' -or
     $settingsViewModel -notmatch '_didEditEnableGlobalHotkey' -or
     $settingsViewModel -notmatch '_didEditGlobalHotkey' -or
     $settingsViewModel -notmatch '_didEditAllowMultipleInstances' -or
+    $settingsViewModel -notmatch '_didEditEnableDevTools' -or
     $settingsViewModel -notmatch 'private void ApplyChangedShellSettings\(AppSettings settings\)' -or
     $settingsViewModel -notmatch 'if \(_didEditAlwaysOnTop\)[\s\S]*settings\.AlwaysOnTop = AlwaysOnTop' -or
     $settingsViewModel -notmatch 'if \(_didEditEnableGlobalHotkey\)[\s\S]*settings\.EnableGlobalHotkey = EnableGlobalHotkey' -or
     $settingsViewModel -notmatch 'if \(_didEditGlobalHotkey\)[\s\S]*settings\.GlobalHotkey = NormalizeHotkey\(GlobalHotkey\)' -or
-    $settingsViewModel -notmatch 'if \(_didEditAllowMultipleInstances\)[\s\S]*settings\.AllowMultipleInstances = AllowMultipleInstances') {
+    $settingsViewModel -notmatch 'if \(_didEditAllowMultipleInstances\)[\s\S]*settings\.AllowMultipleInstances = AllowMultipleInstances' -or
+    $settingsViewModel -notmatch 'if \(_didEditEnableDevTools\)[\s\S]*settings\.Diagnostics\.EnableDevTools = EnableDevTools') {
     throw 'SettingsViewModel must merge only fields edited in the open Settings window so stale snapshots cannot overwrite live shell changes.'
 }
 
 foreach ($property in @(
     'SelectedLanguage',
     'EnableDevLog',
+    'EnableDevTools',
     'MinimizeToTray',
     'CloseToTray',
     'AllowMultipleInstances',
@@ -1367,8 +1418,10 @@ if ($settingsPersistenceAdapter -match 'App\.Configuration|App\.Logger') {
 
 $settingsViewModel = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/SettingsViewModel.cs') -Raw
 if ($settingsPersistenceAdapter -notmatch 'public SettingsPersistenceSaveResult Save\(\)' -or
+    $settingsPersistenceAdapter -notmatch 'public SettingsPersistenceSaveResult Save\(AppSettings settings\)' -or
     $settingsPersistenceAdapter -match 'void Save\(\)' -or
-    $settingsViewModel -notmatch 'var saveResult = _settingsPersistence\.Save\(\)' -or
+    $settingsViewModel -notmatch 'var candidateSettings = currentSettings\.Clone\(\)' -or
+    $settingsViewModel -notmatch 'var saveResult = _settingsPersistence\.Save\(candidateSettings\)' -or
     $settingsViewModel -notmatch 'if \(!saveResult\.Succeeded\)' -or
     $settingsViewModel -match '_settingsPersistence\.Save\(\);\s*ValidationMessage') {
     throw 'Settings save failures must flow from persistence to SettingsViewModel instead of being reported as successful saves.'
@@ -1382,6 +1435,7 @@ if ($configurationService -match '_ = Task\.Run\(ProcessDeferredSaveQueueAsync\)
     $configurationService -notmatch '_deferredSaveCts' -or
     $configurationService -notmatch 'TryStartDeferredSaveWorker' -or
     $configurationService -notmatch 'TryCompleteDeferredSaveBatch' -or
+    $configurationService -notmatch 'RetainDeferredSaveAfterFailure' -or
     $configurationService -notmatch 'CancelDeferredSaveWorker' -or
     $configurationService -notmatch 'ProcessDeferredSaveQueueAsync\(CancellationToken' -or
     $configurationService -notmatch 'ObserveDeferredSaveWorkerShutdownAsync') {
@@ -1396,6 +1450,7 @@ if ($configurationService -notmatch 'public SettingsWriteResult Save\(\)' -or
 }
 
 if ($configurationService -notmatch 'NormalizeEnvironments' -or
+    $configurationService -notmatch 'GatewayUrlIdentity\.IsSupportedGatewayUrl' -or
     $configurationService -notmatch 'uniqueName = \$"\{name\} \(\{suffix\+\+\}\)"' -or
     $configurationService -notmatch 'settings\.SelectedEnvironmentName = defaultEnvironment\.Name' -or
     $configurationService -notmatch 'environment\.IsDefault = shouldBeDefault' -or

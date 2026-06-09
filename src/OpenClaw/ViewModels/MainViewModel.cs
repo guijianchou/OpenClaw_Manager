@@ -21,7 +21,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
             runtime.Logger,
             _messageOwnership,
             _dispatchToUi,
-            () => runtime.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging);
+            () => runtime.Configuration.Settings.Diagnostics.EnableDevTools);
         _hostedUiBridge = new HostedUiBridge(runtime.Logger, _messageOwnership);
         InitializeCommands();
         SubscribeToServiceEvents();

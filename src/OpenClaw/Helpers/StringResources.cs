@@ -188,6 +188,8 @@ public static class StringResources
     public static string SettingsDevToolsDescription => Get("SettingsDevToolsDescription");
     public static string SettingsEnableDevLog => Get("SettingsEnableDevLog");
     public static string SettingsEnableDevLogDescription => Get("SettingsEnableDevLogDescription");
+    public static string SettingsEnableDevTools => Get("SettingsEnableDevTools");
+    public static string SettingsEnableDevToolsDescription => Get("SettingsEnableDevToolsDescription");
     public static string SettingsRunDiagnostics => Get("SettingsRunDiagnostics");
     public static string SettingsViewLogs => Get("SettingsViewLogs");
     public static string SettingsOpenDevTools => Get("SettingsOpenDevTools");

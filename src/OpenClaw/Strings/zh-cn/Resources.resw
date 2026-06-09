@@ -407,6 +407,12 @@
   <data name="SettingsEnableDevLogDescription" xml:space="preserve">
     <value>启用后，应用会把详细的恢复遥测和内部诊断信息写入日志文件。</value>
   </data>
+  <data name="SettingsEnableDevTools" xml:space="preserve">
+    <value>启用 DevTools</value>
+  </data>
+  <data name="SettingsEnableDevToolsDescription" xml:space="preserve">
+    <value>允许当前 WebView 打开 DevTools。DevTools 可能暴露 Cookie、本地存储和会话数据。</value>
+  </data>
   <data name="SettingsRunDiagnostics" xml:space="preserve">
     <value>运行诊断</value>
   </data>
@@ -432,7 +438,7 @@
     <value>当前没有可用于 DevTools 的活动 WebView。</value>
   </data>
   <data name="SettingsDevToolsDisabled" xml:space="preserve">
-    <value>当前构建禁用了 DevTools。请启用详细恢复诊断日志并重新打开 WebView。</value>
+    <value>DevTools 已禁用。请在诊断设置中启用 DevTools。</value>
   </data>
   <data name="SettingsDevToolsOpenFailedFormat" xml:space="preserve">
     <value>无法打开 DevTools：{0}</value>

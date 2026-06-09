@@ -56,6 +56,12 @@ public static partial class DiagnosticBundleService
             return $"{prefix}\"<redacted>\"";
         });
 
+        redacted = AuthorizationCredentialPattern().Replace(redacted, match =>
+        {
+            var prefix = match.Groups[1].Value;
+            return $"{prefix}<redacted>";
+        });
+
         redacted = KeyValueSecretPattern().Replace(redacted, match =>
         {
             var prefix = match.Groups[1].Value;
@@ -276,7 +282,10 @@ public static partial class DiagnosticBundleService
     [GeneratedRegex(@"(""(?:[^""]*(?:authorization|cookie|token|key|secret|password|credential)[^""]*)""\s*:\s*)""[^""]+""", RegexOptions.IgnoreCase)]
     private static partial Regex TokenPattern();
 
-    [GeneratedRegex(@"(\b(?:authorization|cookie|token|key|secret|password|credential)\b\s*[=:]\s*)[^\s,;}\]]+", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(\bAuthorization\b\s*:\s*(?:Bearer|Basic)\s+)[^\s,;}\]""']+", RegexOptions.IgnoreCase)]
+    private static partial Regex AuthorizationCredentialPattern();
+
+    [GeneratedRegex(@"(\b(?!(?:authorization)\b)(?:cookie|token|key|secret|password|credential)\b\s*[=:]\s*)[^\s,;}\]]+", RegexOptions.IgnoreCase)]
     private static partial Regex KeyValueSecretPattern();
 
     [GeneratedRegex(@"(?im)^(\s*(?:Authorization|Cookie|Set-Cookie|X-Api-Key|Api-Key)\s*:\s*).+$")]

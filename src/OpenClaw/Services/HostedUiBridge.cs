@@ -89,7 +89,6 @@ public sealed class HostedUiBridge : IDisposable
 
             var scriptId = await coreWebView.AddScriptToExecuteOnDocumentCreatedAsync(
                 HostedUiBridgeScript.Build(_messageOwnership.OwnerToken));
-            _documentCreatedScriptId = scriptId;
             if (cancellationToken.IsCancellationRequested)
             {
                 RemoveDocumentCreatedScript(coreWebView, scriptId);
@@ -104,6 +103,7 @@ public sealed class HostedUiBridge : IDisposable
                 return;
             }
 
+            _documentCreatedScriptId = scriptId;
             _webMessageReceivedHandler = CreateWebMessageReceivedHandler(hostGeneration);
             coreWebView.WebMessageReceived += _webMessageReceivedHandler;
             _isInitialized = true;

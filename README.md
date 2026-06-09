@@ -2,7 +2,7 @@
 
 **Language:** English | [Simplified Chinese](readme_zh.md)
 
-**Current version:** 5.1.1
+**Current version:** 5.1.2
 
 OpenClaw Manager is a lightweight Windows-native shell for the hosted OpenClaw Control UI, built with WinUI 3 and WebView2.
 
@@ -10,16 +10,17 @@ It is intended for remote Gateway deployments running on a VPS and exposed throu
 
 ---
 
-## Current 5.1.1 Notes
+## Current 5.1.2 Notes
 
-- `5.1.1` is a stability, maintainability, and production-adaptation release for the current x64-only WinUI app.
-- Hosted `session-ready` recovery state is scoped to the active environment probe key, so stale events from a previous endpoint cannot clear the current environment's degraded state.
-- Hard-refresh cooldown starts only after WebView2 accepts a reload, and latency success is published only for classified reachable Gateway responses, not auth, pairing, rate-limit, redirect, or proxy/error states.
-- Settings normalization trims environment names and URLs, removes blank entries, de-duplicates names, enforces one default environment, and repairs invalid selected-environment values.
-- WebView2 session identity uses both environment name and Gateway URL. Inactive session clearing targets the exact environment object, and legacy profile migration runs only when the stored URL identity marker matches the current endpoint.
-- Diagnostic bundles now cap total copied log payload, cap individual diagnostic text entries, redact auth/cookie/API-key headers, and record skipped or truncated content in bundle notes.
-- Settings diagnostics, diagnostic bundle export, and DevTools actions keep the Settings window open and report progress or failures inline. Release DevTools enablement is injected from diagnostics settings instead of reading global configuration inside `WebViewService`.
-- The Core regression harness and repository guardrails cover the 5.1.1 contracts, while real WebView2, Gateway, tunnel, tray, hotkey, and compact-mode behavior still require manual Windows debug validation.
+- `5.1.2` hardens the current x64-only WinUI app around settings preservation, WebView2 profile identity, diagnostics redaction, recovery ordering, and CI determinism.
+- WebView2 profile folders are now scoped by stable Gateway URL identity instead of display name, with hashed markers so query/userinfo can separate sessions without being written in readable marker text.
+- Settings load now backs up corrupt JSON before writing defaults, avoids overwriting settings after read/permission failures, rejects non-http(s) Gateway URLs, and preserves deferred-save work after a failed write.
+- Hosted `session-ready` cancels in-flight recovery work and accepts deep routes under the active Gateway base path, avoiding stale recovery state flips after the page is already ready.
+- Gateway route matching now honors base-path case exactly, reload recovery refreshes transitional hosted UI states because Gateway event gaps are not replayed, and Stop/Abort prefer documented hosted chat APIs before scoped DOM fallbacks.
+- Diagnostic bundles redact inline `Authorization: Bearer|Basic` credentials in JSON log messages and summaries, not only line-start headers.
+- DevTools release enablement is an explicit diagnostics setting separate from verbose recovery logging, with UI text that calls out storage/session visibility.
+- CI is pinned to the VS2026 Windows runner and .NET SDK `10.0.300`; repository guardrails validate the active workflow and `global.json` contract.
+- The Core regression harness covers the 5.1.2 contracts, while real WebView2, Gateway, tunnel, tray, hotkey, DevTools, and compact-mode behavior still require manual Windows debug validation.
 
 ---
 
@@ -46,7 +47,7 @@ It is intended for remote Gateway deployments running on a VPS and exposed throu
 |---|---|
 | WebView2 shell | Hosts the remote OpenClaw Control UI in a native WinUI window. |
 | Environments | Stores multiple hosted Control UI endpoints and switches between them. |
-| Session isolation | Uses separate WebView2 profile data per environment name plus Gateway URL. |
+| Session isolation | Uses separate WebView2 profile data per stable Gateway URL identity. |
 | Recovery | Tracks hosted session state, heartbeat failures, navigation stalls, event gaps, and recovery escalation. |
 | Diagnostics | Runs runtime, network, session, and WebView checks with localized status labels. |
 | Diagnostic bundle | Exports redacted settings, runtime info, and bounded log samples to a zip bundle. |
@@ -74,7 +75,7 @@ OpenClaw Manager
 |  `- ShellSessionCoordinator adapters
 |- WebViewService
 |  |- Lifecycle: initialize/detach/dispose WebView2 and explicit profile environment
-|  |- Profile: environment+URL user-data folders and legacy profile migration
+|  |- Profile: stable Gateway URL user-data folders, hashed identity markers, and legacy profile migration
 |  |- Session: browsing-data clear, environment session clear, DevTools, current URL
 |  |- Navigation: navigate/reload/retry, watchdogs, page-token ownership, process failure
 |  |- Heartbeat: Gateway transport and hosted Control UI session observation
@@ -162,8 +163,8 @@ Claw_winui3/
 - Windows 10 1809+ or Windows 11, x64 only
 - Visual Studio 2026 with .NET Desktop Development workload
 - Windows App SDK C# templates
-- .NET 10 SDK
-- Node.js for `tools\verify-bridge-scripts.ps1`, unless `OPENCLAW_ALLOW_NODE_SKIP=1` is explicitly set for a local skip
+- .NET 10 SDK `10.0.300`
+- Node.js for `tools\verify-bridge-scripts.ps1`; set `OPENCLAW_NODE=C:\path\to\node.exe` if PATH resolves to a bad shim, and use `OPENCLAW_ALLOW_NODE_SKIP=1` only for an explicit local skip
 
 The solution uses SDK-style projects, `PackageReference`, package lock files, and static graph restore.
 
@@ -195,7 +196,7 @@ git diff --check
 
 ## Continuous Integration
 
-GitHub Actions runs the supported non-interactive verification set on Windows:
+GitHub Actions runs the supported non-interactive verification set on `windows-2025-vs2026` with .NET SDK `10.0.300`:
 
 - locked NuGet restore
 - Core executable harness

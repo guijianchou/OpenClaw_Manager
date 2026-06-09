@@ -128,6 +128,11 @@ public sealed partial class MainWindow
             ScheduleWebViewRecreation("settings_saved_topology_changed");
         }
 
+        if (saveResult.DidChangeDevToolsPolicy)
+        {
+            ScheduleWebViewRecreation("settings_saved_devtools_policy_changed");
+        }
+
         if (saveResult.DidChangeLiveShellOptions)
         {
             _liveShellSettingsApplier.Apply(saveResult.LiveShellSettingsChange);

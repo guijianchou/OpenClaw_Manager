@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 5.1.1
+**当前版本：** 5.1.2
 
 OpenClaw Manager 是一个轻量的 Windows 原生外壳，用 WinUI 3 和 WebView2 承载托管版 OpenClaw Control UI。
 
@@ -10,16 +10,17 @@ OpenClaw Manager 是一个轻量的 Windows 原生外壳，用 WinUI 3 和 WebVi
 
 ---
 
-## 当前 5.1.1 注意事项
+## 当前 5.1.2 注意事项
 
-- `5.1.1` 是当前 x64-only WinUI 应用的稳定性、可维护性和生产环境适配版本。
-- 托管端 `session-ready` 的 recovery state 现在绑定到当前环境 probe key，旧端点的滞后事件不会再清理当前环境的 degraded state。
-- hard refresh cooldown 只会在 WebView2 接受 reload 后开始计时；latency success 只对分类为 reachable 的 Gateway 响应发布，不再把 auth、pairing、rate-limit、redirect 或 proxy/error 状态当作成功。
-- Settings normalization 会裁剪环境名称和 URL、移除空条目、去重同名环境、保证只有一个默认环境，并修复无效的 selected environment。
-- WebView2 session 身份同时使用环境名称和 Gateway URL。非活动 session 清理会针对精确环境对象，legacy profile migration 仅在保存的 URL identity marker 与当前端点一致时执行。
-- Diagnostic bundle 现在限制总日志 payload、限制单个诊断文本条目、脱敏 auth/cookie/API-key headers，并在 bundle notes 中记录被跳过或截断的内容。
-- Settings 中的 diagnostics、diagnostic bundle export 和 DevTools 操作会保持窗口打开并在页面内反馈结果。Release DevTools enablement 由 diagnostics settings 注入，不再由 `WebViewService` 直接读取全局配置。
-- Core regression harness 和 repository guardrails 已覆盖 5.1.1 契约；真实 WebView2、Gateway、tunnel、tray、hotkey 和 compact mode 行为仍需要 Windows 手工调试验证。
+- `5.1.2` 围绕 settings 保全、WebView2 profile identity、diagnostics 脱敏、recovery 顺序和 CI 确定性加固当前 x64-only WinUI 应用。
+- WebView2 profile folder 现在按稳定 Gateway URL identity 隔离，而不是按显示名称隔离；identity marker 使用 hash，query/userinfo 可以区分 session，但不会以可读明文写入 marker。
+- Settings load 会在写入默认值前备份损坏 JSON，读取或权限失败时不会覆盖 settings，非 http(s) Gateway URL 会被拒绝，deferred save 写失败后仍保留待保存状态。
+- 托管端 `session-ready` 会取消仍在执行的 recovery，并接受当前 Gateway base path 下的深层路由，避免页面已经 ready 后 recovery 又把状态改回 connecting。
+- Gateway route 匹配现在严格保留 base path 大小写；由于 Gateway event gap 不会重放，reload recovery 会刷新过渡态 hosted UI；Stop/Abort 会优先使用文档化的 hosted chat API，再退回到受限 DOM fallback。
+- Diagnostic bundle 会脱敏 JSON log message 和 summary 中内联的 `Authorization: Bearer|Basic` 凭据，不再只处理行首 header。
+- Release DevTools enablement 现在是独立 diagnostics 设置，不再复用 verbose recovery logging，并在 UI 文案中说明 storage/session 可见性风险。
+- CI 固定到 VS2026 Windows runner 和 .NET SDK `10.0.300`；repository guardrails 会验证 active workflow 与 `global.json` 契约。
+- Core regression harness 已覆盖 5.1.2 契约；真实 WebView2、Gateway、tunnel、tray、hotkey、DevTools 和 compact mode 行为仍需要 Windows 手工调试验证。
 
 ---
 
@@ -46,7 +47,7 @@ OpenClaw Manager 是一个轻量的 Windows 原生外壳，用 WinUI 3 和 WebVi
 |---|---|
 | WebView2 shell | 在 WinUI 原生窗口中承载远程 OpenClaw Control UI。 |
 | Environments | 保存多个托管 Control UI endpoint，并在它们之间切换。 |
-| Session isolation | 按环境名称和 Gateway URL 分离 WebView2 profile 数据。 |
+| Session isolation | 按稳定 Gateway URL identity 分离 WebView2 profile 数据。 |
 | Recovery | 跟踪托管 session 状态、heartbeat failure、navigation stall、event gap 和 recovery escalation。 |
 | Diagnostics | 执行 runtime、network、session 和 WebView 检查，并使用本地化状态标签。 |
 | Diagnostic bundle | 导出脱敏 settings、runtime info 和有界日志样本到 zip bundle。 |
@@ -74,7 +75,7 @@ OpenClaw Manager
 |  `- ShellSessionCoordinator adapters
 |- WebViewService
 |  |- Lifecycle: 初始化、detach、dispose WebView2 和显式 profile environment
-|  |- Profile: environment+URL user-data folders 和 legacy profile migration
+|  |- Profile: stable Gateway URL user-data folders、hashed identity markers 和 legacy profile migration
 |  |- Session: browsing-data clear、environment session clear、DevTools、current URL
 |  |- Navigation: navigate/reload/retry、watchdogs、page-token ownership、process failure
 |  |- Heartbeat: Gateway transport 和 hosted Control UI session observation
@@ -162,8 +163,8 @@ Claw_winui3/
 - Windows 10 1809+ 或 Windows 11，仅支持 x64
 - Visual Studio 2026，并安装 .NET Desktop Development workload
 - Windows App SDK C# templates
-- .NET 10 SDK
-- Node.js，用于 `tools\verify-bridge-scripts.ps1`；只有明确设置 `OPENCLAW_ALLOW_NODE_SKIP=1` 时才允许本地跳过
+- .NET 10 SDK `10.0.300`
+- Node.js，用于 `tools\verify-bridge-scripts.ps1`；如果 PATH 解析到不可用 shim，可设置 `OPENCLAW_NODE=C:\path\to\node.exe`，只有明确设置 `OPENCLAW_ALLOW_NODE_SKIP=1` 时才允许本地跳过
 
 解决方案使用 SDK-style projects、`PackageReference`、package lock files 和 static graph restore。
 
@@ -195,7 +196,7 @@ git diff --check
 
 ## Continuous Integration
 
-GitHub Actions 会在 Windows 上运行当前支持的非交互式验证集合：
+GitHub Actions 会在 `windows-2025-vs2026` 和 .NET SDK `10.0.300` 上运行当前支持的非交互式验证集合：
 
 - locked NuGet restore
 - Core executable harness

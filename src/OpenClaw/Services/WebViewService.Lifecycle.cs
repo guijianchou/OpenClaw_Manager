@@ -62,11 +62,13 @@ public partial class WebViewService
 
             _coreWebView = coreWebView;
 
-            // Make WebView2 follow system Light/Dark theme preferred scheme
-            coreWebView.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto;
+            TryApplyNonCriticalWebViewSetting(
+                "PreferredColorScheme",
+                () => coreWebView.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto);
 
-            // Set default background to transparent (blends with Mica)
-            webView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
+            TryApplyNonCriticalWebViewSetting(
+                "DefaultBackgroundColor",
+                () => webView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent);
 
             var hostGeneration = _hostGeneration;
             _navigationStartingHandler = CreateNavigationStartingHandler(hostGeneration);
@@ -79,12 +81,18 @@ public partial class WebViewService
             coreWebView.ProcessFailed += _processFailedHandler;
             coreWebView.WebMessageReceived += _webMessageReceivedHandler;
 
-            // Allow file input dialog
-            coreWebView.Settings.AreDefaultContextMenusEnabled = true;
-            coreWebView.Settings.IsStatusBarEnabled = false;
-            coreWebView.Settings.AreDevToolsEnabled = ShouldEnableDevTools();
-
-            coreWebView.Settings.IsGeneralAutofillEnabled = true;
+            TryApplyNonCriticalWebViewSetting(
+                "AreDefaultContextMenusEnabled",
+                () => coreWebView.Settings.AreDefaultContextMenusEnabled = true);
+            TryApplyNonCriticalWebViewSetting(
+                "IsStatusBarEnabled",
+                () => coreWebView.Settings.IsStatusBarEnabled = false);
+            TryApplyNonCriticalWebViewSetting(
+                "AreDevToolsEnabled",
+                () => coreWebView.Settings.AreDevToolsEnabled = ShouldEnableDevTools());
+            TryApplyNonCriticalWebViewSetting(
+                "IsGeneralAutofillEnabled",
+                () => coreWebView.Settings.IsGeneralAutofillEnabled = true);
 
             _isInitialized = true;
             _logger.Info("WebView2 initialized successfully.");
@@ -195,6 +203,22 @@ public partial class WebViewService
 #else
         return _shouldEnableDevTools();
 #endif
+    }
+
+    private void TryApplyNonCriticalWebViewSetting(string settingName, Action apply)
+    {
+        try
+        {
+            apply();
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException or NotImplementedException)
+        {
+            _logger.Warning("webview2.setting.skipped", new
+            {
+                settingName,
+                ex.Message
+            });
+        }
     }
 
     private CoreWebView2? GetCoreWebView()

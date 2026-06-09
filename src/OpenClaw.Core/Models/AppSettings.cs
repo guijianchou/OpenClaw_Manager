@@ -135,6 +135,59 @@ public class AppSettings
     /// Gets or sets the diagnostics options.
     /// </summary>
     public DiagnosticsOptions Diagnostics { get; set; } = new();
+
+    public AppSettings Clone() => new()
+    {
+        Environments = Environments?.Select(environment => environment.Clone()).ToList() ?? [],
+        SelectedEnvironmentName = SelectedEnvironmentName,
+        WindowWidth = WindowWidth,
+        WindowHeight = WindowHeight,
+        WindowLeft = WindowLeft,
+        WindowTop = WindowTop,
+        SettingsWindowWidth = SettingsWindowWidth,
+        SettingsWindowHeight = SettingsWindowHeight,
+        SettingsWindowLeft = SettingsWindowLeft,
+        SettingsWindowTop = SettingsWindowTop,
+        AppTheme = AppTheme,
+        AppLanguage = AppLanguage,
+        MinimizeToTray = MinimizeToTray,
+        CloseToTray = CloseToTray,
+        AllowMultipleInstances = AllowMultipleInstances,
+        GlobalHotkey = GlobalHotkey,
+        EnableGlobalHotkey = EnableGlobalHotkey,
+        AlwaysOnTop = AlwaysOnTop,
+        CompactMode = CompactMode,
+        CompactWindowLeft = CompactWindowLeft,
+        CompactWindowTop = CompactWindowTop,
+        HeartbeatIntervalSeconds = HeartbeatIntervalSeconds,
+        RecoveryPolicy = new RecoveryPolicyOptions
+        {
+            EnableBackgroundResume = RecoveryPolicy?.EnableBackgroundResume ?? true,
+            BackgroundResumeThresholdSeconds = RecoveryPolicy?.BackgroundResumeThresholdSeconds ?? 10,
+            MaxReconnectAttempts = RecoveryPolicy?.MaxReconnectAttempts ?? 3,
+            MaxSoftResyncAttempts = RecoveryPolicy?.MaxSoftResyncAttempts ?? 2,
+            EventIdleSuspicionSeconds = RecoveryPolicy?.EventIdleSuspicionSeconds ?? 120,
+            TransportIdleSuspicionSeconds = RecoveryPolicy?.TransportIdleSuspicionSeconds ?? 60,
+            ReconnectDelayMs = RecoveryPolicy?.ReconnectDelayMs ?? 1200,
+            ReconnectBackoffMultiplier = RecoveryPolicy?.ReconnectBackoffMultiplier ?? 2.0,
+            MaxReconnectDelayMs = RecoveryPolicy?.MaxReconnectDelayMs ?? 45000,
+            HardRefreshCooldownSeconds = RecoveryPolicy?.HardRefreshCooldownSeconds ?? 75,
+        },
+        Heartbeat = new HeartbeatOptions
+        {
+            EnableHeartbeat = Heartbeat?.EnableHeartbeat ?? true,
+            IntervalSeconds = Heartbeat?.IntervalSeconds ?? 45,
+            FailureThreshold = Heartbeat?.FailureThreshold ?? 2,
+            ConnectingThreshold = Heartbeat?.ConnectingThreshold ?? 4,
+        },
+        Diagnostics = new DiagnosticsOptions
+        {
+            EnableVerboseRecoveryLogging = Diagnostics?.EnableVerboseRecoveryLogging ?? false,
+            EnableDevTools = Diagnostics?.EnableDevTools ?? false,
+            EnableTelemetryCollection = Diagnostics?.EnableTelemetryCollection ?? true,
+            TelemetryIntervalSeconds = Diagnostics?.TelemetryIntervalSeconds ?? 60,
+        },
+    };
 }
 
 /// <summary>

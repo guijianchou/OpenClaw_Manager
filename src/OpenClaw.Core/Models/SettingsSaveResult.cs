@@ -6,6 +6,7 @@ public readonly record struct SettingsSaveResult(
     bool DidChangeEnvironmentState,
     bool DidChangeSessionTopology,
     bool DidChangeLanguage,
+    bool DidChangeDevToolsPolicy,
     LiveShellSettingsChange LiveShellSettingsChange)
 {
     public bool DidChangeLiveShellOptions => LiveShellSettingsChange.HasChanges;

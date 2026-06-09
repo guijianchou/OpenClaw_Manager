@@ -40,6 +40,7 @@ public sealed partial class ShellSessionCoordinator
         _streamHealth = HealthStatus.Healthy;
         ResetEscalationCounters();
 
+        AbortRecoveryOperation();
         MarkRecoveryReady();
         _logger.Info("session.ready", new
         {
@@ -63,17 +64,7 @@ public sealed partial class ShellSessionCoordinator
             return false;
         }
 
-        var currentKey = ControlUiProbeUriFactory.TryCreateProbeKey(_currentGatewayUrl);
-        var readyKey = ControlUiProbeUriFactory.TryCreateProbeKey(args.Uri);
-        if (currentKey is not null && readyKey is not null)
-        {
-            return string.Equals(currentKey, readyKey, StringComparison.OrdinalIgnoreCase);
-        }
-
-        return string.Equals(
-            _currentGatewayUrl.Trim().TrimEnd('/'),
-            args.Uri.Trim().TrimEnd('/'),
-            StringComparison.OrdinalIgnoreCase);
+        return GatewayUrlIdentity.IsSameGatewayRoute(_currentGatewayUrl, args.Uri);
     }
 
     private async Task HandleEventGapDetectedAsync(EventGapEventArgs args, CancellationToken cancellationToken)

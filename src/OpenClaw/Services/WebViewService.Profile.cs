@@ -115,6 +115,10 @@ public partial class WebViewService
 
         var sourceFolder = GetUserDataFolderForEnvironment(originalEnvironmentName, gatewayUrl);
         var targetFolder = GetUserDataFolderForEnvironment(renamedEnvironmentName, gatewayUrl);
+        if (string.Equals(sourceFolder, targetFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
         try
         {
@@ -144,35 +148,39 @@ public partial class WebViewService
             return;
         }
 
-        var legacyFolder = GetUserDataFolderForEnvironment(environmentName);
         var profileFolder = GetUserDataFolderForEnvironment(environmentName, gatewayUrl);
-        if (!Directory.Exists(legacyFolder) || Directory.Exists(profileFolder))
+        if (Directory.Exists(profileFolder))
         {
             return;
         }
 
-        var expectedIdentity = NormalizeGatewayUrlForProfileIdentity(gatewayUrl);
-        var legacyIdentity = await TryReadProfileIdentityMarkerAsync(legacyFolder, cancellationToken);
-        if (!string.Equals(legacyIdentity, expectedIdentity, StringComparison.OrdinalIgnoreCase))
+        foreach (var legacyFolder in EnumerateLegacyProfileFolders(environmentName, gatewayUrl, profileFolder))
         {
-            logger?.Info($"Skipped legacy WebView2 profile migration for environment '{environmentName}' because the legacy profile URL identity is unknown or different.");
-            return;
-        }
+            var legacyIdentity = await TryReadProfileIdentityMarkerAsync(legacyFolder, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(legacyIdentity) &&
+                !GatewayUrlIdentity.ProfileIdentityMarkerMatches(legacyIdentity, gatewayUrl))
+            {
+                logger?.Info($"Skipped legacy WebView2 profile migration for environment '{environmentName}' because the legacy profile URL identity is different.");
+                continue;
+            }
 
-        try
-        {
-            await Task.Run(
-                () =>
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(profileFolder)!);
-                    Directory.Move(legacyFolder, profileFolder);
-                },
-                cancellationToken);
-            logger?.Info($"Migrated WebView2 profile folder for environment '{environmentName}' to URL-scoped profile identity.");
-        }
-        catch (Exception ex)
-        {
-            logger?.Warning($"Failed to migrate WebView2 profile folder for environment '{environmentName}': {ex.Message}");
+            try
+            {
+                await Task.Run(
+                    () =>
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(profileFolder)!);
+                        Directory.Move(legacyFolder, profileFolder);
+                    },
+                    cancellationToken);
+                logger?.Info($"Migrated WebView2 profile folder for environment '{environmentName}' to stable URL-scoped profile identity.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger?.Warning($"Failed to migrate WebView2 profile folder for environment '{environmentName}': {ex.Message}");
+                return;
+            }
         }
     }
 
@@ -192,7 +200,7 @@ public partial class WebViewService
             var markerPath = Path.Combine(profileFolder, ProfileIdentityFileName);
             await File.WriteAllTextAsync(
                 markerPath,
-                NormalizeGatewayUrlForProfileIdentity(gatewayUrl),
+                GatewayUrlIdentity.CreateProfileIdentityMarker(gatewayUrl),
                 cancellationToken);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -223,6 +231,38 @@ public partial class WebViewService
 
     private static string BuildEnvironmentFolderName(string environmentName, string? gatewayUrl)
     {
+        if (!string.IsNullOrWhiteSpace(gatewayUrl))
+        {
+            var hash = GatewayUrlIdentity.CreateProfileIdentityHash(gatewayUrl)[..16];
+            return $"profile_{hash}";
+        }
+
+        return BuildLegacyEnvironmentFolderName(environmentName, gatewayUrl: null);
+    }
+
+    private static IEnumerable<string> EnumerateLegacyProfileFolders(
+        string environmentName,
+        string gatewayUrl,
+        string profileFolder)
+    {
+        var root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OpenClaw",
+            "WebView2Data");
+        var candidates = new[]
+        {
+            Path.Combine(root, BuildLegacyEnvironmentFolderName(environmentName, gatewayUrl)),
+            Path.Combine(root, BuildLegacyEnvironmentFolderName(environmentName, gatewayUrl: null)),
+        };
+
+        return candidates
+            .Where(folder => !string.Equals(folder, profileFolder, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(Directory.Exists);
+    }
+
+    private static string BuildLegacyEnvironmentFolderName(string environmentName, string? gatewayUrl)
+    {
         var normalized = string.IsNullOrWhiteSpace(environmentName) ? "default" : environmentName.Trim();
         var sanitized = new string(normalized
             .Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)
@@ -237,12 +277,12 @@ public partial class WebViewService
         sanitized = sanitized.Length > 48 ? sanitized[..48] : sanitized;
         var profileIdentity = string.IsNullOrWhiteSpace(gatewayUrl)
             ? normalized
-            : $"{normalized}\n{NormalizeGatewayUrlForProfileIdentity(gatewayUrl)}";
+            : $"{normalized}\n{NormalizeGatewayUrlForLegacyProfileIdentity(gatewayUrl)}";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(profileIdentity)))[..8];
         return $"{sanitized}_{hash}";
     }
 
-    private static string NormalizeGatewayUrlForProfileIdentity(string gatewayUrl)
+    private static string NormalizeGatewayUrlForLegacyProfileIdentity(string gatewayUrl)
     {
         if (!Uri.TryCreate(gatewayUrl.Trim(), UriKind.Absolute, out var uri))
         {

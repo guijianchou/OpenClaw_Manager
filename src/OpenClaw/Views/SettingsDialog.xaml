@@ -357,6 +357,13 @@
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
+                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsEnableDevTools}"
+                                                   Description="{x:Bind helpers:StringResources.SettingsEnableDevToolsDescription}">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.EnableDevTools, Mode=TwoWay}"
+                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsEnableDevTools}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </controls:SettingsCard>
                         </StackPanel>
 
                         <InfoBar x:Name="DevToolsInfoBar"
