@@ -141,8 +141,10 @@ public sealed partial class ShellSessionCoordinator
 
     private void HandleHeartbeatObserved(HeartbeatProbeResult result)
     {
-        _lastHeartbeatAt = DateTimeOffset.Now;
+        var observedAt = DateTimeOffset.Now;
+        _lastHeartbeatAt = observedAt;
         ApplyHeartbeatHealth(result);
+        ApplyIdleSuspicion(observedAt);
     }
 
     private async Task HandleHeartbeatFailedAsync(string message, CancellationToken cancellationToken)
@@ -154,8 +156,10 @@ public sealed partial class ShellSessionCoordinator
             return;
         }
 
-        _logger.Warning("heartbeat.recovery.requested", new { message });
+        var observedAt = DateTimeOffset.Now;
+        var recoveryReason = ResolveTransportIdleRecoveryReason(observedAt, message);
+        _logger.Warning("heartbeat.recovery.requested", new { message, recoveryReason });
         cancellationToken.ThrowIfCancellationRequested();
-        await RequestReconnectAsync($"Heartbeat recovery requested: {message}", cancellationToken);
+        await RequestReconnectAsync(recoveryReason, cancellationToken);
     }
 }

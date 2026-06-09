@@ -24,9 +24,9 @@ function Assert-CiPattern {
 }
 
 Assert-CiPattern '(?m)^\s*runs-on:\s*windows-2025-vs2026\s*$' 'GitHub Actions CI must pin the Windows runner to windows-2025-vs2026.'
-Assert-CiPattern '(?ms)- name:\s*Checkout\s+uses:\s*actions/checkout@v4' 'GitHub Actions CI must check out the repository.'
-Assert-CiPattern '(?ms)- name:\s*Setup \.NET\s+uses:\s*actions/setup-dotnet@v4\s+with:\s+dotnet-version:\s*10\.0\.300' 'GitHub Actions CI must install the pinned .NET SDK 10.0.300.'
-Assert-CiPattern '(?ms)- name:\s*Setup Node\.js\s+uses:\s*actions/setup-node@v4\s+with:\s+node-version:\s*24\.x' 'GitHub Actions CI must install Node.js 24.x for bridge verification.'
+Assert-CiPattern '(?ms)- name:\s*Checkout\s+uses:\s*actions/checkout@v6' 'GitHub Actions CI must check out the repository with the current Node24-runtime action major.'
+Assert-CiPattern '(?ms)- name:\s*Setup \.NET\s+uses:\s*actions/setup-dotnet@v5\s+with:\s+dotnet-version:\s*10\.0\.300' 'GitHub Actions CI must install the pinned .NET SDK 10.0.300.'
+Assert-CiPattern '(?ms)- name:\s*Setup Node\.js\s+uses:\s*actions/setup-node@v6\s+with:\s+node-version:\s*24\.x' 'GitHub Actions CI must install Node.js 24.x for bridge verification with the current Node24-runtime action major.'
 Assert-CiPattern '(?ms)- name:\s*Restore locked packages\s+shell:\s*pwsh\s+run:\s*dotnet restore OpenClaw\.sln --locked-mode' 'GitHub Actions CI must restore locked packages.'
 Assert-CiPattern '(?ms)- name:\s*Run Core executable harness\s+shell:\s*pwsh\s+run:\s*dotnet run --no-restore --project tests\\OpenClaw\.Core\.Tests\\OpenClaw\.Core\.Tests\.csproj' 'GitHub Actions CI must run the Core executable harness.'
 Assert-CiPattern '(?ms)- name:\s*Run VSTest workflow\s+shell:\s*pwsh\s+run:\s*dotnet test OpenClaw\.sln -c Debug -p:Platform=x64 --no-restore' 'GitHub Actions CI must run VSTest for x64.'
@@ -42,8 +42,27 @@ if (-not (Test-Path -LiteralPath $globalJsonPath)) {
 }
 
 $globalJson = Get-Content -LiteralPath $globalJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($globalJson.sdk.version -ne '10.0.300' -or $globalJson.sdk.rollForward -ne 'latestPatch') {
-    throw 'global.json must pin SDK 10.0.300 with rollForward latestPatch.'
+if ($globalJson.sdk.version -ne '10.0.300' -or $globalJson.sdk.rollForward -ne 'disable') {
+    throw 'global.json must pin SDK 10.0.300 with rollForward disable.'
+}
+
+$directoryBuildPropsPath = Join-Path $repoRoot 'Directory.Build.props'
+if (-not (Test-Path -LiteralPath $directoryBuildPropsPath)) {
+    throw 'Directory.Build.props must exist and centralize deterministic build properties.'
+}
+
+$directoryBuildProps = [xml](Get-Content -LiteralPath $directoryBuildPropsPath -Raw -Encoding UTF8)
+$buildProperties = $directoryBuildProps.Project.PropertyGroup
+if ($buildProperties.RestorePackagesWithLockFile -ne 'true' -or
+    $buildProperties.RestoreUseStaticGraphEvaluation -ne 'true' -or
+    $buildProperties.Nullable -ne 'enable' -or
+    $buildProperties.ImplicitUsings -ne 'enable' -or
+    $buildProperties.EnableNETAnalyzers -ne 'true' -or
+    $buildProperties.AnalysisLevel -ne '10.0' -or
+    $buildProperties.EnforceCodeStyleInBuild -ne 'true' -or
+    $buildProperties.TreatWarningsAsErrors.'#text' -ne 'true' -or
+    $buildProperties.TreatWarningsAsErrors.Condition -ne "'`$(CI)' == 'true'") {
+    throw 'Directory.Build.props must keep locked restore, static graph restore, nullable/implicit usings, analyzer level 10.0, code-style enforcement, and CI warnings-as-errors.'
 }
 
 $testsPath = Join-Path $repoRoot 'tests'
@@ -70,8 +89,10 @@ if ($coreTestsProject -notmatch 'Microsoft\.NET\.Test\.Sdk' -or
     $coreTestsProject -notmatch '<GenerateProgramFile>false</GenerateProgramFile>' -or
     $coreTests -notmatch '\[TestClass\]' -or
     $coreTests -notmatch '\[TestMethod\]' -or
-    $coreTests -notmatch 'await Program\.Main\(\)') {
-    throw 'OpenClaw.Core.Tests must be discoverable by dotnet test while preserving the executable Program.Main harness.'
+    $coreTests -notmatch 'DynamicData\(nameof\(CoreRegressionCases\)' -or
+    $coreTests -notmatch 'public static async Task<int> Main\(\)' -or
+    $coreTests -notmatch 'RegressionCases') {
+    throw 'OpenClaw.Core.Tests must expose per-case VSTest discovery while preserving the executable Program.Main harness.'
 }
 
 foreach ($testName in @(
@@ -85,6 +106,8 @@ foreach ($testName in @(
     'ProbeKeyDistinguishesBasePathsAndPorts',
     'ProbeUriStripsUserInfo',
     'ProbeUriRejectsInvalidUrls',
+    'GatewayProfileIdentitySeparatesQueryAndUserInfoWithoutReadableSecrets',
+    'GatewayLegacyReadableProfileMarkersDoNotMatchSecretScopedUrls',
     'SettingsWindowBoundsUseDedicatedPersistedWidthFloor',
     'LatencyHistoryClearRemovesStaleSamples',
     'ClassifierMarksMissingAndMethodRejectedPathsAsFailures',
@@ -99,25 +122,40 @@ foreach ($testName in @(
     'DiagnosticsMapperDistinguishesPassWarningAndFailureStates',
     'DiagnosticsMapperMarksRedirectsAsFailures',
     'DiagnosticBundleRedactsCopiedLogFilesAsync',
+    'DiagnosticBundleRedactsInlineAuthorizationCredentialsAsync',
     'DiagnosticBundleUsesUniquePathsForRepeatedExportsAsync',
+    'DiagnosticBundleRedactsNonStandardAuthorizationCredentialsAsync',
+    'DiagnosticBundleFormatsFileAccessFailuresWithoutLocalPaths',
     'DiagnosticBundleLimitsTotalLogPayloadAndRedactsHeadersAsync',
     'DiagnosticProbeDowngradesReachableNonLocalHttpToWarningAsync',
     'HeartbeatResolverPreservesHostedConnectingStateWhenTransportFails',
     'HeartbeatResolverMapsTransportSessionBlockedToUserAction',
+    'RecoveryPolicyMarksEventIdleSessionsDegradedAsync',
+    'RecoveryPolicyKeepsActiveStatesDuringEventIdleSuspicionAsync',
     'LatencyServiceDoesNotPublishAuthRequiredAsSuccessAsync',
+    'SessionReadyCancelsInFlightRecoveryOperationsAsync',
     'SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync',
     'SessionReadyRejectsCaseMismatchedGatewayBasePathAsync',
     'StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync',
     'HardRefreshCooldownStartsOnlyAfterReloadSucceedsAsync',
     'HardRefreshReloadsTransitionalHostedUiStatesAsync',
+    'ConfigurationNormalizesInvalidRecoveryPolicyValuesAsync',
     'ConfigurationNormalizesInvalidEnvironmentEntriesAsync',
     'ConfigurationNormalizesCaseOnlyDuplicateEnvironmentNamesAsync',
     'ConfigurationCandidateSaveReplacesLiveSettingsOnlyAfterWriteSuccessAsync',
-    'LiveShellSettingsTolerateNullablePersistedHotkey'
+    'LiveShellSettingsTolerateNullablePersistedHotkey',
+    'ConfigurationRejectsInvalidGatewayUrlSchemesAsync',
+    'ConfigurationBacksUpCorruptSettingsBeforeWritingDefaultsAsync',
+    'ConfigurationPreservesDeferredSaveQueueAfterWriteFailureAsync',
+    'DiagnosticBundleLimitsOversizedLogEntriesAsync'
 )) {
     if ($coreTests -notmatch [regex]::Escape($testName)) {
         throw "Core regression harness is missing required Gateway/Control UI test: $testName"
     }
+}
+
+if ($coreTests -notmatch 'RecoveryPolicyMarksEventIdleSessionsDegradedAsync[\s\S]*_lastEventAt') {
+    throw 'Core regression harness must verify event-idle recovery policy behavior with a stale last-event timestamp.'
 }
 
 $coreProjectId = '{BC4C7184-C8DD-4748-AC82-D26123568BD1}'
@@ -289,10 +327,12 @@ $changelogMetadataLines = $changelogLines | Where-Object {
 if ($readme -notmatch [regex]::Escape("**Current version:** $currentVersion") -or
     $readme -notmatch [regex]::Escape("## Current $currentVersion Notes") -or
     $readme -notmatch [regex]::Escape('Windows 10 1809+ or Windows 11, x64 only') -or
+    $readme -notmatch 'same-host VPS reverse proxies or Cloudflare Tunnel sidecars' -or
     $readmeZhLines.Count -lt 5 -or
     $readmeZhLines[4] -notmatch [regex]::Escape($currentVersion) -or
     $readmeZh -notmatch 'Windows 10 1809' -or
     $readmeZh -notmatch 'x64' -or
+    $readmeZh -notmatch 'same-host loopback forwarding' -or
     [string]::IsNullOrWhiteSpace($readmeZhHeading) -or
     $changelog -notmatch [regex]::Escape("metadata to $currentVersionCodeSpan") -or
     $changelogMetadataLines.Count -lt 2) {
@@ -348,6 +388,29 @@ foreach ($requiredResourceKey in @(
         $chineseResourceKeys -notcontains $requiredResourceKey) {
         throw "Localized resource key missing: $requiredResourceKey"
     }
+}
+
+$englishSessionDescription = ($englishResources.root.data | Where-Object { $_.name -eq 'SettingsSessionsDescription' }).value
+$englishDuplicateEnvironment = ($englishResources.root.data | Where-Object { $_.name -eq 'SettingsValidationDuplicateEnvironment' }).value
+$chineseSessionDescription = ($chineseResources.root.data | Where-Object { $_.name -eq 'SettingsSessionsDescription' }).value
+$chineseDuplicateEnvironment = ($chineseResources.root.data | Where-Object { $_.name -eq 'SettingsValidationDuplicateEnvironment' }).value
+$legacyChineseDuplicateEnvironment = -join @(
+    [char]0x4F1A,
+    [char]0x8BDD,
+    [char]0x9694,
+    [char]0x79BB,
+    [char]0x4F9D,
+    [char]0x8D56,
+    [char]0x73AF,
+    [char]0x5883,
+    [char]0x540D,
+    [char]0x79F0
+)
+if ($englishSessionDescription -notmatch 'URL identity' -or
+    $englishDuplicateEnvironment -match 'Session isolation now uses environment names' -or
+    $chineseSessionDescription -notmatch 'URL identity' -or
+    $chineseDuplicateEnvironment -match [regex]::Escape($legacyChineseDuplicateEnvironment)) {
+    throw 'Settings session/profile resource copy must describe stable Control UI URL identity, not environment-name session isolation.'
 }
 
 foreach ($resource in @(
@@ -459,6 +522,7 @@ if ($webViewProfile -notmatch 'ProfileIdentityFileName' -or
     $webViewProfile -notmatch 'GatewayUrlIdentity\.CreateProfileIdentityHash' -or
     $webViewProfile -notmatch 'GatewayUrlIdentity\.CreateProfileIdentityMarker' -or
     $webViewProfile -notmatch 'GatewayUrlIdentity\.ProfileIdentityMarkerMatches' -or
+    $webViewProfile -notmatch 'if \(!GatewayUrlIdentity\.ProfileIdentityMarkerMatches\(legacyIdentity, gatewayUrl\)\)' -or
     $webViewProfile -notmatch 'EnumerateLegacyProfileFolders' -or
     $webViewProfile -notmatch 'Directory\.Move\(legacyFolder, profileFolder\)' -or
     $webViewProfile -notmatch 'Skipped legacy WebView2 profile migration') {
@@ -1156,15 +1220,22 @@ $stopInjectionScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenCl
 if ($stopInjectionScript -match 'querySelectorAll\(''textarea, input\[type="text"\], input:not\(\[type\]\)''' -or
     $stopInjectionScript -match 'form\.submit\(\)' -or
     $stopInjectionScript -match 'dispatchEvent\(submitEvent\)' -or
+    $stopInjectionScript -match '^\s*\(async\s*\(\)\s*=>' -or
+    $stopInjectionScript -match "'openclaw-app'" -or
     $stopInjectionScript -notmatch 'findChatComposer' -or
-    $stopInjectionScript -notmatch 'requestSubmit') {
+    $stopInjectionScript -notmatch 'tryChatCall' -or
+    $stopInjectionScript -notmatch 'button:not\(\[type\]\), button\[type="submit"\], input\[type="submit"\]' -or
+    $stopInjectionScript -notmatch 'catch') {
     throw 'Stop command fallback must target a known chat composer and must not submit arbitrary first-page inputs or bypass hosted UI validation.'
 }
 
 $abortRunScript = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewCommands.AbortRun.js') -Raw
 if ($abortRunScript -match 'querySelectorAll\(''button, \[role="button"\], \[aria-label\], \[title\]''' -or
+    $abortRunScript -match '^\s*\(async\s*\(\)\s*=>' -or
+    $abortRunScript -match "'openclaw-app'" -or
     $abortRunScript -notmatch 'findChatActionSurface' -or
-    $abortRunScript -notmatch 'chat\.abort') {
+    $abortRunScript -notmatch 'tryAbortTarget' -or
+    $abortRunScript -notmatch 'window\.chat') {
     throw 'Abort fallback must target a known chat/run action surface and prefer the hosted chat.abort API.'
 }
 
@@ -1322,6 +1393,17 @@ if ($coordinatorStateEffects -notmatch 'SafeFireAndForget\(\s*async token' -or
 
 if ($coordinatorStateEffects -notmatch 'case ControlUiPhase\.GatewayError:[\s\S]*case ControlUiPhase\.Unavailable:[\s\S]*MarkRecoveryDegraded\(snapshot\.DetailOrSummary\)') {
     throw 'ShellSessionCoordinator terminal hosted-session failures must move recovery state out of stale Ready/Healthy state.'
+}
+
+$coordinatorEventHandlers = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/ShellSessionCoordinator.EventHandlers.cs') -Raw
+if ($coordinatorStateEffects -notmatch 'ApplyIdleSuspicion\(DateTimeOffset observedAt\)' -or
+    $coordinatorStateEffects -notmatch 'EventIdleSuspicionSeconds' -or
+    $coordinatorStateEffects -notmatch 'RecoveryState\.Ready and not RecoveryState\.Healthy' -or
+    $coordinatorStateEffects -notmatch 'ResolveTransportIdleRecoveryReason' -or
+    $coordinatorStateEffects -notmatch 'TransportIdleSuspicionSeconds' -or
+    $coordinatorEventHandlers -notmatch 'ApplyIdleSuspicion\(observedAt\)' -or
+    $coordinatorEventHandlers -notmatch 'ResolveTransportIdleRecoveryReason\(observedAt, message\)') {
+    throw 'ShellSessionCoordinator must consume configured event and transport idle suspicion thresholds.'
 }
 
 $coordinatorHost = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/ShellSessionCoordinator.Host.cs') -Raw
@@ -1866,8 +1948,14 @@ if ($commands -match 'Diagnostic bundle exported to Desktop' -or
 
 $diagnosticBundleService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/DiagnosticBundleService.cs') -Raw
 if ($diagnosticBundleService -notmatch 'RedactDiagnosticText' -or
+    $diagnosticBundleService -notmatch 'AuthorizationCredentialPattern' -or
+    $diagnosticBundleService -notmatch 'RedactAuthorizationCredentials' -or
+    $diagnosticBundleService -notmatch 'FindAuthorizationValueEnd' -or
     $diagnosticBundleService -notmatch 'KeyValueSecretPattern' -or
     $diagnosticBundleService -notmatch 'HeaderSecretPattern' -or
+    $diagnosticBundleService -notmatch 'CollectRecentLogFiles\(\s*string logsDirectory,\s*TimeSpan\? retention,\s*List<string>\? notes\)' -or
+    $diagnosticBundleService -notmatch 'log directory skipped' -or
+    $diagnosticBundleService -notmatch 'FormatFileAccessFailure' -or
     $diagnosticBundleService -notmatch 'MaxBundledLogPayloadBytes' -or
     $diagnosticBundleService -notmatch 'MaxDiagnosticTextEntryBytes' -or
     $diagnosticBundleService -notmatch 'DiagnosticLogReadResult\(bool Succeeded, string\? Content, string Message, long ByteCount\)' -or

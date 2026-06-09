@@ -157,7 +157,7 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 
 ## Tests
 
-- `tests\OpenClaw.Core.Tests` is the active executable Core regression harness. `dotnet run` is the fastest targeted signal for the harness, and `dotnet test` is the supported VSTest workflow invoking the same harness.
+- `tests\OpenClaw.Core.Tests` is the active executable Core regression harness. `dotnet run` is the fastest targeted signal for the harness, and `dotnet test` is the supported VSTest workflow exposing the same regression cases individually.
 - Keep Core harness coverage limited to pure .NET behavior such as status classifiers, probe URI helpers, parsers, and policies.
 - Use source-text assertions only for contracts a harness cannot execute, such as XAML resource usage, project metadata, and platform integration declarations.
 - `tools\verify-bridge-scripts.ps1` is the active behavior check for embedded JS assets. Future bridge, MODEL, mutation-filter, status-inspection, and command-dispatch changes must update that script.

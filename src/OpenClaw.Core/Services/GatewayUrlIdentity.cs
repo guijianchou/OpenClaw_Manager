@@ -41,6 +41,12 @@ public static class GatewayUrlIdentity
             return true;
         }
 
+        if (TryCreateSupportedUri(gatewayUrl, out var uri) &&
+            HasSecretScopedProfileIdentity(uri))
+        {
+            return false;
+        }
+
         return string.Equals(
             trimmedMarker,
             NormalizeForLegacyReadableProfileMarker(gatewayUrl),
@@ -120,6 +126,12 @@ public static class GatewayUrlIdentity
         };
 
         return builder.Uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
+    }
+
+    private static bool HasSecretScopedProfileIdentity(Uri uri)
+    {
+        return !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query);
     }
 
     private static string TrimRootPath(string absoluteUri)

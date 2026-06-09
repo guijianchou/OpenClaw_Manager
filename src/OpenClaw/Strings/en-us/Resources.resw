@@ -387,7 +387,7 @@
     <value>Environment Sessions</value>
   </data>
   <data name="SettingsSessionsDescription" xml:space="preserve">
-    <value>Each environment uses its own WebView2Data profile. Clear only the environment you want to reset.</value>
+    <value>WebView2Data profiles are keyed by stable Control UI URL identity. Clear only the Control UI session you want to reset.</value>
   </data>
   <data name="SettingsSessionReset" xml:space="preserve">
     <value>Session Reset</value>
@@ -466,7 +466,7 @@
     <value>Select an environment first.</value>
   </data>
   <data name="SettingsValidationDuplicateEnvironment" xml:space="preserve">
-    <value>Environment name '{0}' is duplicated. Session isolation now uses environment names, so each environment name must be unique.</value>
+    <value>Environment name '{0}' is duplicated. Names must stay unique for selection, defaults, and profile-management actions.</value>
   </data>
   <data name="SettingsValidationEnvironmentNameRequired" xml:space="preserve">
     <value>Environment name is required.</value>

@@ -2,6 +2,7 @@
 
 using System.IO.Compression;
 using System.Net;
+using System.Reflection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenClaw.Helpers;
 using OpenClaw.Models;
@@ -10,85 +11,103 @@ using OpenClaw.Services;
 namespace OpenClaw.Core.Tests;
 
 /// <summary>
-/// Lets standard VSTest-based workflows execute the same regression harness used by dotnet run.
+/// Lets standard VSTest-based workflows report the same regression cases used by dotnet run.
 /// </summary>
 [TestClass]
 public sealed class CoreRegressionHarnessTests
 {
     [TestMethod]
-    public async Task CoreRegressionHarnessPasses()
+    [DynamicData(nameof(CoreRegressionCases), DynamicDataSourceType.Method)]
+    public async Task CoreRegressionCasePasses(string name, Func<Task> test)
     {
-        Assert.AreEqual(0, await Program.Main());
+        try
+        {
+            await test();
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"{name}: {ex.Message}");
+        }
     }
+
+    public static IEnumerable<object[]> CoreRegressionCases() =>
+        Program.RegressionCases.Select(test => new object[] { test.Name, test.Test });
 }
+
+internal readonly record struct RegressionCase(string Name, Func<Task> Test);
 
 internal static class Program
 {
+    internal static IReadOnlyList<RegressionCase> RegressionCases { get; } =
+    [
+        new("Cloudflare error 1033 body is detected under an HTTP 5xx response", () => Run(Cloudflare1033BodyIsDetected)),
+        new("Cloudflare error 1033 response body is detected through production classifier entry point", Cloudflare1033ResponseBodyIsDetectedThroughProductionEntryPointAsync),
+        new("Cloudflare error 1033 header is detected under an HTTP 5xx response", () => Run(Cloudflare1033HeaderIsDetected)),
+        new("Cloudflare error 1033 header is detected through production classifier entry point", Cloudflare1033HeaderIsDetectedThroughProductionEntryPointAsync),
+        new("Cloudflare error 1033 code header is detected through production entry point", Cloudflare1033CodeHeaderIsDetectedThroughProductionEntryPointAsync),
+        new("Plain 5xx response remains a server or proxy error", () => Run(Plain5xxRemainsServerOrProxyError)),
+        new("Cloudflare branded 5xx body with unrelated 1033 remains a server or proxy error", CloudflareBrandedBodyWithUnrelated1033RemainsServerOrProxyErrorAsync),
+        new("Cloudflare error body snippet read timeout falls back to status classification", CloudflareBodySnippetReadTimeoutFallsBackToStatusClassificationAsync),
+        new("Control UI probe URI preserves base path and appends config endpoint", () => Run(ProbeUriPreservesBasePath)),
+        new("Control UI probe URI appends config endpoint at root", () => Run(ProbeUriAppendsAtRoot)),
+        new("Control UI probe URI is idempotent for an already configured endpoint", () => Run(ProbeUriIsIdempotent)),
+        new("Control UI probe URI normalizes already configured endpoint without trailing slash", () => Run(ProbeUriNormalizesConfiguredEndpointWithoutTrailingSlash)),
+        new("Control UI probe key distinguishes base paths and ports", () => Run(ProbeKeyDistinguishesBasePathsAndPorts)),
+        new("Control UI probe URI strips userinfo before publishing probe URL or key", () => Run(ProbeUriStripsUserInfo)),
+        new("Control UI probe URI rejects non-http schemes and relative URLs", () => Run(ProbeUriRejectsInvalidUrls)),
+        new("Gateway profile identity separates query and userinfo without readable secrets", () => Run(GatewayProfileIdentitySeparatesQueryAndUserInfoWithoutReadableSecrets)),
+        new("Gateway legacy readable profile markers do not match secret-scoped URLs", () => Run(GatewayLegacyReadableProfileMarkersDoNotMatchSecretScopedUrls)),
+        new("Settings window bounds use the dedicated persisted width floor", () => Run(SettingsWindowBoundsUseDedicatedPersistedWidthFloor)),
+        new("Settings window bounds reject unsafe narrow persisted widths", () => Run(SettingsWindowBoundsRejectUnsafeNarrowPersistedWidths)),
+        new("Tray menu strings expose localized status and tooltip formats", () => Run(TrayMenuStringsExposeLocalizedStatusAndTooltipFormats)),
+        new("Latency history clear removes stale samples", () => Run(LatencyHistoryClearRemovesStaleSamples)),
+        new("Gateway classifier treats missing and method-rejected probe paths as failures", () => Run(ClassifierMarksMissingAndMethodRejectedPathsAsFailures)),
+        new("Gateway classifier treats auth rate-limit as reachable user action", () => Run(ClassifierMarksAuthRateLimitAsReachableUserAction)),
+        new("Gateway classifier treats reverse-proxy 5xx as unreachable", () => Run(ClassifierMarksServerOrProxyErrorsAsUnreachable)),
+        new("Heartbeat maps access-required HTTP states to session-blocked", () => Run(HeartbeatMapsAccessRequiredToSessionBlocked)),
+        new("Heartbeat maps auth rate-limit HTTP states to session-blocked", () => Run(HeartbeatMapsAuthRateLimitToSessionBlocked)),
+        new("Heartbeat maps redirects to failure", () => Run(HeartbeatMapsRedirectsToFailure)),
+        new("Heartbeat maps missing Control UI path to failure", () => Run(HeartbeatMapsMissingPathToFailure)),
+        new("Latency service publishes redirect responses as failure", LatencyServicePublishesRedirectsAsFailureAsync),
+        new("Latency service does not publish auth-required responses as success", LatencyServiceDoesNotPublishAuthRequiredAsSuccessAsync),
+        new("Latency service publishes 2xx responses as success", LatencyServicePublishesSuccessAsync),
+        new("Diagnostics mapper marks path and proxy failures as failures", () => Run(DiagnosticsMapperMarksPathAndProxyFailuresAsFailures)),
+        new("Diagnostics mapper distinguishes pass, warning, and failure states", () => Run(DiagnosticsMapperDistinguishesPassWarningAndFailureStates)),
+        new("Diagnostics mapper marks redirects as failures", () => Run(DiagnosticsMapperMarksRedirectsAsFailures)),
+        new("Diagnostic bundle redacts copied log files", DiagnosticBundleRedactsCopiedLogFilesAsync),
+        new("Diagnostic bundle redacts inline authorization credentials", DiagnosticBundleRedactsInlineAuthorizationCredentialsAsync),
+        new("Diagnostic bundle uses unique paths for repeated exports", DiagnosticBundleUsesUniquePathsForRepeatedExportsAsync),
+        new("Diagnostic bundle redacts non-standard authorization credentials", DiagnosticBundleRedactsNonStandardAuthorizationCredentialsAsync),
+        new("Diagnostic bundle formats file access failures without local paths", () => Run(DiagnosticBundleFormatsFileAccessFailuresWithoutLocalPaths)),
+        new("Diagnostic network probe downgrades reachable non-local HTTP to warning", DiagnosticProbeDowngradesReachableNonLocalHttpToWarningAsync),
+        new("Heartbeat resolver preserves hosted connecting state when transport fails", () => Run(HeartbeatResolverPreservesHostedConnectingStateWhenTransportFails)),
+        new("Heartbeat resolver maps transport session-blocked to user action while preserving hosted detail", () => Run(HeartbeatResolverMapsTransportSessionBlockedToUserAction)),
+        new("Recovery policy marks event-idle sessions degraded", RecoveryPolicyMarksEventIdleSessionsDegradedAsync),
+        new("Recovery policy keeps active recovery states during event idle suspicion", RecoveryPolicyKeepsActiveStatesDuringEventIdleSuspicionAsync),
+        new("Session ready clears terminal recovery states", SessionReadyClearsTerminalRecoveryStatesAsync),
+        new("Session ready cancels in-flight recovery operations", SessionReadyCancelsInFlightRecoveryOperationsAsync),
+        new("Session ready accepts deep routes under current gateway base path", SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync),
+        new("Session ready rejects case-mismatched gateway base paths", SessionReadyRejectsCaseMismatchedGatewayBasePathAsync),
+        new("Stale session ready does not clear current environment recovery state", StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync),
+        new("Hard refresh cooldown starts only after reload succeeds", HardRefreshCooldownStartsOnlyAfterReloadSucceedsAsync),
+        new("Hard refresh reloads transitional hosted UI states", HardRefreshReloadsTransitionalHostedUiStatesAsync),
+        new("Successful soft resync resets consecutive recovery attempts", SuccessfulSoftResyncResetsConsecutiveAttemptsAsync),
+        new("Configuration normalizes invalid recovery policy values", ConfigurationNormalizesInvalidRecoveryPolicyValuesAsync),
+        new("Configuration normalizes invalid environment entries", ConfigurationNormalizesInvalidEnvironmentEntriesAsync),
+        new("Configuration normalizes case-only duplicate environment names", ConfigurationNormalizesCaseOnlyDuplicateEnvironmentNamesAsync),
+        new("Configuration candidate save replaces live settings only after write success", ConfigurationCandidateSaveReplacesLiveSettingsOnlyAfterWriteSuccessAsync),
+        new("Live shell settings tolerate nullable persisted hotkey", () => Run(LiveShellSettingsTolerateNullablePersistedHotkey)),
+        new("Configuration rejects invalid gateway URL schemes", ConfigurationRejectsInvalidGatewayUrlSchemesAsync),
+        new("Configuration backs up corrupt settings before writing defaults", ConfigurationBacksUpCorruptSettingsBeforeWritingDefaultsAsync),
+        new("Configuration preserves deferred save queue after write failure", ConfigurationPreservesDeferredSaveQueueAfterWriteFailureAsync),
+        new("Diagnostic bundle limits oversized log entries", DiagnosticBundleLimitsOversizedLogEntriesAsync),
+        new("Diagnostic bundle limits total log payload and redacts headers", DiagnosticBundleLimitsTotalLogPayloadAndRedactsHeadersAsync),
+    ];
+
     public static async Task<int> Main()
     {
-        var tests = new (string Name, Func<Task> Test)[]
-        {
-            ("Cloudflare error 1033 body is detected under an HTTP 5xx response", () => Run(Cloudflare1033BodyIsDetected)),
-            ("Cloudflare error 1033 response body is detected through production classifier entry point", Cloudflare1033ResponseBodyIsDetectedThroughProductionEntryPointAsync),
-            ("Cloudflare error 1033 header is detected under an HTTP 5xx response", () => Run(Cloudflare1033HeaderIsDetected)),
-            ("Cloudflare error 1033 header is detected through production classifier entry point", Cloudflare1033HeaderIsDetectedThroughProductionEntryPointAsync),
-            ("Cloudflare error 1033 code header is detected through production classifier entry point", Cloudflare1033CodeHeaderIsDetectedThroughProductionEntryPointAsync),
-            ("Plain 5xx response remains a server or proxy error", () => Run(Plain5xxRemainsServerOrProxyError)),
-            ("Cloudflare branded 5xx body with unrelated 1033 remains a server or proxy error", CloudflareBrandedBodyWithUnrelated1033RemainsServerOrProxyErrorAsync),
-            ("Cloudflare error body snippet read timeout falls back to status classification", CloudflareBodySnippetReadTimeoutFallsBackToStatusClassificationAsync),
-            ("Control UI probe URI preserves base path and appends config endpoint", () => Run(ProbeUriPreservesBasePath)),
-            ("Control UI probe URI appends config endpoint at root", () => Run(ProbeUriAppendsAtRoot)),
-            ("Control UI probe URI is idempotent for an already configured endpoint", () => Run(ProbeUriIsIdempotent)),
-            ("Control UI probe URI normalizes already configured endpoint without trailing slash", () => Run(ProbeUriNormalizesConfiguredEndpointWithoutTrailingSlash)),
-            ("Control UI probe key distinguishes base paths and ports", () => Run(ProbeKeyDistinguishesBasePathsAndPorts)),
-            ("Control UI probe URI strips userinfo before publishing probe URL or key", () => Run(ProbeUriStripsUserInfo)),
-            ("Control UI probe URI rejects non-http schemes and relative URLs", () => Run(ProbeUriRejectsInvalidUrls)),
-            ("Gateway profile identity separates query and userinfo without readable secrets", () => Run(GatewayProfileIdentitySeparatesQueryAndUserInfoWithoutReadableSecrets)),
-            ("Settings window bounds use the dedicated persisted width floor", () => Run(SettingsWindowBoundsUseDedicatedPersistedWidthFloor)),
-            ("Settings window bounds reject unsafe narrow persisted widths", () => Run(SettingsWindowBoundsRejectUnsafeNarrowPersistedWidths)),
-            ("Tray menu strings expose localized status and tooltip formats", () => Run(TrayMenuStringsExposeLocalizedStatusAndTooltipFormats)),
-            ("Latency history clear removes stale samples", () => Run(LatencyHistoryClearRemovesStaleSamples)),
-            ("Gateway classifier treats missing and method-rejected probe paths as failures", () => Run(ClassifierMarksMissingAndMethodRejectedPathsAsFailures)),
-            ("Gateway classifier treats auth rate-limit as reachable user action", () => Run(ClassifierMarksAuthRateLimitAsReachableUserAction)),
-            ("Gateway classifier treats reverse-proxy 5xx as unreachable", () => Run(ClassifierMarksServerOrProxyErrorsAsUnreachable)),
-            ("Heartbeat maps access-required HTTP states to session-blocked", () => Run(HeartbeatMapsAccessRequiredToSessionBlocked)),
-            ("Heartbeat maps auth rate-limit HTTP states to session-blocked", () => Run(HeartbeatMapsAuthRateLimitToSessionBlocked)),
-            ("Heartbeat maps redirects to failure", () => Run(HeartbeatMapsRedirectsToFailure)),
-            ("Heartbeat maps missing Control UI path to failure", () => Run(HeartbeatMapsMissingPathToFailure)),
-            ("Latency service publishes redirect responses as failure", LatencyServicePublishesRedirectsAsFailureAsync),
-            ("Latency service does not publish auth-required responses as success", LatencyServiceDoesNotPublishAuthRequiredAsSuccessAsync),
-            ("Latency service publishes 2xx responses as success", LatencyServicePublishesSuccessAsync),
-            ("Diagnostics mapper marks path and proxy failures as failures", () => Run(DiagnosticsMapperMarksPathAndProxyFailuresAsFailures)),
-            ("Diagnostics mapper distinguishes pass, warning, and failure states", () => Run(DiagnosticsMapperDistinguishesPassWarningAndFailureStates)),
-            ("Diagnostics mapper marks redirects as failures", () => Run(DiagnosticsMapperMarksRedirectsAsFailures)),
-            ("Diagnostic bundle redacts copied log files", DiagnosticBundleRedactsCopiedLogFilesAsync),
-            ("Diagnostic bundle redacts inline authorization credentials", DiagnosticBundleRedactsInlineAuthorizationCredentialsAsync),
-            ("Diagnostic bundle uses unique paths for repeated exports", DiagnosticBundleUsesUniquePathsForRepeatedExportsAsync),
-            ("Diagnostic network probe downgrades reachable non-local HTTP to warning", DiagnosticProbeDowngradesReachableNonLocalHttpToWarningAsync),
-            ("Heartbeat resolver preserves hosted connecting state when transport fails", () => Run(HeartbeatResolverPreservesHostedConnectingStateWhenTransportFails)),
-            ("Heartbeat resolver maps transport session-blocked to user action while preserving hosted detail", () => Run(HeartbeatResolverMapsTransportSessionBlockedToUserAction)),
-            ("Session ready clears terminal recovery states", SessionReadyClearsTerminalRecoveryStatesAsync),
-            ("Session ready cancels in-flight recovery operations", SessionReadyCancelsInFlightRecoveryOperationsAsync),
-            ("Session ready accepts deep routes under current gateway base path", SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync),
-            ("Session ready rejects case-mismatched gateway base paths", SessionReadyRejectsCaseMismatchedGatewayBasePathAsync),
-            ("Stale session ready does not clear current environment recovery state", StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync),
-            ("Hard refresh cooldown starts only after reload succeeds", HardRefreshCooldownStartsOnlyAfterReloadSucceedsAsync),
-            ("Hard refresh reloads transitional hosted UI states", HardRefreshReloadsTransitionalHostedUiStatesAsync),
-            ("Successful soft resync resets consecutive recovery attempts", SuccessfulSoftResyncResetsConsecutiveAttemptsAsync),
-            ("Configuration normalizes invalid recovery policy values", ConfigurationNormalizesInvalidRecoveryPolicyValuesAsync),
-            ("Configuration normalizes invalid environment entries", ConfigurationNormalizesInvalidEnvironmentEntriesAsync),
-            ("Configuration normalizes case-only duplicate environment names", ConfigurationNormalizesCaseOnlyDuplicateEnvironmentNamesAsync),
-            ("Configuration candidate save replaces live settings only after write success", ConfigurationCandidateSaveReplacesLiveSettingsOnlyAfterWriteSuccessAsync),
-            ("Live shell settings tolerate nullable persisted hotkey", () => Run(LiveShellSettingsTolerateNullablePersistedHotkey)),
-            ("Configuration rejects invalid gateway URL schemes", ConfigurationRejectsInvalidGatewayUrlSchemesAsync),
-            ("Configuration backs up corrupt settings before writing defaults", ConfigurationBacksUpCorruptSettingsBeforeWritingDefaultsAsync),
-            ("Configuration preserves deferred save queue after write failure", ConfigurationPreservesDeferredSaveQueueAfterWriteFailureAsync),
-            ("Diagnostic bundle limits oversized log entries", DiagnosticBundleLimitsOversizedLogEntriesAsync),
-            ("Diagnostic bundle limits total log payload and redacts headers", DiagnosticBundleLimitsTotalLogPayloadAndRedactsHeadersAsync),
-        };
-
         var failures = new List<string>();
-        foreach (var (name, test) in tests)
+        foreach (var (name, test) in RegressionCases)
         {
             try
             {
@@ -352,6 +371,32 @@ internal static class Program
         AssertNotContains("secret-one", firstMarker, "marker");
         AssertNotContains("tenant=alpha", firstMarker, "marker");
         AssertNotContains("user-one", firstMarker, "marker");
+    }
+
+    private static void GatewayLegacyReadableProfileMarkersDoNotMatchSecretScopedUrls()
+    {
+        const string legacyReadableMarker = "https://gateway.example.com/manager";
+
+        AssertTrue(
+            GatewayUrlIdentity.ProfileIdentityMarkerMatches(
+                legacyReadableMarker,
+                "https://gateway.example.com/manager"),
+            "legacyReadableMarkerStillMatchesPlainUrl");
+        AssertFalse(
+            GatewayUrlIdentity.ProfileIdentityMarkerMatches(
+                legacyReadableMarker,
+                "https://gateway.example.com/manager?tenant=alpha"),
+            "legacyReadableMarkerRejectsQueryScopedUrl");
+        AssertFalse(
+            GatewayUrlIdentity.ProfileIdentityMarkerMatches(
+                legacyReadableMarker,
+                "https://user:secret@gateway.example.com/manager"),
+            "legacyReadableMarkerRejectsUserInfoScopedUrl");
+        AssertFalse(
+            GatewayUrlIdentity.ProfileIdentityMarkerMatches(
+                null,
+                "https://gateway.example.com/manager"),
+            "missingMarkerRejectsMigration");
     }
 
     private static void SettingsWindowBoundsUseDedicatedPersistedWidthFloor()
@@ -643,8 +688,8 @@ internal static class Program
             AssertNotContains("inline-log-secret", logEntry, "logEntry");
             AssertNotContains("inline-basic-secret", logEntry, "logEntry");
             AssertNotContains("inline-summary-secret", summaryEntry, "summaryEntry");
-            AssertContains("Authorization: Bearer <redacted>", logEntry, "logEntry");
-            AssertContains("Authorization: Bearer <redacted>", summaryEntry, "summaryEntry");
+            AssertContains("Authorization: <redacted>", logEntry, "logEntry");
+            AssertContains("Authorization: <redacted>", summaryEntry, "summaryEntry");
         }
         finally
         {
@@ -684,6 +729,77 @@ internal static class Program
         }
     }
 
+    private static async Task DiagnosticBundleRedactsNonStandardAuthorizationCredentialsAsync()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"openclaw-tests-{Guid.NewGuid():N}");
+        var logsDirectory = Path.Combine(tempRoot, "logs");
+        var outputDirectory = Path.Combine(tempRoot, "out");
+        Directory.CreateDirectory(logsDirectory);
+
+        try
+        {
+            var logPath = Path.Combine(logsDirectory, "openclaw-20260608.log");
+            await File.WriteAllTextAsync(
+                logPath,
+                string.Join(Environment.NewLine, new[]
+                {
+                    "Authorization=Bearer equals-secret",
+                    "Authorization: Token token-secret",
+                    "Authorization: AWS4-HMAC-SHA256 aws-secret",
+                    "event=retry Authorization: AWS4-HMAC-SHA256 Credential=tenant/access-key/20260608/us-east-1/service/aws4_request, SignedHeaders=host;x-openclaw, Signature=aws-signature-secret",
+                    "debug Authorization: Digest username=\"tenant\", realm=\"openclaw\", nonce=\"nonce-secret\", response=\"digest-response-secret\"",
+                    "{\"message\":\"Authorization=Token json-secret\"}",
+                }));
+
+            var outputPath = await DiagnosticBundleService.ExportBundleAsync(
+                "{}",
+                logsDirectory,
+                "Authorization=Bearer summary-secret",
+                outputDirectory,
+                CreateRuntimeInfo());
+
+            var logEntry = await ReadZipEntryAsync(outputPath, "logs/openclaw-20260608.log");
+            var summaryEntry = await ReadZipEntryAsync(outputPath, "diagnostic-summary.txt");
+
+            AssertNotContains("equals-secret", logEntry, "logEntry");
+            AssertNotContains("token-secret", logEntry, "logEntry");
+            AssertNotContains("aws-secret", logEntry, "logEntry");
+            AssertNotContains("access-key", logEntry, "logEntry");
+            AssertNotContains("aws-signature-secret", logEntry, "logEntry");
+            AssertNotContains("nonce-secret", logEntry, "logEntry");
+            AssertNotContains("digest-response-secret", logEntry, "logEntry");
+            AssertNotContains("json-secret", logEntry, "logEntry");
+            AssertNotContains("summary-secret", summaryEntry, "summaryEntry");
+            AssertContains("Authorization=<redacted>", logEntry, "logEntry");
+            AssertContains("Authorization: <redacted>", logEntry, "logEntry");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    private static void DiagnosticBundleFormatsFileAccessFailuresWithoutLocalPaths()
+    {
+        var method = typeof(DiagnosticBundleService).GetMethod(
+            "FormatFileAccessFailure",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        AssertNotNull(method, "FormatFileAccessFailure");
+
+        var message = method!.Invoke(
+            null,
+            new object[]
+            {
+                new IOException(@"Access to C:\Users\Zen\Repo\Codes\Claw_winui3\logs\openclaw-secret.log was denied.")
+            }) as string;
+
+        AssertNotNull(message, "message");
+        AssertContains(nameof(IOException), message!, "message");
+        AssertNotContains(@"C:\Users", message!, "message");
+        AssertNotContains("Zen", message!, "message");
+        AssertNotContains("openclaw-secret.log", message!, "message");
+    }
+
     private static async Task DiagnosticProbeDowngradesReachableNonLocalHttpToWarningAsync()
     {
         using var probe = new GatewayDiagnosticProbe(
@@ -718,6 +834,62 @@ internal static class Program
         AssertEqual(HeartbeatProbeStatus.SessionBlocked, result.Status, "result.Status");
         AssertContains("hosted connecting", result.Message, "result.Message");
         AssertContains("transport auth required", result.Message, "result.Message");
+    }
+
+    private static async Task RecoveryPolicyMarksEventIdleSessionsDegradedAsync()
+    {
+        var webView = new FakeShellSessionWebView();
+        var bridge = new FakeShellSessionBridge();
+        using var coordinator = await CreateAttachedCoordinatorAsync(
+            webView,
+            bridge,
+            new RecoveryPolicyOptions
+            {
+                EventIdleSuspicionSeconds = 1,
+            });
+
+        webView.RaiseControlUiSnapshot(ConnectedSnapshot());
+        AssertEqual(RecoveryState.Ready, coordinator.CurrentRecoveryState, "stateBeforeIdle");
+
+        SetPrivateField(
+            coordinator,
+            "_lastEventAt",
+            DateTimeOffset.Now - TimeSpan.FromSeconds(5));
+
+        webView.RaiseHeartbeatObserved(HeartbeatProbeResult.Healthy("transport healthy"));
+
+        AssertEqual(RecoveryState.Degraded, coordinator.CurrentRecoveryState, "stateAfterIdleHeartbeat");
+    }
+
+    private static async Task RecoveryPolicyKeepsActiveStatesDuringEventIdleSuspicionAsync()
+    {
+        foreach (var activeState in new[]
+        {
+            RecoveryState.Reconnecting,
+            RecoveryState.Resyncing,
+            RecoveryState.Refreshing,
+        })
+        {
+            var webView = new FakeShellSessionWebView();
+            var bridge = new FakeShellSessionBridge();
+            using var coordinator = await CreateAttachedCoordinatorAsync(
+                webView,
+                bridge,
+                new RecoveryPolicyOptions
+                {
+                    EventIdleSuspicionSeconds = 1,
+                });
+
+            SetPrivateField(coordinator, "_recoveryState", activeState);
+            SetPrivateField(
+                coordinator,
+                "_lastEventAt",
+                DateTimeOffset.Now - TimeSpan.FromSeconds(5));
+
+            webView.RaiseHeartbeatObserved(HeartbeatProbeResult.Healthy("transport healthy"));
+
+            AssertEqual(activeState, coordinator.CurrentRecoveryState, $"stateAfterIdleHeartbeat:{activeState}");
+        }
     }
 
     private static async Task SessionReadyClearsTerminalRecoveryStatesAsync()
@@ -763,6 +935,7 @@ internal static class Program
         var webView = new FakeShellSessionWebView
         {
             Snapshot = ControlUiProbeSnapshot.Unavailable("proxy unavailable"),
+            ReloadDelay = TimeSpan.FromSeconds(30),
         };
         var bridge = new FakeShellSessionBridge();
         using var coordinator = await CreateAttachedCoordinatorAsync(webView, bridge);
@@ -776,6 +949,7 @@ internal static class Program
         await hardRefreshTask;
 
         AssertEqual(RecoveryState.Ready, coordinator.CurrentRecoveryState, "stateAfterInFlightRecoveryCompletes");
+        AssertTrue(webView.ReloadCancellationObserved, "reloadCancellationObserved");
     }
 
     private static async Task SessionReadyAcceptsDeepRoutesUnderCurrentGatewayBasePathAsync()
@@ -1435,6 +1609,13 @@ internal static class Program
         return await reader.ReadToEndAsync();
     }
 
+    private static void SetPrivateField<T>(object target, string fieldName, T value)
+    {
+        var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        AssertNotNull(field, fieldName);
+        field!.SetValue(target, value);
+    }
+
     private static void TryDeleteDirectory(string directory)
     {
         try
@@ -1555,6 +1736,10 @@ internal static class Program
 
         public TimeSpan InspectDelay { get; set; }
 
+        public TimeSpan ReloadDelay { get; set; }
+
+        public bool ReloadCancellationObserved { get; private set; }
+
         public int ReloadRequests { get; private set; }
 
         public int TotalControlUiInspectionRequests { get; private set; }
@@ -1591,7 +1776,26 @@ internal static class Program
         public Task<bool> ReloadAsync(CancellationToken cancellationToken)
         {
             ReloadRequests++;
-            return Task.FromResult(true);
+            if (ReloadDelay <= TimeSpan.Zero)
+            {
+                return Task.FromResult(true);
+            }
+
+            return ReloadWithDelayAsync(cancellationToken);
+        }
+
+        private async Task<bool> ReloadWithDelayAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(ReloadDelay, cancellationToken);
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                ReloadCancellationObserved = true;
+                throw;
+            }
         }
 
         public void RaiseControlUiSnapshot(ControlUiProbeSnapshot snapshot)

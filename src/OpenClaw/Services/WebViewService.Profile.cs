@@ -157,10 +157,9 @@ public partial class WebViewService
         foreach (var legacyFolder in EnumerateLegacyProfileFolders(environmentName, gatewayUrl, profileFolder))
         {
             var legacyIdentity = await TryReadProfileIdentityMarkerAsync(legacyFolder, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(legacyIdentity) &&
-                !GatewayUrlIdentity.ProfileIdentityMarkerMatches(legacyIdentity, gatewayUrl))
+            if (!GatewayUrlIdentity.ProfileIdentityMarkerMatches(legacyIdentity, gatewayUrl))
             {
-                logger?.Info($"Skipped legacy WebView2 profile migration for environment '{environmentName}' because the legacy profile URL identity is different.");
+                logger?.Info($"Skipped legacy WebView2 profile migration for environment '{environmentName}' because the legacy profile URL identity marker is missing, unreadable, or different.");
                 continue;
             }
 

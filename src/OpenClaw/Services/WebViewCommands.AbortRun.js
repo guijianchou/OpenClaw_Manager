@@ -21,28 +21,8 @@
     el?.textContent
   ].filter(Boolean).join(' ').trim();
 
-  if (window.chat && typeof window.chat.abort === 'function') {
-    window.chat.abort();
-    return true;
-  }
-
-  const abortTargets = [
-    window.__openclaw?.chat,
-    window.__OPENCLAW__?.chat,
-    window.__APP__?.chat,
-    window.app?.chat
-  ];
-
-  for (const target of abortTargets) {
-    if (target && typeof target.abort === 'function') {
-      target.abort();
-      return true;
-    }
-  }
-
   const findChatActionSurface = () => {
     const selectors = [
-      'openclaw-app',
       '[data-openclaw-chat]',
       '[data-openclaw-chat-surface]',
       '[data-testid="chat"]',
@@ -57,16 +37,53 @@
       .find(isVisible) || null;
   };
 
-  const surface = findChatActionSurface();
-  if (!surface) return false;
+  const clickAbortButton = () => {
+    const surface = findChatActionSurface();
+    if (!surface) return false;
 
-  const abortButton = Array.from(surface.querySelectorAll('button, [role="button"]'))
-    .find((el) => isEnabledAction(el) && /\b(stop|abort|cancel)\b/i.test(labelOf(el)));
+    const abortButton = Array.from(surface.querySelectorAll('button, [role="button"]'))
+      .find((el) => isEnabledAction(el) && /\b(stop|abort|cancel)\b/i.test(labelOf(el)));
 
-  if (abortButton) {
+    if (!abortButton) return false;
+
     abortButton.click();
     return true;
-  }
+  };
 
-  return false;
+  const abortTargets = [
+    window.chat,
+    window.__openclaw?.chat,
+    window.__OPENCLAW__?.chat,
+    window.__APP__?.chat,
+    window.app?.chat
+  ];
+
+  const tryAbortTarget = (index) => {
+    if (index >= abortTargets.length) {
+      return clickAbortButton();
+    }
+
+    const target = abortTargets[index];
+    if (!target || typeof target.abort !== 'function') {
+      return tryAbortTarget(index + 1);
+    }
+
+    try {
+      const result = target.abort();
+      if (result && typeof result.then === 'function') {
+        result.then(
+          (resolved) => {
+            if (resolved === false) tryAbortTarget(index + 1);
+          },
+          () => tryAbortTarget(index + 1));
+        return true;
+      }
+
+      return result !== false || tryAbortTarget(index + 1);
+    } catch {
+      return tryAbortTarget(index + 1);
+    }
+  };
+
+  return tryAbortTarget(0);
 })()

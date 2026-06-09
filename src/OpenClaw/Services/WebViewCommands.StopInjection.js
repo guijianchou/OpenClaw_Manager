@@ -1,19 +1,7 @@
-(async () => {
+(() => {
   const stopCommand = '/stop';
 
-  const invokeMaybeAsync = async (target, methodName, ...args) => {
-    const method = target?.[methodName];
-    if (typeof method !== 'function') return false;
-
-    const result = method.call(target, ...args);
-    if (result && typeof result.then === 'function') {
-      await result;
-    }
-
-    return result !== false;
-  };
-
-  const chatTargets = () => [
+  const chatTargets = [
     window.chat,
     window.__openclaw?.chat,
     window.__OPENCLAW__?.chat,
@@ -21,11 +9,11 @@
     window.app?.chat
   ].filter(Boolean);
 
-  for (const chat of chatTargets()) {
-    if (await invokeMaybeAsync(chat, 'inject', stopCommand)) return true;
-    if (await invokeMaybeAsync(chat, 'send', stopCommand)) return true;
-    if (await invokeMaybeAsync(chat, 'sendMessage', stopCommand)) return true;
-  }
+  const chatCalls = chatTargets.flatMap((chat) => [
+    () => typeof chat.inject === 'function' ? chat.inject(stopCommand) : false,
+    () => typeof chat.send === 'function' ? chat.send(stopCommand) : false,
+    () => typeof chat.sendMessage === 'function' ? chat.sendMessage(stopCommand) : false
+  ]);
 
   const isVisible = (el) => {
     if (!el) return false;
@@ -61,7 +49,6 @@
 
   const findChatSurface = () => {
     const selectors = [
-      'openclaw-app',
       '[data-openclaw-chat]',
       '[data-openclaw-chat-surface]',
       '[data-testid="chat"]',
@@ -117,14 +104,15 @@
   const submitElement = (el) => {
     if (!el) return false;
     const form = el.closest('form');
-    if (form) {
-      if (typeof form.requestSubmit !== 'function') return false;
-
-      const submitter = Array.from(form.querySelectorAll('button, input[type="submit"]'))
-        .find((button) => !button.disabled && !button.hasAttribute('disabled') && isVisible(button));
-      form.requestSubmit(submitter || undefined);
-      window.setTimeout(() => clearElement(el), 0);
-      return true;
+    if (form && typeof form.requestSubmit === 'function') {
+      try {
+        const submitter = Array.from(form.querySelectorAll('button:not([type]), button[type="submit"], input[type="submit"]'))
+          .find((button) => !button.disabled && !button.hasAttribute('disabled') && isVisible(button));
+        form.requestSubmit(submitter || undefined);
+        window.setTimeout(() => clearElement(el), 0);
+        return true;
+      } catch {
+      }
     }
 
     const keyboardEventInit = {
@@ -143,18 +131,46 @@
     return true;
   };
 
-  const composer = findChatComposer();
-  if (!composer) return false;
+  const submitStopCommand = () => {
+    const composer = findChatComposer();
+    if (!composer) return false;
 
-  composer.focus();
-  if ('value' in composer) {
-    setNativeValue(composer, stopCommand);
-    composer.dispatchEvent(new Event('input', { bubbles: true }));
-    composer.dispatchEvent(new Event('change', { bubbles: true }));
-  } else {
-    composer.textContent = stopCommand;
-    composer.dispatchEvent(new InputEvent('input', { bubbles: true, data: stopCommand, inputType: 'insertText' }));
-  }
+    composer.focus();
+    if ('value' in composer) {
+      setNativeValue(composer, stopCommand);
+      composer.dispatchEvent(new Event('input', { bubbles: true }));
+      composer.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      composer.textContent = stopCommand;
+      composer.dispatchEvent(new InputEvent('input', { bubbles: true, data: stopCommand, inputType: 'insertText' }));
+    }
 
-  return submitElement(composer);
+    return submitElement(composer);
+  };
+
+  const tryChatCall = (index) => {
+    if (index >= chatCalls.length) {
+      return submitStopCommand();
+    }
+
+    let result;
+    try {
+      result = chatCalls[index]();
+    } catch {
+      return tryChatCall(index + 1);
+    }
+
+    if (result && typeof result.then === 'function') {
+      result.then(
+        (resolved) => {
+          if (resolved === false) tryChatCall(index + 1);
+        },
+        () => tryChatCall(index + 1));
+      return true;
+    }
+
+    return result !== false || tryChatCall(index + 1);
+  };
+
+  return tryChatCall(0);
 })()

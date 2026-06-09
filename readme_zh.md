@@ -16,8 +16,8 @@ OpenClaw Manager 是一个轻量的 Windows 原生外壳，用 WinUI 3 和 WebVi
 - WebView2 profile folder 现在按稳定 Gateway URL identity 隔离，而不是按显示名称隔离；identity marker 使用 hash，query/userinfo 可以区分 session，但不会以可读明文写入 marker。
 - Settings load 会在写入默认值前备份损坏 JSON，读取或权限失败时不会覆盖 settings，非 http(s) Gateway URL 会被拒绝，deferred save 写失败后仍保留待保存状态。
 - 托管端 `session-ready` 会取消仍在执行的 recovery，并接受当前 Gateway base path 下的深层路由，避免页面已经 ready 后 recovery 又把状态改回 connecting。
-- Gateway route 匹配现在严格保留 base path 大小写；由于 Gateway event gap 不会重放，reload recovery 会刷新过渡态 hosted UI；Stop/Abort 会优先使用文档化的 hosted chat API，再退回到受限 DOM fallback。
-- Diagnostic bundle 会脱敏 JSON log message 和 summary 中内联的 `Authorization: Bearer|Basic` 凭据，不再只处理行首 header。
+- Gateway route 匹配现在严格保留 base path 大小写；由于 Gateway event gap 不会重放，reload recovery 会刷新过渡态 hosted UI；Stop/Abort 会保持 WebView2 同步 handled 契约，并优先使用文档化 hosted chat API，再退回到受限 DOM fallback。
+- Diagnostic bundle 会脱敏 JSON log message 和 summary 中跨 scheme、复杂参数形式的内联 `Authorization` 凭据；日志枚举保持 best-effort，并避免把本地文件路径写入 bundle notes。
 - Release DevTools enablement 现在是独立 diagnostics 设置，不再复用 verbose recovery logging，并在 UI 文案中说明 storage/session 可见性风险。
 - CI 固定到 VS2026 Windows runner 和 .NET SDK `10.0.300`；repository guardrails 会验证 active workflow 与 `global.json` 契约。
 - Core regression harness 已覆盖 5.1.2 契约；真实 WebView2、Gateway、tunnel、tray、hotkey、DevTools 和 compact mode 行为仍需要 Windows 手工调试验证。
@@ -192,7 +192,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.
 git diff --check
 ```
 
-`tests\OpenClaw.Core.Tests` 仍是 executable Core harness，因此 `dotnet run` 是纯 Core 行为最快的定向信号。该项目也支持 `dotnet test` discoverability，两条命令都是当前支持的验证流程。
+`tests\OpenClaw.Core.Tests` 仍是 executable Core harness，因此 `dotnet run` 是纯 Core 行为最快的定向信号。同一组 regression cases 也会通过 `dotnet test` 逐项暴露给 VSTest；两条命令都是当前支持的验证流程。
 
 ## Continuous Integration
 
@@ -248,6 +248,7 @@ CI workflow 明确保持 x64-only，并且不声明覆盖真实应用启动。Wi
 - 将托管 Control UI path 和 `<basePath>/__openclaw__/a2ui/` 都路由到 Gateway service。
 - tunnel 或 proxy 必须保留原始 host 和 scheme。
 - trusted-proxy auth 模式下，HTTP request 和 WebSocket upgrade 都必须转发身份 headers。
+- 对于同机 VPS 反向代理或 Cloudflare Tunnel sidecar，优先使用 token/password auth；same-host loopback forwarding 不满足 trusted-proxy auth，除非 Gateway 明确配置为信任对应的非 loopback proxy path。
 - 除非上游 Gateway 明确支持，不要混用 trusted-proxy mode 和 shared token auth。
 
 如果页面能加载但应用报告 origin rejection，请先核对精确 public origin 和 proxy forwarding rules，再排查桌面 shell。

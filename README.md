@@ -16,8 +16,8 @@ It is intended for remote Gateway deployments running on a VPS and exposed throu
 - WebView2 profile folders are now scoped by stable Gateway URL identity instead of display name, with hashed markers so query/userinfo can separate sessions without being written in readable marker text.
 - Settings load now backs up corrupt JSON before writing defaults, avoids overwriting settings after read/permission failures, rejects non-http(s) Gateway URLs, and preserves deferred-save work after a failed write.
 - Hosted `session-ready` cancels in-flight recovery work and accepts deep routes under the active Gateway base path, avoiding stale recovery state flips after the page is already ready.
-- Gateway route matching now honors base-path case exactly, reload recovery refreshes transitional hosted UI states because Gateway event gaps are not replayed, and Stop/Abort prefer documented hosted chat APIs before scoped DOM fallbacks.
-- Diagnostic bundles redact inline `Authorization: Bearer|Basic` credentials in JSON log messages and summaries, not only line-start headers.
+- Gateway route matching now honors base-path case exactly, reload recovery refreshes transitional hosted UI states because Gateway event gaps are not replayed, and Stop/Abort keep the WebView2 synchronous handled contract while preferring documented hosted chat APIs before scoped DOM fallbacks.
+- Diagnostic bundles redact inline `Authorization` credentials across schemes and complex parameter lists in JSON log messages and summaries, keep log enumeration best-effort, and avoid writing local file paths into bundle notes.
 - DevTools release enablement is an explicit diagnostics setting separate from verbose recovery logging, with UI text that calls out storage/session visibility.
 - CI is pinned to the VS2026 Windows runner and .NET SDK `10.0.300`; repository guardrails validate the active workflow and `global.json` contract.
 - The Core regression harness covers the 5.1.2 contracts, while real WebView2, Gateway, tunnel, tray, hotkey, DevTools, and compact-mode behavior still require manual Windows debug validation.
@@ -192,7 +192,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.
 git diff --check
 ```
 
-`tests\OpenClaw.Core.Tests` remains an executable Core harness, so `dotnet run` is the fastest targeted signal for pure Core behavior. The project is also discoverable by `dotnet test`, and both commands are part of the supported verification workflow.
+`tests\OpenClaw.Core.Tests` remains an executable Core harness, so `dotnet run` is the fastest targeted signal for pure Core behavior. The same regression cases are also exposed individually to VSTest through `dotnet test`, and both commands are part of the supported verification workflow.
 
 ## Continuous Integration
 
@@ -248,6 +248,7 @@ For VPS, Cloudflare Tunnel, or reverse-proxy deployments:
 - Route both the hosted Control UI path and `<basePath>/__openclaw__/a2ui/` to the Gateway service.
 - Preserve the original host and scheme through the tunnel or proxy.
 - Forward identity headers on both HTTP requests and WebSocket upgrades when using trusted-proxy auth.
+- For same-host VPS reverse proxies or Cloudflare Tunnel sidecars, prefer token/password auth; same-host loopback forwarding does not satisfy trusted-proxy auth unless the Gateway is explicitly configured to trust that non-loopback proxy path.
 - Avoid mixing trusted-proxy mode and shared token auth unless the upstream Gateway explicitly supports that combination.
 
 If the hosted page loads but the app reports origin rejection, verify the exact public origin and proxy forwarding rules before debugging the desktop shell.

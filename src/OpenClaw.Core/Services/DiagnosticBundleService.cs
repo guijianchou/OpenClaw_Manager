@@ -56,11 +56,7 @@ public static partial class DiagnosticBundleService
             return $"{prefix}\"<redacted>\"";
         });
 
-        redacted = AuthorizationCredentialPattern().Replace(redacted, match =>
-        {
-            var prefix = match.Groups[1].Value;
-            return $"{prefix}<redacted>";
-        });
+        redacted = RedactAuthorizationCredentials(redacted);
 
         redacted = KeyValueSecretPattern().Replace(redacted, match =>
         {
@@ -75,6 +71,91 @@ public static partial class DiagnosticBundleService
         });
 
         return redacted;
+    }
+
+    private static string RedactAuthorizationCredentials(string text)
+    {
+        var matches = AuthorizationCredentialPattern().Matches(text);
+        if (matches.Count == 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        var cursor = 0;
+        foreach (Match match in matches)
+        {
+            if (match.Index < cursor)
+            {
+                continue;
+            }
+
+            var valueStart = match.Index + match.Length;
+            var valueEnd = FindAuthorizationValueEnd(text, match.Index, valueStart);
+            builder.Append(text, cursor, valueStart - cursor);
+            builder.Append("<redacted>");
+            cursor = valueEnd;
+        }
+
+        builder.Append(text, cursor, text.Length - cursor);
+        return builder.ToString();
+    }
+
+    private static int FindAuthorizationValueEnd(string text, int prefixStart, int valueStart)
+    {
+        var lineStart = text.LastIndexOfAny(['\r', '\n'], prefixStart);
+        lineStart = lineStart < 0 ? 0 : lineStart + 1;
+        var lineEnd = text.IndexOfAny(['\r', '\n'], valueStart);
+        lineEnd = lineEnd < 0 ? text.Length : lineEnd;
+
+        if (IsInsideDoubleQuotedString(text, lineStart, prefixStart))
+        {
+            var closingQuote = FindNextUnescapedDoubleQuote(text, valueStart, lineEnd);
+            if (closingQuote >= 0)
+            {
+                return closingQuote;
+            }
+        }
+
+        return lineEnd;
+    }
+
+    private static bool IsInsideDoubleQuotedString(string text, int start, int offset)
+    {
+        var inString = false;
+        for (var i = start; i < offset; i++)
+        {
+            if (text[i] == '"' && !IsEscaped(text, i))
+            {
+                inString = !inString;
+            }
+        }
+
+        return inString;
+    }
+
+    private static int FindNextUnescapedDoubleQuote(string text, int start, int end)
+    {
+        for (var i = start; i < end; i++)
+        {
+            if (text[i] == '"' && !IsEscaped(text, i))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool IsEscaped(string text, int index)
+    {
+        var slashCount = 0;
+        for (var i = index - 1; i >= 0 && text[i] == '\\'; i--)
+        {
+            slashCount++;
+        }
+
+        return slashCount % 2 == 1;
     }
 
     /// <summary>
@@ -114,6 +195,12 @@ public static partial class DiagnosticBundleService
     /// Collects log files from the specified directory that are within the retention window.
     /// </summary>
     public static IReadOnlyList<string> CollectRecentLogFiles(string logsDirectory, TimeSpan? retention = null)
+        => CollectRecentLogFiles(logsDirectory, retention, notes: null);
+
+    private static IReadOnlyList<string> CollectRecentLogFiles(
+        string logsDirectory,
+        TimeSpan? retention,
+        List<string>? notes)
     {
         var maxAge = retention ?? DefaultLogRetention;
         var cutoff = DateTimeOffset.UtcNow - maxAge;
@@ -123,8 +210,34 @@ public static partial class DiagnosticBundleService
             return [];
         }
 
-        return Directory.GetFiles(logsDirectory, "openclaw-*.log")
-            .Where(f => File.GetLastWriteTimeUtc(f) >= cutoff.UtcDateTime)
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(logsDirectory, "openclaw-*.log");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            notes?.Add($"log directory skipped: {FormatFileAccessFailure(ex)}");
+            return [];
+        }
+
+        var recentFiles = new List<string>();
+        foreach (var file in files)
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) >= cutoff.UtcDateTime)
+                {
+                    recentFiles.Add(file);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                notes?.Add($"{Path.GetFileName(file)} skipped: {FormatFileAccessFailure(ex)}");
+            }
+        }
+
+        return recentFiles
             .OrderByDescending(f => f)
             .ToArray();
     }
@@ -166,7 +279,7 @@ public static partial class DiagnosticBundleService
         }
 
         // 4. Recent log files
-        var logFiles = CollectRecentLogFiles(logsDirectory);
+        var logFiles = CollectRecentLogFiles(logsDirectory, retention: null, notes);
         long bundledLogPayloadBytes = 0;
         var bundledLogFileCount = 0;
         foreach (var logFile in logFiles)
@@ -223,9 +336,12 @@ public static partial class DiagnosticBundleService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return DiagnosticLogReadResult.Failure(ex.Message);
+            return DiagnosticLogReadResult.Failure(FormatFileAccessFailure(ex));
         }
     }
+
+    private static string FormatFileAccessFailure(Exception ex)
+        => $"{ex.GetType().Name} 0x{ex.HResult:X8}";
 
     private readonly record struct DiagnosticLogReadResult(bool Succeeded, string? Content, string Message, long ByteCount)
     {
@@ -282,7 +398,7 @@ public static partial class DiagnosticBundleService
     [GeneratedRegex(@"(""(?:[^""]*(?:authorization|cookie|token|key|secret|password|credential)[^""]*)""\s*:\s*)""[^""]+""", RegexOptions.IgnoreCase)]
     private static partial Regex TokenPattern();
 
-    [GeneratedRegex(@"(\bAuthorization\b\s*:\s*(?:Bearer|Basic)\s+)[^\s,;}\]""']+", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bAuthorization\b\s*[:=]\s*", RegexOptions.IgnoreCase)]
     private static partial Regex AuthorizationCredentialPattern();
 
     [GeneratedRegex(@"(\b(?!(?:authorization)\b)(?:cookie|token|key|secret|password|credential)\b\s*[=:]\s*)[^\s,;}\]]+", RegexOptions.IgnoreCase)]

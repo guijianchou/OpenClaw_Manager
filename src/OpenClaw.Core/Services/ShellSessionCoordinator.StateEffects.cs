@@ -97,6 +97,55 @@ public sealed partial class ShellSessionCoordinator
         return true;
     }
 
+    private void ApplyIdleSuspicion(DateTimeOffset observedAt)
+    {
+        if (_isInBackground ||
+            _recoveryOptions.EventIdleSuspicionSeconds <= 0 ||
+            _lastEventAt is not { } lastEventAt)
+        {
+            return;
+        }
+
+        var idleFor = observedAt - lastEventAt;
+        if (idleFor.TotalSeconds < _recoveryOptions.EventIdleSuspicionSeconds ||
+            _recoveryState is not RecoveryState.Ready and not RecoveryState.Healthy)
+        {
+            return;
+        }
+
+        _streamHealth = HealthStatus.Degraded;
+        MarkRecoveryDegraded($"No hosted Control UI event observed for {Math.Floor(idleFor.TotalSeconds)}s.");
+        _logger.Warning("stream.event_idle.detected", new
+        {
+            idleSeconds = Math.Floor(idleFor.TotalSeconds),
+            thresholdSeconds = _recoveryOptions.EventIdleSuspicionSeconds
+        });
+    }
+
+    private string ResolveTransportIdleRecoveryReason(DateTimeOffset observedAt, string heartbeatFailureMessage)
+    {
+        if (_recoveryOptions.TransportIdleSuspicionSeconds <= 0 ||
+            _lastTransportActivityAt is not { } lastTransportActivityAt)
+        {
+            return $"Heartbeat recovery requested: {heartbeatFailureMessage}";
+        }
+
+        var idleFor = observedAt - lastTransportActivityAt;
+        if (idleFor.TotalSeconds < _recoveryOptions.TransportIdleSuspicionSeconds)
+        {
+            return $"Heartbeat recovery requested: {heartbeatFailureMessage}";
+        }
+
+        _transportHealth = HealthStatus.Degraded;
+        _logger.Warning("transport.idle.detected", new
+        {
+            idleSeconds = Math.Floor(idleFor.TotalSeconds),
+            thresholdSeconds = _recoveryOptions.TransportIdleSuspicionSeconds
+        });
+
+        return $"Transport idle for {Math.Floor(idleFor.TotalSeconds)}s; heartbeat recovery requested: {heartbeatFailureMessage}";
+    }
+
     private void LogIgnoredGap(EventGapEventArgs args)
     {
         _logger.Info("stream.gap.ignored", new

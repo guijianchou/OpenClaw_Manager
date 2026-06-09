@@ -15,7 +15,8 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - Hardened settings persistence so corrupt JSON is backed up before defaults are written, read/permission failures do not overwrite existing settings, invalid non-http(s) Gateway URLs are removed during normalization, and deferred saves remain queued after a failed write.
 - Fixed hosted `session-ready` recovery ordering by cancelling in-flight recovery operations after a current ready event and accepting deep page routes under the configured Gateway base path.
 - Aligned hosted Gateway behavior with the Gateway docs: base-path route identity is case-sensitive, transitional hosted UI states trigger reload because event gaps are not replayed, and Stop/Abort prefer documented chat APIs before scoped DOM fallbacks.
-- Extended diagnostic bundle redaction to inline `Authorization: Bearer|Basic` credentials inside JSON log messages and diagnostic summaries.
+- Further hardened 5.1.2 follow-ups: legacy WebView2 profile migration now requires a positive URL-identity marker match, Stop/Abort command scripts keep the WebView2 synchronous handled-result contract while avoiding whole-app DOM actions, diagnostic bundles redact scheme-independent Authorization values and complex parameter lists, log enumeration is best-effort, and CI actions/global SDK pinning were tightened.
+- Extended diagnostic bundle redaction to inline `Authorization` credentials inside JSON log messages and diagnostic summaries, and kept diagnostic bundle notes from exposing local file paths when log files cannot be enumerated or read.
 - Split release DevTools enablement from verbose recovery logging with a dedicated diagnostics setting, Settings UI toggle, localized security-aware copy, and explicit disabled feedback.
 - Pinned CI to `windows-2025-vs2026` and .NET SDK `10.0.300`, added `global.json`, pinned analyzer level to `10.0`, and strengthened repository guardrails for active workflow structure.
 - Added Core regression coverage for the 5.1.2 settings, diagnostics, recovery, Gateway URL identity, and deferred-save contracts.
@@ -343,7 +344,8 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 - 加固 settings 持久化：损坏 JSON 会先备份再写默认值，读取或权限失败不会覆盖现有 settings，normalization 会移除非 http(s) Gateway URL，deferred save 写失败后仍保留待保存状态。
 - 修复托管端 `session-ready` 的 recovery 顺序：当前环境 ready 后会取消仍在执行的 recovery operation，并接受配置 Gateway base path 下的深层页面路由。
 - 对齐 Gateway 文档中的托管行为：base-path route identity 严格区分大小写；由于 event gap 不会重放，过渡态 hosted UI 会触发 reload；Stop/Abort 优先使用文档化 chat API，再退回到受限 DOM fallback。
-- Diagnostic bundle 现在会脱敏 JSON log message 和 diagnostic summary 中内联的 `Authorization: Bearer|Basic` 凭据。
+- 继续加固 5.1.2 follow-up：legacy WebView2 profile migration 必须有 URL-identity marker 正向匹配；Stop/Abort command script 保持 WebView2 同步 handled-result 契约并避免 whole-app DOM action；diagnostic bundle 会脱敏不限定 scheme 和复杂参数列表的 Authorization 值；日志枚举改为 best-effort；CI actions 和全局 SDK pinning 进一步收紧。
+- Diagnostic bundle 现在会脱敏 JSON log message 和 diagnostic summary 中内联的 `Authorization` 凭据，并在日志文件无法枚举或读取时避免把本地文件路径写入 diagnostic bundle notes。
 - 将 release DevTools enablement 从 verbose recovery logging 中拆出，新增独立 diagnostics setting、Settings UI toggle、本地化安全文案和明确的 disabled 反馈。
 - CI 固定到 `windows-2025-vs2026` 和 .NET SDK `10.0.300`，新增 `global.json`，将 analyzer level 固定为 `10.0`，并强化 repository guardrails 对 active workflow 结构的检查。
 - 新增 Core 回归覆盖，验证 5.1.2 的 settings、diagnostics、recovery、Gateway URL identity 和 deferred-save 契约。
