@@ -65,6 +65,12 @@
   <data name="WebViewRecreationFailedFormat" xml:space="preserve">
     <value>重建浏览器宿主时 WebView 恢复失败：{0}</value>
   </data>
+  <data name="AsyncCommandFailedFormat" xml:space="preserve">
+    <value>命令执行失败：{0}</value>
+  </data>
+  <data name="GlobalHotkeyRegistrationFailedFormat" xml:space="preserve">
+    <value>全局热键“{0}”注册失败，可能已被其他应用占用。Win32 错误：{1}</value>
+  </data>
   <data name="DevTools" xml:space="preserve">
     <value>开发者工具</value>
   </data>
@@ -80,6 +86,48 @@
   <data name="MainStatusLabel" xml:space="preserve">
     <value>状态：</value>
   </data>
+  <data name="StatusDefaultHeartbeat" xml:space="preserve">
+    <value>心跳 --</value>
+  </data>
+  <data name="StatusDefaultAccess" xml:space="preserve">
+    <value>认证 --</value>
+  </data>
+  <data name="StatusDefaultLatency" xml:space="preserve">
+    <value>-- ms</value>
+  </data>
+  <data name="LatencyBadgeAutomationName" xml:space="preserve">
+    <value>Control UI 延迟历史</value>
+  </data>
+  <data name="LatencyError" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="LatencyStale" xml:space="preserve">
+    <value>旧值</value>
+  </data>
+  <data name="LatencyHistoryNoSamples" xml:space="preserve">
+    <value>延迟历史：暂无样本</value>
+  </data>
+  <data name="LatencyHistoryHeaderFormat" xml:space="preserve">
+    <value>延迟历史（{0} 个样本）</value>
+  </data>
+  <data name="LatencyLatestFormat" xml:space="preserve">
+    <value>最新：{0} ms</value>
+  </data>
+  <data name="LatencyMinFormat" xml:space="preserve">
+    <value>最小：{0} ms</value>
+  </data>
+  <data name="LatencyAverageFormat" xml:space="preserve">
+    <value>平均：{0} ms</value>
+  </data>
+  <data name="LatencyP95Format" xml:space="preserve">
+    <value>P95：{0} ms</value>
+  </data>
+  <data name="LatencyMaxFormat" xml:space="preserve">
+    <value>最大：{0} ms</value>
+  </data>
+  <data name="LatencyPoPFormat" xml:space="preserve">
+    <value>PoP：{0}</value>
+  </data>
   <data name="ThemeSystem" xml:space="preserve">
     <value>系统主题</value>
   </data>
@@ -88,6 +136,9 @@
   </data>
   <data name="ThemeDark" xml:space="preserve">
     <value>深色主题</value>
+  </data>
+  <data name="ThemeSelectorAutomationName" xml:space="preserve">
+    <value>主题选择器</value>
   </data>
 
   <data name="StatusConnected" xml:space="preserve">
@@ -128,6 +179,57 @@
   </data>
   <data name="HeartbeatFailed" xml:space="preserve">
     <value>心跳失败</value>
+  </data>
+  <data name="HeartbeatInvalidControlUiUrl" xml:space="preserve">
+    <value>网关心跳请求失败：Control UI URL 无效。</value>
+  </data>
+  <data name="HeartbeatRequestFailedFormat" xml:space="preserve">
+    <value>网关心跳请求失败：{0}</value>
+  </data>
+  <data name="HeartbeatHostedSessionActive" xml:space="preserve">
+    <value>内嵌 Control UI 报告 Gateway 会话处于活跃状态。</value>
+  </data>
+  <data name="HeartbeatHostedSessionReconnecting" xml:space="preserve">
+    <value>内嵌 Control UI 仍在重连 Gateway。</value>
+  </data>
+  <data name="WebViewInvalidUrlFormat" xml:space="preserve">
+    <value>URL 无效：{0}</value>
+  </data>
+  <data name="WebViewNavigationNotReady" xml:space="preserve">
+    <value>WebView2 尚未就绪，导航启动失败。</value>
+  </data>
+  <data name="WebViewReloadNotInitialized" xml:space="preserve">
+    <value>WebView2 尚未初始化，无法刷新。</value>
+  </data>
+  <data name="WebViewReloadNotReady" xml:space="preserve">
+    <value>WebView2 尚未就绪，刷新失败。</value>
+  </data>
+  <data name="WebViewRetryNotReady" xml:space="preserve">
+    <value>WebView2 尚未就绪，重试失败。</value>
+  </data>
+  <data name="AccessStatusOk" xml:space="preserve">
+    <value>认证正常</value>
+  </data>
+  <data name="AccessStatusLogin" xml:space="preserve">
+    <value>需要登录</value>
+  </data>
+  <data name="AccessStatusPair" xml:space="preserve">
+    <value>需要配对</value>
+  </data>
+  <data name="AccessStatusOrigin" xml:space="preserve">
+    <value>来源被拒</value>
+  </data>
+  <data name="AccessStatusWait" xml:space="preserve">
+    <value>认证等待</value>
+  </data>
+  <data name="WorkStatusLive" xml:space="preserve">
+    <value>运行中</value>
+  </data>
+  <data name="WorkStatusIdle" xml:space="preserve">
+    <value>空闲</value>
+  </data>
+  <data name="WorkStatusWait" xml:space="preserve">
+    <value>等待</value>
   </data>
   <data name="CircuitBreakerRecreationSuppressed" xml:space="preserve">
     <value>WebView 连续恢复失败后已暂时暂停自动恢复。请稍后再重试。</value>
@@ -181,6 +283,9 @@
   </data>
   <data name="NoEnvironments" xml:space="preserve">
     <value>尚未配置环境，请添加一个以开始使用。</value>
+  </data>
+  <data name="SettingsNavigationAutomationName" xml:space="preserve">
+    <value>设置导航</value>
   </data>
   <data name="SettingsNavLanguage" xml:space="preserve">
     <value>语言</value>
@@ -264,10 +369,10 @@
     <value>Control UI URL</value>
   </data>
   <data name="SettingsControlUiUrlHint1" xml:space="preserve">
-    <value>请填写公开托管的 Control UI 页面地址（`http://` 或 `https://`），不要填写 Gateway WebSocket URL。如果你通过 Cloudflare Tunnel 或其他反向代理访问，这里应当是浏览器最终访问的公网 origin。</value>
+    <value>请填写公开托管的 Control UI 页面地址（`http://` 或 `https://`），不要填写 Gateway WebSocket URL。如果配置了 Control UI base path，也要包含在这里；它可以比公网 origin 更具体。</value>
   </data>
   <data name="SettingsControlUiUrlHint2" xml:space="preserve">
-    <value>如果页面能打开，但 OpenClaw 报告 origin rejection，请把这个精确 origin 加入 `gateway.controlUi.allowedOrigins`，并确认反向代理 / Cloudflare Tunnel 保留了原始 host 和 scheme。</value>
+    <value>如果页面能打开，但 OpenClaw 报告 origin rejection，请只把 URL 的 origin（scheme、host 和 port）加入 `gateway.controlUi.allowedOrigins`，并确认反向代理 / Cloudflare Tunnel 保留了原始 host 和 scheme。</value>
   </data>
   <data name="SettingsControlUiUrlHint3" xml:space="preserve">
     <value>对于同机 VPS 反向代理或 Cloudflare Tunnel sidecar，当前 OpenClaw 文档更推荐 `gateway.auth.mode: "token"` 或 `"password"`，而不是 `"trusted-proxy"`。同机 loopback 转发不满足 trusted-proxy 验证。</value>
@@ -313,6 +418,31 @@
   </data>
   <data name="SettingsExportDiagnosticBundle" xml:space="preserve">
     <value>导出诊断包</value>
+  </data>
+  <data name="SettingsDiagnosticsRunning" xml:space="preserve">
+    <value>正在运行诊断...</value>
+  </data>
+  <data name="SettingsDiagnosticBundleExporting" xml:space="preserve">
+    <value>正在导出诊断包...</value>
+  </data>
+  <data name="SettingsDevToolsOpened" xml:space="preserve">
+    <value>已向当前 WebView 发送打开 DevTools 的请求。</value>
+  </data>
+  <data name="SettingsDevToolsUnavailable" xml:space="preserve">
+    <value>当前没有可用于 DevTools 的活动 WebView。</value>
+  </data>
+  <data name="SettingsDevToolsDisabled" xml:space="preserve">
+    <value>当前构建禁用了 DevTools。请启用详细恢复诊断日志并重新打开 WebView。</value>
+  </data>
+  <data name="SettingsDevToolsOpenFailedFormat" xml:space="preserve">
+    <value>无法打开 DevTools：{0}</value>
+  </data>
+  <data name="DiagnosticBundleExportedFormat" xml:space="preserve">
+    <value>诊断包已导出：
+{0}</value>
+  </data>
+  <data name="DiagnosticBundleExportFallbackDirectoryName" xml:space="preserve">
+    <value>diagnostics</value>
   </data>
   <data name="SettingsSessionResetSelectEnvironment" xml:space="preserve">
     <value>请选择要清除会话的环境。</value>
@@ -374,6 +504,9 @@
   <data name="AboutDescription" xml:space="preserve">
     <value>基于 WinUI 3 与 WebView2 的 OpenClaw Gateway 原生 Windows 管理外壳。</value>
   </data>
+  <data name="AboutVersionFormat" xml:space="preserve">
+    <value>版本 {0}</value>
+  </data>
   <data name="AboutGitHubProfile" xml:space="preserve">
     <value>GitHub 主页</value>
   </data>
@@ -404,6 +537,12 @@
   <data name="LogReadFailedFormat" xml:space="preserve">
     <value>读取日志失败：{0}</value>
   </data>
+  <data name="LogFolderMissingFormat" xml:space="preserve">
+    <value>日志文件夹不存在：{0}</value>
+  </data>
+  <data name="LogFolderOpenFailedFormat" xml:space="preserve">
+    <value>打开日志文件夹失败：{0}</value>
+  </data>
 
   <data name="DiagnosticWebView2RuntimeLabel" xml:space="preserve">
     <value>WebView2 运行时</value>
@@ -413,6 +552,18 @@
   </data>
   <data name="DiagnosticSessionStatusLabel" xml:space="preserve">
     <value>会话状态</value>
+  </data>
+  <data name="DiagnosticStatusPass" xml:space="preserve">
+    <value>[正常]</value>
+  </data>
+  <data name="DiagnosticStatusWarning" xml:space="preserve">
+    <value>[警告]</value>
+  </data>
+  <data name="DiagnosticStatusFail" xml:space="preserve">
+    <value>[失败]</value>
+  </data>
+  <data name="DiagnosticStatusSkipped" xml:space="preserve">
+    <value>[跳过]</value>
   </data>
   <data name="DiagnosticInstrumentationLabel" xml:space="preserve">
     <value>运行时观测</value>
@@ -537,6 +688,9 @@
   <data name="DiagnosticNetworkProbeFailed" xml:space="preserve">
     <value>网络探测失败</value>
   </data>
+  <data name="DiagnosticInvalidControlUiUrlDetail" xml:space="preserve">
+    <value>配置的 Control UI URL 必须是绝对 http(s) URL。</value>
+  </data>
   <data name="DiagnosticWebViewNotInitialized" xml:space="preserve">
     <value>WebView2 尚未初始化。</value>
   </data>
@@ -545,6 +699,9 @@
   </data>
   <data name="DiagnosticPageLoadedButEstablishing" xml:space="preserve">
     <value>页面已加载，但 Gateway 会话仍在建立中。</value>
+  </data>
+  <data name="DiagnosticHostedStateDetailFormat" xml:space="preserve">
+    <value>托管 Control UI 状态：{0}</value>
   </data>
   <data name="DiagnosticCurrentDeviceApprovalDetailFormat" xml:space="preserve">
     <value>{0} 请使用 `openclaw devices approve --latest` 或显式 requestId 批准当前设备请求。</value>
@@ -657,6 +814,12 @@
   </data>
   <data name="TrayMenuExit" xml:space="preserve">
     <value>退出</value>
+  </data>
+  <data name="TrayStatusFormat" xml:space="preserve">
+    <value>状态：{0}</value>
+  </data>
+  <data name="TrayTooltipFormat" xml:space="preserve">
+    <value>OpenClaw - {0}</value>
   </data>
   <data name="SettingsEnableGlobalHotkey" xml:space="preserve">
     <value>启用全局热键</value>

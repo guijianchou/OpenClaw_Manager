@@ -28,7 +28,7 @@ internal sealed class TrayIconService : IDisposable
     private IntPtr _iconHandle;
     private bool _isDisposed;
     private bool _isIconAdded;
-    private string _statusText = "WAIT";
+    private string _statusText;
 
     public TrayIconService(string iconPath, IAppLogger logger)
         : this(iconPath, logger, TrayMenuStrings.Default)
@@ -42,6 +42,7 @@ internal sealed class TrayIconService : IDisposable
         ArgumentNullException.ThrowIfNull(menuStrings);
         _logger = logger;
         _menuStrings = menuStrings;
+        _statusText = menuStrings.DefaultStatusLabel;
         _windowProcedure = OnWindowMessage;
         Initialize(iconPath);
     }
@@ -69,7 +70,7 @@ internal sealed class TrayIconService : IDisposable
             return;
         }
 
-        _statusText = string.IsNullOrWhiteSpace(statusText) ? "WAIT" : statusText.Trim();
+        _statusText = string.IsNullOrWhiteSpace(statusText) ? _menuStrings.DefaultStatusLabel : statusText.Trim();
         if (!IsAvailable)
         {
             return;
@@ -208,7 +209,7 @@ internal sealed class TrayIconService : IDisposable
 
         try
         {
-            AppendMenu(menu, MenuFlags.String | MenuFlags.Grayed, MenuStatusHeader, $"Status: {_statusText}");
+            AppendMenu(menu, MenuFlags.String | MenuFlags.Grayed, MenuStatusHeader, FormatMenuText(_menuStrings.StatusHeaderFormat));
             AppendMenu(menu, MenuFlags.Separator, 0, null);
             AppendMenu(menu, MenuFlags.String, MenuOpenOpenClaw, _menuStrings.OpenLabel);
             AppendMenu(menu, MenuFlags.String, MenuReload, _menuStrings.ReloadLabel);
@@ -287,10 +288,22 @@ internal sealed class TrayIconService : IDisposable
 
     private string CreateTooltip()
     {
-        var tooltip = $"OpenClaw - {_statusText}";
+        var tooltip = FormatMenuText(_menuStrings.TooltipFormat);
         return tooltip.Length <= TooltipMaxLength
             ? tooltip
             : tooltip[..TooltipMaxLength];
+    }
+
+    private string FormatMenuText(string format)
+    {
+        try
+        {
+            return string.Format(format, _statusText);
+        }
+        catch (FormatException)
+        {
+            return _statusText;
+        }
     }
 
     private static uint LowWord(IntPtr value) =>

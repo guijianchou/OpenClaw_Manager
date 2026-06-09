@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OpenClaw.Helpers;
 using OpenClaw.Models;
+using OpenClaw.Services;
 
 namespace OpenClaw.Views;
 
@@ -30,10 +31,16 @@ public sealed partial class SettingsDialog
         this.Close();
     }
 
-    private void OnRunDiagnosticsClick(object sender, RoutedEventArgs e)
+    private async void OnRunDiagnosticsClick(object sender, RoutedEventArgs e)
     {
-        MainViewModel?.RunDiagnosticsCommand.Execute(null);
-        this.Close();
+        await RunDevToolsActionAsync(
+            sender as Button,
+            StringResources.SettingsDiagnosticsRunning,
+            async mainViewModel =>
+            {
+                await mainViewModel.RunDiagnosticsAsync();
+                ShowDevToolsMessage(InfoBarSeverity.Informational, mainViewModel.DiagnosticSummary);
+            });
     }
 
     private void OnViewLogsClick(object sender, RoutedEventArgs e)
@@ -45,14 +52,32 @@ public sealed partial class SettingsDialog
 
     private void OnDevToolsClick(object sender, RoutedEventArgs e)
     {
-        MainViewModel?.DevToolsCommand.Execute(null);
-        this.Close();
+        var result = MainViewModel?.OpenDevTools();
+        if (result is null)
+        {
+            ShowDevToolsMessage(InfoBarSeverity.Warning, StringResources.SettingsDevToolsUnavailable);
+            return;
+        }
+
+        var severity = result.Value.Status switch
+        {
+            WebViewService.DevToolsOpenStatus.Opened => InfoBarSeverity.Informational,
+            WebViewService.DevToolsOpenStatus.Failed => InfoBarSeverity.Error,
+            _ => InfoBarSeverity.Warning,
+        };
+        ShowDevToolsMessage(severity, OpenClaw.ViewModels.MainViewModel.FormatDevToolsOpenResult(result.Value));
     }
 
-    private void OnExportDiagnosticBundleClick(object sender, RoutedEventArgs e)
+    private async void OnExportDiagnosticBundleClick(object sender, RoutedEventArgs e)
     {
-        MainViewModel?.ExportDiagnosticBundleCommand.Execute(null);
-        this.Close();
+        await RunDevToolsActionAsync(
+            sender as Button,
+            StringResources.SettingsDiagnosticBundleExporting,
+            async mainViewModel =>
+            {
+                await mainViewModel.ExportDiagnosticBundleAsync();
+                ShowDevToolsMessage(InfoBarSeverity.Informational, mainViewModel.DiagnosticSummary);
+            });
     }
 
     private void OnResetHotkeyClick(object sender, RoutedEventArgs e)
@@ -102,11 +127,56 @@ public sealed partial class SettingsDialog
         SessionInfoBar.IsOpen = true;
     }
 
+    private void ShowDevToolsMessage(InfoBarSeverity severity, string message)
+    {
+        DevToolsInfoBar.Title = StringResources.DiagnosticsTitle;
+        DevToolsInfoBar.Severity = severity;
+        DevToolsInfoBar.Message = message;
+        DevToolsInfoBar.IsOpen = true;
+    }
+
+    private async Task RunDevToolsActionAsync(
+        Button? button,
+        string inProgressMessage,
+        Func<OpenClaw.ViewModels.MainViewModel, Task> action)
+    {
+        var mainViewModel = MainViewModel;
+        if (mainViewModel is null)
+        {
+            return;
+        }
+
+        if (button is not null)
+        {
+            button.IsEnabled = false;
+        }
+
+        ShowDevToolsMessage(InfoBarSeverity.Informational, inProgressMessage);
+        try
+        {
+            await action(mainViewModel);
+        }
+        catch (Exception ex)
+        {
+            App.Logger.Warning($"Settings developer tool action failed: {ex.Message}");
+            ShowDevToolsMessage(
+                InfoBarSeverity.Error,
+                string.Format(StringResources.AsyncCommandFailedFormat, ex.Message));
+        }
+        finally
+        {
+            if (button is not null)
+            {
+                button.IsEnabled = true;
+            }
+        }
+    }
+
     private async Task ClearEnvironmentSessionAsync(Button? button)
     {
         if (MainViewModel is null ||
-            button?.Tag is not string environmentName ||
-            string.IsNullOrWhiteSpace(environmentName))
+            button?.Tag is not EnvironmentConfig environment ||
+            string.IsNullOrWhiteSpace(environment.Name))
         {
             ShowSessionMessage(InfoBarSeverity.Warning, StringResources.SettingsSessionResetSelectEnvironment);
             return;
@@ -115,10 +185,10 @@ public sealed partial class SettingsDialog
         button.IsEnabled = false;
         try
         {
-            await MainViewModel.ClearSessionForEnvironmentAsync(environmentName);
+            await MainViewModel.ClearSessionForEnvironmentAsync(environment);
             ShowSessionMessage(
                 InfoBarSeverity.Informational,
-                string.Format(StringResources.SettingsSessionResetCompleted, environmentName));
+                string.Format(StringResources.SettingsSessionResetCompleted, environment.Name));
         }
         finally
         {
@@ -128,8 +198,8 @@ public sealed partial class SettingsDialog
 
     private static string GetSessionButtonEnvironmentName(Button? button)
     {
-        return button?.Tag is string environmentName && !string.IsNullOrWhiteSpace(environmentName)
-            ? environmentName
+        return button?.Tag is EnvironmentConfig environment && !string.IsNullOrWhiteSpace(environment.Name)
+            ? environment.Name
             : StringResources.SettingsSessionReset;
     }
 

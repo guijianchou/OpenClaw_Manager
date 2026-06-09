@@ -6,6 +6,19 @@ namespace OpenClaw.Services;
 
 public partial class WebViewService
 {
+    public enum DevToolsOpenStatus
+    {
+        Opened,
+        Unavailable,
+        Disabled,
+        Failed,
+    }
+
+    public readonly record struct DevToolsOpenResult(DevToolsOpenStatus Status, string? Message = null)
+    {
+        public bool Succeeded => Status == DevToolsOpenStatus.Opened;
+    }
+
     /// <summary>
     /// Clears all browsing data (cookies, cache, local storage) from the WebView2 profile.
     /// </summary>
@@ -32,28 +45,35 @@ public partial class WebViewService
     /// <summary>
     /// Opens the WebView2 DevTools window.
     /// </summary>
-    public void OpenDevTools()
+    public DevToolsOpenResult OpenDevTools()
     {
         var coreWebView = GetCoreWebView();
         if (coreWebView is null)
         {
-            return;
+            return new DevToolsOpenResult(DevToolsOpenStatus.Unavailable);
+        }
+
+        if (!coreWebView.Settings.AreDevToolsEnabled)
+        {
+            return new DevToolsOpenResult(DevToolsOpenStatus.Disabled);
         }
 
         try
         {
             coreWebView.OpenDevToolsWindow();
+            return new DevToolsOpenResult(DevToolsOpenStatus.Opened);
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
             _logger.Warning($"OpenDevTools skipped because CoreWebView2 became unavailable: {ex.Message}");
+            return new DevToolsOpenResult(DevToolsOpenStatus.Failed, ex.Message);
         }
     }
 
     /// <summary>
     /// Clears the session for a specific environment profile.
     /// </summary>
-    public async Task ClearEnvironmentSessionAsync(string environmentName)
+    public async Task ClearEnvironmentSessionAsync(string environmentName, string? gatewayUrl)
     {
         if (string.IsNullOrWhiteSpace(environmentName))
         {
@@ -63,14 +83,15 @@ public partial class WebViewService
         var coreWebView = GetCoreWebView();
         if (coreWebView is not null &&
             _isInitialized &&
-            string.Equals(CurrentEnvironmentName, environmentName, StringComparison.Ordinal))
+            string.Equals(CurrentEnvironmentName, environmentName, StringComparison.Ordinal) &&
+            string.Equals(CurrentEnvironmentGatewayUrl, gatewayUrl, StringComparison.Ordinal))
         {
             _logger.Info($"Clearing active browsing data for environment '{environmentName}'.");
             await coreWebView.Profile.ClearBrowsingDataAsync();
             return;
         }
 
-        await Task.Run(() => DeleteUserDataFolderForEnvironment(environmentName, _logger));
+        await DeleteUserDataFolderForEnvironmentAsync(environmentName, gatewayUrl, _logger);
     }
 
     /// <summary>
@@ -84,10 +105,11 @@ public partial class WebViewService
     /// <summary>
     /// Gets whether the active WebView2 instance already uses the requested environment profile.
     /// </summary>
-    public bool IsUsingEnvironmentProfile(string? environmentName)
+    public bool IsUsingEnvironmentProfile(string? environmentName, string? gatewayUrl)
     {
         return _isInitialized &&
             !string.IsNullOrWhiteSpace(environmentName) &&
-            string.Equals(CurrentEnvironmentName, environmentName, StringComparison.Ordinal);
+            string.Equals(CurrentEnvironmentName, environmentName, StringComparison.Ordinal) &&
+            string.Equals(CurrentEnvironmentGatewayUrl, gatewayUrl, StringComparison.Ordinal);
     }
 }

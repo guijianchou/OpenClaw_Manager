@@ -11,8 +11,7 @@ namespace OpenClaw.Services;
 /// </summary>
 public class DiagnosticService
 {
-    private static readonly HttpClient SharedHttpClient = CreateHttpClient();
-    private static readonly string[] LocalLoopbackHosts = ["127.0.0.1", "localhost", "::1"];
+    private static readonly GatewayDiagnosticProbe SharedGatewayDiagnosticProbe = new();
 
     /// <summary>
     /// Checks whether the WebView2 runtime is installed and available.
@@ -48,115 +47,172 @@ public class DiagnosticService
     /// <summary>
     /// Probes network connectivity to the given gateway URL.
     /// </summary>
-    public static async Task<DiagnosticResult> ProbeNetworkAsync(string? gatewayUrl, ControlUiProbeSnapshot? snapshot = null)
+    public static async Task<DiagnosticResult> ProbeNetworkAsync(
+        string? gatewayUrl,
+        ControlUiProbeSnapshot? snapshot = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(gatewayUrl))
         {
             return DiagnosticResult.Skip(StringResources.DiagnosticNoGatewayUrlConfigured);
         }
 
-        var uri = Uri.TryCreate(gatewayUrl, UriKind.Absolute, out var parsedUri) ? parsedUri : null;
-        if (uri is not null &&
-            string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
-            !IsLoopbackLike(uri))
+        var probeResult = await SharedGatewayDiagnosticProbe.ProbeAsync(gatewayUrl, cancellationToken);
+        var nonLocalHttpDetail = GetNonLocalHttpWarningDetail(probeResult.IsNonLocalHttp);
+        var statusCode = probeResult.StatusCode;
+
+        if (probeResult.ErrorKind != GatewayDiagnosticProbeErrorKind.None)
         {
-            return DiagnosticResult.Warn(
-                StringResources.DiagnosticNonLocalHttp,
-                StringResources.DiagnosticNonLocalHttpDetail);
+            return CreateNetworkErrorResult(probeResult, nonLocalHttpDetail);
         }
 
-        if (snapshot is not null && snapshot.Phase is not ControlUiPhase.Unknown and not ControlUiPhase.Unavailable)
+        return probeResult.Kind switch
         {
-            return snapshot.Phase switch
-            {
-                ControlUiPhase.Connected => DiagnosticResult.Pass(StringResources.DiagnosticControlUiReachableActive),
-                ControlUiPhase.Loading => DiagnosticResult.Warn(
-                    StringResources.DiagnosticControlUiLoading,
-                    StringResources.DiagnosticControlUiLoadingDetail),
-                ControlUiPhase.PageLoaded or ControlUiPhase.GatewayConnecting => DiagnosticResult.Warn(
-                    StringResources.DiagnosticControlUiEstablishing,
-                    snapshot.DetailOrSummary),
-                ControlUiPhase.AuthRequired => DiagnosticResult.Warn(
-                    StringResources.DiagnosticControlUiAuthRequired,
-                    snapshot.DetailOrSummary),
-                ControlUiPhase.PairingRequired => DiagnosticResult.Warn(
-                    StringResources.DiagnosticControlUiPairingRequired,
-                    string.Format(StringResources.DiagnosticControlUiPairingRequiredDetailFormat, snapshot.DetailOrSummary)),
-                ControlUiPhase.OriginRejected => DiagnosticResult.Warn(
-                    StringResources.DiagnosticControlUiOriginRejected,
-                    string.Format(StringResources.DiagnosticControlUiOriginRejectedDetailFormat, snapshot.DetailOrSummary)),
-                ControlUiPhase.GatewayError => DiagnosticResult.Warn(
-                    StringResources.DiagnosticControlUiGatewayWsFailing,
-                    snapshot.DetailOrSummary),
-                _ => DiagnosticResult.Skip(StringResources.DiagnosticControlUiStateUnavailable)
-            };
+            GatewayHttpStatusKind.Reachable =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    string.Format(StringResources.DiagnosticHttpReachableFormat, statusCode),
+                    StringResources.DiagnosticHttpReachableDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.AccessRequired =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    string.Format(StringResources.DiagnosticAccessRejectedFormat, statusCode),
+                    StringResources.DiagnosticAccessRejectedDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.GatewayWaitingApproval =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    StringResources.DiagnosticGatewayWaitingApproval,
+                    StringResources.DiagnosticGatewayWaitingApprovalDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.AuthRateLimited =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    StringResources.DiagnosticAuthRateLimited,
+                    StringResources.DiagnosticAuthRateLimitedDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.MethodRejected =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    StringResources.DiagnosticMethodRejected,
+                    StringResources.DiagnosticMethodRejectedDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.Redirected =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    string.Format(StringResources.DiagnosticRedirectedFormat, statusCode),
+                    StringResources.DiagnosticRedirectedDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.MissingPath =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    StringResources.DiagnosticPathNotFound,
+                    StringResources.DiagnosticPathNotFoundDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.CloudflareTunnelUnavailable =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, probeResult.ReasonPhrase),
+                    StringResources.DiagnosticCloudflareTunnelUnavailableDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            GatewayHttpStatusKind.ServerOrProxyError =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, probeResult.ReasonPhrase),
+                    StringResources.DiagnosticGatewayReturnedServerFailureDetail,
+                    snapshot,
+                    nonLocalHttpDetail),
+            _ =>
+                CreateNetworkDiagnosticResult(
+                    probeResult.Severity,
+                    string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, probeResult.ReasonPhrase),
+                    StringResources.DiagnosticGatewayReturnedDetail,
+                    snapshot,
+                    nonLocalHttpDetail)
+        };
+    }
+
+    private static DiagnosticResult CreateNetworkDiagnosticResult(
+        GatewayDiagnosticProbeSeverity severity,
+        string message,
+        string detail,
+        ControlUiProbeSnapshot? snapshot = null,
+        string? warningDetail = null)
+    {
+        var resolvedDetail = AppendHostedControlUiStateDetail(
+            AppendDiagnosticDetail(detail, warningDetail),
+            snapshot);
+        return severity switch
+        {
+            GatewayDiagnosticProbeSeverity.Pass => new DiagnosticResult(DiagnosticStatus.Pass, message, resolvedDetail),
+            GatewayDiagnosticProbeSeverity.Failure => DiagnosticResult.Fail(message, resolvedDetail),
+            _ => DiagnosticResult.Warn(message, resolvedDetail),
+        };
+    }
+
+    private static DiagnosticResult CreateNetworkErrorResult(
+        GatewayDiagnosticProbeResult probeResult,
+        string? warningDetail)
+    {
+        return probeResult.ErrorKind switch
+        {
+            GatewayDiagnosticProbeErrorKind.InvalidUrl => DiagnosticResult.Fail(
+                StringResources.DiagnosticNetworkProbeFailed,
+                AppendDiagnosticDetail(StringResources.DiagnosticInvalidControlUiUrlDetail, warningDetail)),
+            GatewayDiagnosticProbeErrorKind.Timeout => DiagnosticResult.Fail(
+                StringResources.DiagnosticGatewayTimeout,
+                AppendDiagnosticDetail(StringResources.DiagnosticGatewayTimeoutDetail, warningDetail)),
+            GatewayDiagnosticProbeErrorKind.Unreachable => DiagnosticResult.Fail(
+                StringResources.DiagnosticGatewayUnreachable,
+                AppendDiagnosticDetail(probeResult.Detail, warningDetail)),
+            _ => DiagnosticResult.Fail(
+                StringResources.DiagnosticNetworkProbeFailed,
+                AppendDiagnosticDetail(probeResult.Detail, warningDetail)),
+        };
+    }
+
+    private static string? GetNonLocalHttpWarningDetail(bool isNonLocalHttp)
+    {
+        if (!isNonLocalHttp)
+        {
+            return null;
         }
 
-        try
-        {
-            using var response = await SharedHttpClient.GetAsync(gatewayUrl, HttpCompletionOption.ResponseHeadersRead);
-            var classification = GatewayHttpStatusClassifier.Classify(
-                response.StatusCode,
-                response.ReasonPhrase,
-                response.Headers.TryGetValues("cf-ray", out _));
-            var statusCode = classification.StatusCode;
+        return AppendDiagnosticDetail(
+            StringResources.DiagnosticNonLocalHttp,
+            StringResources.DiagnosticNonLocalHttpDetail);
+    }
 
-            return classification.Kind switch
-            {
-                GatewayHttpStatusKind.Reachable =>
-                    DiagnosticResult.Warn(
-                        string.Format(StringResources.DiagnosticHttpReachableFormat, statusCode),
-                        StringResources.DiagnosticHttpReachableDetail),
-                GatewayHttpStatusKind.AccessRequired =>
-                    DiagnosticResult.Warn(
-                        string.Format(StringResources.DiagnosticAccessRejectedFormat, statusCode),
-                        StringResources.DiagnosticAccessRejectedDetail),
-                GatewayHttpStatusKind.GatewayWaitingApproval =>
-                    DiagnosticResult.Warn(
-                        StringResources.DiagnosticGatewayWaitingApproval,
-                        StringResources.DiagnosticGatewayWaitingApprovalDetail),
-                GatewayHttpStatusKind.AuthRateLimited =>
-                    DiagnosticResult.Warn(
-                        StringResources.DiagnosticAuthRateLimited,
-                        StringResources.DiagnosticAuthRateLimitedDetail),
-                GatewayHttpStatusKind.MethodRejected =>
-                    DiagnosticResult.Warn(
-                        StringResources.DiagnosticMethodRejected,
-                        StringResources.DiagnosticMethodRejectedDetail),
-                GatewayHttpStatusKind.Redirected =>
-                    DiagnosticResult.Warn(
-                        string.Format(StringResources.DiagnosticRedirectedFormat, statusCode),
-                        StringResources.DiagnosticRedirectedDetail),
-                GatewayHttpStatusKind.MissingPath =>
-                    DiagnosticResult.Warn(
-                        StringResources.DiagnosticPathNotFound,
-                        StringResources.DiagnosticPathNotFoundDetail),
-                GatewayHttpStatusKind.CloudflareTunnelUnavailable =>
-                    DiagnosticResult.Fail(
-                        string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, response.ReasonPhrase),
-                        StringResources.DiagnosticCloudflareTunnelUnavailableDetail),
-                GatewayHttpStatusKind.ServerOrProxyError =>
-                    DiagnosticResult.Fail(
-                        string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, response.ReasonPhrase),
-                        StringResources.DiagnosticGatewayReturnedServerFailureDetail),
-                _ =>
-                    DiagnosticResult.Warn(
-                        string.Format(StringResources.DiagnosticGatewayReturnedFormat, statusCode, response.ReasonPhrase),
-                        StringResources.DiagnosticGatewayReturnedDetail)
-            };
-        }
-        catch (TaskCanceledException)
+    private static string AppendDiagnosticDetail(string detail, string? additionalDetail)
+    {
+        return string.IsNullOrWhiteSpace(additionalDetail)
+            ? detail
+            : string.Join('\n', detail, additionalDetail);
+    }
+
+    private static string AppendHostedControlUiStateDetail(string detail, ControlUiProbeSnapshot? snapshot)
+    {
+        if (snapshot is null || snapshot.Phase is ControlUiPhase.Unknown or ControlUiPhase.Unavailable)
         {
-            return DiagnosticResult.Fail(StringResources.DiagnosticGatewayTimeout, StringResources.DiagnosticGatewayTimeoutDetail);
+            return detail;
         }
-        catch (HttpRequestException ex)
-        {
-            return DiagnosticResult.Fail(StringResources.DiagnosticGatewayUnreachable, ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return DiagnosticResult.Fail(StringResources.DiagnosticNetworkProbeFailed, ex.Message);
-        }
+
+        var state = string.IsNullOrWhiteSpace(snapshot.DetailOrSummary)
+            ? snapshot.Phase.ToString()
+            : $"{snapshot.Phase}: {snapshot.DetailOrSummary}";
+        var hostedStateDetail = string.Format(StringResources.DiagnosticHostedStateDetailFormat, state);
+        return string.IsNullOrWhiteSpace(detail)
+            ? hostedStateDetail
+            : string.Join('\n', detail, hostedStateDetail);
     }
 
     /// <summary>
@@ -165,14 +221,15 @@ public class DiagnosticService
     /// </summary>
     public static async Task<DiagnosticResult> CheckSessionAsync(
         IDiagnosticWebViewSession webViewSession,
-        ControlUiProbeSnapshot? snapshot = null)
+        ControlUiProbeSnapshot? snapshot = null,
+        CancellationToken cancellationToken = default)
     {
         if (!webViewSession.IsInitialized)
         {
             return DiagnosticResult.Skip(StringResources.DiagnosticWebViewNotInitialized);
         }
 
-        snapshot ??= await webViewSession.InspectControlUiStateAsync();
+        snapshot ??= await webViewSession.InspectControlUiStateAsync(cancellationToken);
         if (snapshot.Phase == ControlUiPhase.Unavailable)
         {
             return DiagnosticResult.Skip(
@@ -204,7 +261,8 @@ public class DiagnosticService
     public static async Task<DiagnosticReport> RunAllAsync(
         string? gatewayUrl,
         IDiagnosticWebViewSession? webViewSession,
-        IAppLogger logger)
+        IAppLogger logger,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(logger);
 
@@ -215,14 +273,14 @@ public class DiagnosticService
 
         if (webViewSession is not null)
         {
-            snapshot = await webViewSession.InspectControlUiStateAsync();
+            snapshot = await webViewSession.InspectControlUiStateAsync(cancellationToken);
         }
 
-        report.Items.Add((StringResources.DiagnosticNetworkConnectivityLabel, await ProbeNetworkAsync(gatewayUrl, snapshot)));
+        report.Items.Add((StringResources.DiagnosticNetworkConnectivityLabel, await ProbeNetworkAsync(gatewayUrl, snapshot, cancellationToken)));
 
         if (webViewSession is not null)
         {
-            report.Items.Add((StringResources.DiagnosticSessionStatusLabel, await CheckSessionAsync(webViewSession, snapshot)));
+            report.Items.Add((StringResources.DiagnosticSessionStatusLabel, await CheckSessionAsync(webViewSession, snapshot, cancellationToken)));
             report.Items.Add((StringResources.DiagnosticInstrumentationLabel, DescribeInstrumentation(webViewSession)));
         }
 
@@ -245,22 +303,6 @@ public class DiagnosticService
         return DiagnosticResult.Pass(summary);
     }
 
-    private static HttpClient CreateHttpClient()
-    {
-        return new HttpClient(new HttpClientHandler
-        {
-            AllowAutoRedirect = false,
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(10),
-        };
-    }
-
-    private static bool IsLoopbackLike(Uri uri)
-    {
-        return uri.IsLoopback ||
-            LocalLoopbackHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase);
-    }
 }
 
 /// <summary>
@@ -299,10 +341,10 @@ public class DiagnosticReport
         {
             var icon = result.Status switch
             {
-                DiagnosticStatus.Pass => "[OK]",
-                DiagnosticStatus.Warning => "[WARN]",
-                DiagnosticStatus.Fail => "[FAIL]",
-                _ => "[SKIP]",
+                DiagnosticStatus.Pass => StringResources.DiagnosticStatusPass,
+                DiagnosticStatus.Warning => StringResources.DiagnosticStatusWarning,
+                DiagnosticStatus.Fail => StringResources.DiagnosticStatusFail,
+                _ => StringResources.DiagnosticStatusSkipped,
             };
 
             lines.AppendLine($"{icon} {name}: {result.Message}");

@@ -29,13 +29,29 @@ public interface IWebViewHost
 
     void Navigate(string url);
     bool Reload();
-    void OpenDevTools();
+    HostDevToolsOpenResult OpenDevTools();
 
     Task ClearBrowsingDataAsync();
     bool RetryNavigation();
 
     event Action<HostConnectionState>? ConnectionStateChanged;
     event Action<string>? NavigationErrorOccurred;
+}
+
+/// <summary>
+/// Generic DevTools open result, decoupled from concrete WebView2 service types.
+/// </summary>
+public readonly record struct HostDevToolsOpenResult(HostDevToolsOpenStatus Status, string? Message = null)
+{
+    public bool Succeeded => Status == HostDevToolsOpenStatus.Opened;
+}
+
+public enum HostDevToolsOpenStatus
+{
+    Opened,
+    Unavailable,
+    Disabled,
+    Failed,
 }
 
 /// <summary>

@@ -1,5 +1,7 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
+using OpenClaw.Helpers;
+
 namespace OpenClaw.Services;
 
 internal sealed class HostedSessionHeartbeatPolicy
@@ -9,11 +11,11 @@ internal sealed class HostedSessionHeartbeatPolicy
         return snapshot.Phase switch
         {
             ControlUiPhase.Connected =>
-                HeartbeatProbeResult.Healthy("Hosted Control UI reports an active Gateway session."),
+                HeartbeatProbeResult.Healthy(StringResources.HeartbeatHostedSessionActive),
             ControlUiPhase.AuthRequired or ControlUiPhase.PairingRequired or ControlUiPhase.OriginRejected =>
                 HeartbeatProbeResult.SessionBlocked(snapshot.DetailOrSummary),
             ControlUiPhase.PageLoaded or ControlUiPhase.GatewayConnecting =>
-                HeartbeatProbeResult.Connecting("Hosted Control UI is still reconnecting to the Gateway."),
+                HeartbeatProbeResult.Connecting(StringResources.HeartbeatHostedSessionReconnecting),
             ControlUiPhase.GatewayError =>
                 HeartbeatProbeResult.Failure(snapshot.DetailOrSummary),
             ControlUiPhase.Unavailable =>

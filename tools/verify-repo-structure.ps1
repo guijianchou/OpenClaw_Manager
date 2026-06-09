@@ -4,8 +4,9 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 
 $testsPath = Join-Path $repoRoot 'tests'
-if (Test-Path -LiteralPath $testsPath) {
-    throw 'Active tests/ directory exists, but this checkpoint intentionally keeps tests out of the solution.'
+$coreTestsProjectPath = Join-Path $testsPath 'OpenClaw.Core.Tests/OpenClaw.Core.Tests.csproj'
+if (-not (Test-Path -LiteralPath $coreTestsProjectPath)) {
+    throw 'The Core regression harness must exist at tests/OpenClaw.Core.Tests.'
 }
 
 $solution = Get-Content -LiteralPath (Join-Path $repoRoot 'OpenClaw.sln') -Raw
@@ -13,15 +14,86 @@ if ($solution -match 'OpenClaw\.Tests|tests\\OpenClaw\.Tests') {
     throw 'OpenClaw.sln still references the removed test harness.'
 }
 
-$coreProjectId = '{BC4C7184-C8DD-4748-AC82-D26123568BD1}'
-$coreProject = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/OpenClaw.Core.csproj') -Raw
-if ($coreProject -match '<Platforms>') {
-        throw 'OpenClaw.Core.csproj must stay platform-independent. Do not declare x64/x86/ARM64 platforms on the pure SDK class library; map solution platforms to Debug/Release|Any CPU instead.'
+if ($solution -notmatch 'tests\\OpenClaw\.Core\.Tests\\OpenClaw\.Core\.Tests\.csproj') {
+    throw 'OpenClaw.sln must include the Core regression harness.'
 }
 
-$coreSolutionMappingPattern = [regex]::Escape($coreProjectId) + '\.(Debug|Release)\|(x64|x86|ARM64)\.(ActiveCfg|Build\.0) = (Debug|Release)\|([^`\r\n]+)'
+$coreTestsProject = Get-Content -LiteralPath $coreTestsProjectPath -Raw
+$coreTests = Get-Content -LiteralPath (Join-Path $repoRoot 'tests/OpenClaw.Core.Tests/Program.cs') -Raw
+if ($coreTestsProject -notmatch 'Microsoft\.NET\.Test\.Sdk' -or
+    $coreTestsProject -notmatch 'MSTest\.TestFramework' -or
+    $coreTestsProject -notmatch 'MSTest\.TestAdapter' -or
+    $coreTestsProject -notmatch '<IsTestProject>true</IsTestProject>' -or
+    $coreTestsProject -notmatch '<GenerateProgramFile>false</GenerateProgramFile>' -or
+    $coreTests -notmatch '\[TestClass\]' -or
+    $coreTests -notmatch '\[TestMethod\]' -or
+    $coreTests -notmatch 'await Program\.Main\(\)') {
+    throw 'OpenClaw.Core.Tests must be discoverable by dotnet test while preserving the executable Program.Main harness.'
+}
+
+foreach ($testName in @(
+    'Cloudflare1033ResponseBodyIsDetectedThroughProductionEntryPointAsync',
+    'Cloudflare1033HeaderIsDetectedThroughProductionEntryPointAsync',
+    'Cloudflare1033CodeHeaderIsDetectedThroughProductionEntryPointAsync',
+    'CloudflareBrandedBodyWithUnrelated1033RemainsServerOrProxyErrorAsync',
+    'CloudflareBodySnippetReadTimeoutFallsBackToStatusClassificationAsync',
+    'ProbeUriAppendsAtRoot',
+    'ProbeUriNormalizesConfiguredEndpointWithoutTrailingSlash',
+    'ProbeKeyDistinguishesBasePathsAndPorts',
+    'ProbeUriStripsUserInfo',
+    'ProbeUriRejectsInvalidUrls',
+    'SettingsWindowBoundsUseDedicatedPersistedWidthFloor',
+    'LatencyHistoryClearRemovesStaleSamples',
+    'ClassifierMarksMissingAndMethodRejectedPathsAsFailures',
+    'ClassifierMarksAuthRateLimitAsReachableUserAction',
+    'ClassifierMarksServerOrProxyErrorsAsUnreachable',
+    'HeartbeatMapsAuthRateLimitToSessionBlocked',
+    'HeartbeatMapsRedirectsToFailure',
+    'HeartbeatMapsMissingPathToFailure',
+    'LatencyServicePublishesRedirectsAsFailureAsync',
+    'LatencyServicePublishesSuccessAsync',
+    'DiagnosticsMapperMarksPathAndProxyFailuresAsFailures',
+    'DiagnosticsMapperDistinguishesPassWarningAndFailureStates',
+    'DiagnosticsMapperMarksRedirectsAsFailures',
+    'DiagnosticBundleRedactsCopiedLogFilesAsync',
+    'DiagnosticBundleUsesUniquePathsForRepeatedExportsAsync',
+    'DiagnosticBundleLimitsTotalLogPayloadAndRedactsHeadersAsync',
+    'DiagnosticProbeDowngradesReachableNonLocalHttpToWarningAsync',
+    'HeartbeatResolverPreservesHostedConnectingStateWhenTransportFails',
+    'HeartbeatResolverMapsTransportSessionBlockedToUserAction',
+    'LatencyServiceDoesNotPublishAuthRequiredAsSuccessAsync',
+    'StaleSessionReadyDoesNotClearCurrentEnvironmentRecoveryStateAsync',
+    'HardRefreshCooldownStartsOnlyAfterReloadSucceedsAsync',
+    'ConfigurationNormalizesInvalidEnvironmentEntriesAsync'
+)) {
+    if ($coreTests -notmatch [regex]::Escape($testName)) {
+        throw "Core regression harness is missing required Gateway/Control UI test: $testName"
+    }
+}
+
+$coreProjectId = '{BC4C7184-C8DD-4748-AC82-D26123568BD1}'
+$appProjectId = '{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}'
+$coreTestsProjectId = '{CCE9A104-662A-4ADD-8953-AFD82C475B57}'
+$coreProject = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/OpenClaw.Core.csproj') -Raw
+if ($coreProject -match '<Platforms>') {
+        throw 'OpenClaw.Core.csproj must stay platform-independent. Do not declare architecture-specific platforms on the pure SDK class library; map the x64 solution platform to Debug/Release|Any CPU instead.'
+}
+
+foreach ($forbiddenPlatformToken in @('Debug|x86', 'Release|x86', 'Debug|ARM64', 'Release|ARM64')) {
+    if ($solution -match [regex]::Escape($forbiddenPlatformToken)) {
+        throw "OpenClaw.sln must expose only x64 solution platforms; found $forbiddenPlatformToken."
+    }
+}
+
+foreach ($requiredSolutionPlatform in @('Debug|x64 = Debug|x64', 'Release|x64 = Release|x64')) {
+    if ($solution -notmatch [regex]::Escape($requiredSolutionPlatform)) {
+        throw "OpenClaw.sln is missing required x64 solution platform: $requiredSolutionPlatform"
+    }
+}
+
+$coreSolutionMappingPattern = [regex]::Escape($coreProjectId) + '\.(Debug|Release)\|x64\.(ActiveCfg|Build\.0) = (Debug|Release)\|([^`\r\n]+)'
 foreach ($coreSolutionMapping in [regex]::Matches($solution, $coreSolutionMappingPattern)) {
-    if ($coreSolutionMapping.Groups[5].Value -ne 'Any CPU') {
+    if ($coreSolutionMapping.Groups[4].Value -ne 'Any CPU') {
         throw "OpenClaw.Core solution platform mappings must target the pure class-library Any CPU configuration; invalid mapping: $($coreSolutionMapping.Value)"
     }
 }
@@ -30,19 +102,29 @@ $allCoreSolutionMappingPattern = [regex]::Escape($coreProjectId) + '\.(?<configu
 foreach ($coreSolutionMapping in [regex]::Matches($solution, $allCoreSolutionMappingPattern)) {
     if ($coreSolutionMapping.Groups['configuration'].Value -notin @('Debug', 'Release') -or
         $coreSolutionMapping.Groups['projectConfiguration'].Value -ne $coreSolutionMapping.Groups['configuration'].Value -or
-        $coreSolutionMapping.Groups['solutionPlatform'].Value -notin @('x64', 'x86', 'ARM64') -or
+        $coreSolutionMapping.Groups['solutionPlatform'].Value -ne 'x64' -or
         $coreSolutionMapping.Groups['projectPlatform'].Value -ne 'Any CPU') {
-        throw "OpenClaw.Core solution mappings must map Debug/Release x64/x86/ARM64 solution platforms to the matching Debug/Release|Any CPU project configuration: $($coreSolutionMapping.Value)"
+        throw "OpenClaw.Core solution mappings must map Debug/Release x64 solution platforms to the matching Debug/Release|Any CPU project configuration: $($coreSolutionMapping.Value)"
     }
 }
 
 foreach ($configuration in @('Debug', 'Release')) {
-    foreach ($platform in @('x64', 'x86', 'ARM64')) {
-        foreach ($mapping in @('ActiveCfg', 'Build.0')) {
-            $expectedCoreMapping = "$coreProjectId.$configuration|$platform.$mapping = $configuration|Any CPU"
-            if ($solution -notmatch [regex]::Escape($expectedCoreMapping)) {
-                throw "OpenClaw.Core solution platform mapping is missing or invalid: $expectedCoreMapping"
-            }
+    foreach ($mapping in @('ActiveCfg', 'Build.0')) {
+        $expectedCoreMapping = "$coreProjectId.$configuration|x64.$mapping = $configuration|Any CPU"
+        if ($solution -notmatch [regex]::Escape($expectedCoreMapping)) {
+            throw "OpenClaw.Core solution platform mapping is missing or invalid: $expectedCoreMapping"
+        }
+
+        $expectedCoreTestsMapping = "$coreTestsProjectId.$configuration|x64.$mapping = $configuration|Any CPU"
+        if ($solution -notmatch [regex]::Escape($expectedCoreTestsMapping)) {
+            throw "OpenClaw.Core.Tests solution platform mapping is missing or invalid: $expectedCoreTestsMapping"
+        }
+    }
+
+    foreach ($mapping in @('ActiveCfg', 'Build.0', 'Deploy.0')) {
+        $expectedAppMapping = "$appProjectId.$configuration|x64.$mapping = $configuration|x64"
+        if ($solution -notmatch [regex]::Escape($expectedAppMapping)) {
+            throw "OpenClaw app solution platform mapping is missing or invalid: $expectedAppMapping"
         }
     }
 }
@@ -95,6 +177,21 @@ foreach ($match in $synchronousWaitMatches) {
 }
 
 $project = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/OpenClaw.csproj') -Raw
+if ($project -notmatch [regex]::Escape('<TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>') -or
+    $project -notmatch [regex]::Escape('<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>') -or
+    $project -notmatch [regex]::Escape('<Platforms>x64</Platforms>') -or
+    $project -notmatch [regex]::Escape('<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>') -or
+    $project -match '<Platforms>[^<]*(x86|ARM64)[^<]*</Platforms>' -or
+    $project -match '<RuntimeIdentifiers?>[^<]*(win-x86|win-arm64)[^<]*</RuntimeIdentifiers?>') {
+    throw 'OpenClaw.csproj must target SDK 10.0.26100.0, declare Windows 10 1809 as the minimum platform, and expose only x64 / win-x64.'
+}
+
+$packageLock = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/packages.lock.json') -Raw
+if ($packageLock -match 'win-x86|win-arm64' -or
+    $packageLock -notmatch 'net10\.0-windows10\.0\.26100/win-x64') {
+    throw 'OpenClaw packages.lock.json must contain only the win-x64 runtime graph for the WinUI app.'
+}
+
 $linkedCompileItems = [regex]::Matches($project, '<Compile\s+(?:Include|Update)="(?<path>[^"]+)"')
 foreach ($linkedCompileItem in $linkedCompileItems) {
     $compilePath = $linkedCompileItem.Groups['path'].Value
@@ -104,7 +201,7 @@ foreach ($linkedCompileItem in $linkedCompileItems) {
     }
 }
 
-$currentVersion = '5.0.1'
+$currentVersion = '5.1.1'
 $currentFileVersion = "$currentVersion.0"
 if ($project -notmatch [regex]::Escape("<Version>$currentVersion</Version>") -or
     $project -notmatch [regex]::Escape("<AssemblyVersion>$currentFileVersion</AssemblyVersion>") -or
@@ -118,14 +215,22 @@ if ($packageManifest -notmatch [regex]::Escape("Version=`"$currentFileVersion`""
     throw "Package.appxmanifest identity version must stay aligned at $currentFileVersion."
 }
 
+if ([regex]::Matches($packageManifest, 'MinVersion="10\.0\.17763\.0"').Count -ne 2 -or
+    [regex]::Matches($packageManifest, 'MaxVersionTested="10\.0\.26100\.0"').Count -ne 2) {
+    throw 'Package.appxmanifest must keep Windows 10 1809 as MinVersion and SDK 10.0.26100.0 as MaxVersionTested for both target device families.'
+}
+
 if ($appManifest -notmatch [regex]::Escape("version=`"$currentFileVersion`"")) {
     throw "app.manifest assembly identity version must stay aligned at $currentFileVersion."
 }
 
-$readme = Get-Content -LiteralPath (Join-Path $repoRoot 'README.md') -Raw
-$readmeZhLines = Get-Content -LiteralPath (Join-Path $repoRoot 'readme_zh.md')
-$changelogLines = Get-Content -LiteralPath (Join-Path $repoRoot 'changelog.md')
-$changelog = Get-Content -LiteralPath (Join-Path $repoRoot 'changelog.md') -Raw
+$readme = Get-Content -LiteralPath (Join-Path $repoRoot 'README.md') -Raw -Encoding UTF8
+$codeStyle = Get-Content -LiteralPath (Join-Path $repoRoot 'docs/code-style.md') -Raw -Encoding UTF8
+$deepRefactorPlan = Get-Content -LiteralPath (Join-Path $repoRoot 'docs/superpowers/plans/2026-05-23-deep-refactor-hardening.md') -Raw -Encoding UTF8
+$readmeZh = Get-Content -LiteralPath (Join-Path $repoRoot 'readme_zh.md') -Raw -Encoding UTF8
+$readmeZhLines = Get-Content -LiteralPath (Join-Path $repoRoot 'readme_zh.md') -Encoding UTF8
+$changelogLines = Get-Content -LiteralPath (Join-Path $repoRoot 'changelog.md') -Encoding UTF8
+$changelog = Get-Content -LiteralPath (Join-Path $repoRoot 'changelog.md') -Raw -Encoding UTF8
 $readmeZhHeading = $readmeZhLines | Where-Object { $_ -like "## *$currentVersion*" } | Select-Object -First 1
 $currentVersionCodeSpan = '`' + $currentVersion + '`'
 $changelogMetadataLines = $changelogLines | Where-Object {
@@ -134,12 +239,31 @@ $changelogMetadataLines = $changelogLines | Where-Object {
 }
 if ($readme -notmatch [regex]::Escape("**Current version:** $currentVersion") -or
     $readme -notmatch [regex]::Escape("## Current $currentVersion Notes") -or
+    $readme -notmatch [regex]::Escape('Windows 10 1809+ or Windows 11, x64 only') -or
     $readmeZhLines.Count -lt 5 -or
     $readmeZhLines[4] -notmatch [regex]::Escape($currentVersion) -or
+    $readmeZh -notmatch 'Windows 10 1809' -or
+    $readmeZh -notmatch 'x64' -or
     [string]::IsNullOrWhiteSpace($readmeZhHeading) -or
     $changelog -notmatch [regex]::Escape("metadata to $currentVersionCodeSpan") -or
     $changelogMetadataLines.Count -lt 2) {
     throw "README, Chinese README, and changelog current-version metadata must stay aligned at $currentVersion."
+}
+
+if ($codeStyle -match 'There is no active `\.NET tests/` regression harness|no-`tests/` checkpoint|not a valid substitute|false green|C:\\Users\\Zen\\\.cache\\codex-runtimes' -or
+    $codeStyle -notmatch 'dotnet run --no-restore --project tests\\OpenClaw\.Core\.Tests\\OpenClaw\.Core\.Tests\.csproj' -or
+    $codeStyle -notmatch 'dotnet test OpenClaw\.sln -c Debug -p:Platform=x64 --no-restore' -or
+    $codeStyle -notmatch '`tests\\OpenClaw\.Core\.Tests` is the active executable Core regression harness' -or
+    $codeStyle -notmatch 'supported VSTest workflow' -or
+    $codeStyle -notmatch 'set `OPENCLAW_NODE` to a specific executable in your local shell') {
+    throw 'docs/code-style.md must describe the active Core harness and avoid machine-local Node paths.'
+}
+
+if ($deepRefactorPlan -match 'C:\\Users\\Zen\\\.cache\\codex-runtimes|tests/` is intentionally absent|active solution free of `tests/`' -and
+    ($deepRefactorPlan -notmatch 'This file is implementation history, not the current verification source of truth' -or
+     $deepRefactorPlan -notmatch 'historical local verification evidence only' -or
+     $deepRefactorPlan -notmatch 'Sections that say `tests/` is absent describe an older checkpoint')) {
+    throw 'Historical deep-refactor plan must mark stale no-tests and machine-local Node snippets as historical.'
 }
 
 $englishResources = [xml](Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Strings/en-us/Resources.resw') -Raw -Encoding UTF8)
@@ -151,6 +275,30 @@ if ($resourceKeyDifferences.Count -gt 0) {
     $missingKeys = $resourceKeyDifferences |
         ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }
     throw "Localized resource key mismatch between en-us and zh-cn: $($missingKeys -join ', ')"
+}
+
+foreach ($requiredResourceKey in @(
+    'DiagnosticBundleExportedFormat',
+    'DiagnosticBundleExportFallbackDirectoryName',
+    'StatusDefaultHeartbeat',
+    'StatusDefaultAccess',
+    'StatusDefaultLatency',
+    'SettingsDevToolsUnavailable',
+    'SettingsDevToolsDisabled',
+    'SettingsDevToolsOpenFailedFormat',
+    'AccessStatusOk',
+    'AccessStatusLogin',
+    'AccessStatusPair',
+    'AccessStatusOrigin',
+    'AccessStatusWait',
+    'WorkStatusLive',
+    'WorkStatusIdle',
+    'WorkStatusWait'
+)) {
+    if ($englishResourceKeys -notcontains $requiredResourceKey -or
+        $chineseResourceKeys -notcontains $requiredResourceKey) {
+        throw "Localized resource key missing: $requiredResourceKey"
+    }
 }
 
 foreach ($resource in @(
@@ -218,6 +366,7 @@ $webViewPageToken = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/
 $webViewNavigationRecovery = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.NavigationRecovery.cs') -Raw
 $webViewLifecycle = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Lifecycle.cs') -Raw
 $webViewSession = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Session.cs') -Raw
+$webViewProfile = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/WebViewService.Profile.cs') -Raw
 if ($webViewService -match 'private\s+(?:async\s+)?(?:void|Task|Task<[^>]+>|bool|int)\s+(?:OnNavigationStarting|OnNavigationCompleted|ObserveNavigationStartTimeout|CaptureCurrentPageTokenAsync)|private enum AutoRetryOutcome' -or
     $webViewNavigation -notmatch 'OnNavigationStarting' -or
     $webViewNavigation -notmatch 'OnNavigationCompleted' -or
@@ -238,20 +387,39 @@ if ($webViewService -match 'public\s+async\s+Task\s+InitializeAsync|private\s+vo
     $webViewLifecycle -notmatch 'public void Dispose\(' -or
     $webViewLifecycle -notmatch 'private CoreWebView2\? GetCoreWebView\(' -or
     $webViewSession -notmatch 'public async Task ClearBrowsingDataAsync' -or
-    $webViewSession -notmatch 'public void OpenDevTools\(' -or
+    $webViewSession -notmatch 'public DevToolsOpenResult OpenDevTools\(' -or
     $webViewSession -notmatch 'public async Task ClearEnvironmentSessionAsync' -or
     $webViewSession -notmatch 'public string\? GetCurrentUrl\(' -or
     $webViewSession -notmatch 'public bool IsUsingEnvironmentProfile\(') {
     throw 'WebViewService.cs must keep fields, events, construction, and navigation commands; lifecycle and session/profile operations belong in dedicated partials.'
 }
 
+if ($webViewLifecycle -notmatch 'CoreWebView2Environment\.CreateWithOptionsAsync\(null, userDataFolder, null\)' -or
+    $webViewLifecycle -notmatch 'EnsureCoreWebView2Async\(environment\)' -or
+    $webViewLifecycle -match 'WEBVIEW2_USER_DATA_FOLDER|Environment\.SetEnvironmentVariable' -or
+    $webViewService -notmatch 'Func<bool> _shouldEnableDevTools' -or
+    $webViewLifecycle -notmatch 'coreWebView\.Settings\.AreDevToolsEnabled = ShouldEnableDevTools\(\)' -or
+    ($webViewService + $webViewLifecycle + $webViewSession + $webViewProfile) -match 'App\.Configuration') {
+    throw 'WebViewService must use an explicit CoreWebView2Environment user-data folder and injected DevTools policy instead of process-wide environment variables or global configuration.'
+}
+
+if ($webViewProfile -notmatch 'ProfileIdentityFileName' -or
+    $webViewProfile -notmatch 'MigrateLegacyUserDataFolderIfNeededAsync' -or
+    $webViewProfile -notmatch 'WriteProfileIdentityMarkerAsync' -or
+    $webViewProfile -notmatch 'TryReadProfileIdentityMarkerAsync' -or
+    $webViewProfile -notmatch 'NormalizeGatewayUrlForProfileIdentity' -or
+    $webViewProfile -notmatch 'Directory\.Move\(legacyFolder, profileFolder\)' -or
+    $webViewProfile -notmatch 'Skipped legacy WebView2 profile migration') {
+    throw 'WebView2 legacy profile migration must be URL-identity-marker gated before moving environment-only profile folders.'
+}
+
 if ($webViewService -notmatch 'public bool Reload\(\)' -or
     $webViewService -match 'public void Reload\(\)' -or
-    $webViewService -notmatch 'Cannot reload: WebView2 not initialized' -or
+    $webViewService -notmatch 'StringResources\.WebViewReloadNotInitialized' -or
     $webViewService -notmatch 'return false' -or
     $webViewService -notmatch 'return true' -or
-    $webViewService -notmatch 'Reload failed before WebView2 was ready' -or
-    $webViewService -notmatch 'Retry failed before WebView2 was ready') {
+    $webViewService -notmatch 'StringResources\.WebViewReloadNotReady' -or
+    $webViewService -notmatch 'StringResources\.WebViewRetryNotReady') {
     throw 'WebView reload/retry command-start failures must publish error state and expose whether navigation actually started.'
 }
 
@@ -291,6 +459,11 @@ if ($heartbeatRuntime -notmatch 'Task\.Run\(\(\) => RunObservedAsync\(key, loop,
 }
 
 $latencyService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/ControlUiLatencyService.cs') -Raw
+$controlUiProbeUriFactory = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/ControlUiProbeUriFactory.cs') -Raw
+$gatewayHttpStatusClassifier = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/GatewayHttpStatusClassifier.cs') -Raw
+$gatewayDiagnosticProbeMapper = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/GatewayDiagnosticProbeMapper.cs') -Raw
+$gatewayDiagnosticProbe = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/GatewayDiagnosticProbe.cs') -Raw
+$heartbeatProbeResolver = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/HeartbeatProbeResolver.cs') -Raw
 if ($latencyService -notmatch '_probeTask' -or
     $latencyService -notmatch 'ObserveStopAsync' -or
     $latencyService -notmatch '_probeRunId' -or
@@ -307,11 +480,52 @@ if ($latencyService -notmatch '_probeTask' -or
     throw 'ControlUiLatencyService stop paths must cancel active probes, reject stale publications, preserve first-failure state, log start/result diagnostics, and let the observed probe task dispose CTS/timer resources.'
 }
 
-if ($latencyService -match 'control-ui-config\.json' -or
-    $latencyService -notmatch '__openclaw__/a2ui/' -or
-    $latencyService -notmatch 'GatewayHttpStatusClassifier\.Classify' -or
+if ($controlUiProbeUriFactory -notmatch '__openclaw__/a2ui/' -or
+    $controlUiProbeUriFactory -notmatch 'TryCreateConfigUri' -or
+    $controlUiProbeUriFactory -notmatch 'TryCreateProbeKey' -or
+    $controlUiProbeUriFactory -notmatch 'EndsWith\(\$"/\{ControlUiConfigPath\}"' -or
+    $latencyService -match 'control-ui-config\.json' -or
+    $latencyService -notmatch 'ControlUiProbeUriFactory\.TryCreateConfigUri' -or
+    $latencyService -notmatch 'GatewayHttpStatusClassifier\.ClassifyResponseAsync' -or
     $latencyService -match 'ControlUiLatencySnapshot\.Success\([\s\S]*HTTP \{\(int\)response\.StatusCode\}') {
-    throw 'Control UI latency probes must target the documented Gateway A2UI HTTP path and classify HTTP status before publishing success.'
+    throw 'Control UI latency probes must use the shared idempotent Gateway A2UI probe URI and classify HTTP status before publishing success.'
+}
+
+if ($gatewayHttpStatusClassifier -notmatch 'TryDetectCloudflareErrorCode' -or
+    $gatewayHttpStatusClassifier -notmatch 'ClassifyResponseAsync' -or
+    $gatewayHttpStatusClassifier -notmatch 'cf-error-type' -or
+    $gatewayHttpStatusClassifier -notmatch 'cf-error-code' -or
+    $gatewayHttpStatusClassifier -notmatch 'ReadBodySnippetWithTimeoutAsync' -or
+    $gatewayHttpStatusClassifier -notmatch 'ReadBodySnippetAsync' -or
+    $gatewayHttpStatusClassifier -notmatch 'Cloudflare error 1033' -or
+    $gatewayHttpStatusClassifier -notmatch 'GatewayHttpStatusKind\.Redirected,[\s\S]*false') {
+    throw 'Gateway HTTP status classification must detect Cloudflare error 1033 from headers/body snippets and must not treat redirects as reachable.'
+}
+
+if ($gatewayDiagnosticProbeMapper -notmatch 'GatewayDiagnosticProbeSeverity' -or
+    $gatewayDiagnosticProbeMapper -notmatch 'GatewayHttpStatusKind\.Reachable => GatewayDiagnosticProbeSeverity\.Pass' -or
+    $gatewayDiagnosticProbeMapper -notmatch 'GatewayHttpStatusKind\.Redirected or[\s\S]*GatewayHttpStatusKind\.MissingPath or[\s\S]*GatewayDiagnosticProbeSeverity\.Failure' -or
+    $gatewayDiagnosticProbeMapper -notmatch '_ => GatewayDiagnosticProbeSeverity\.Warning') {
+    throw 'Gateway diagnostics status severity must be mapped in Core and covered by the Core harness.'
+}
+
+if ($gatewayDiagnosticProbe -notmatch 'public sealed class GatewayDiagnosticProbe' -or
+    $gatewayDiagnosticProbe -notmatch 'public GatewayDiagnosticProbe\(HttpMessageHandler messageHandler\)' -or
+    $gatewayDiagnosticProbe -notmatch 'ControlUiProbeUriFactory\.TryCreateConfigUri\(gatewayUrl\)' -or
+    $gatewayDiagnosticProbe -notmatch 'GatewayHttpStatusClassifier\.ClassifyResponseAsync' -or
+    $gatewayDiagnosticProbe -notmatch 'GatewayDiagnosticProbeMapper\.Map' -or
+    $gatewayDiagnosticProbe -notmatch 'GatewayDiagnosticProbeSeverity\.Pass && isNonLocalHttp' -or
+    $gatewayDiagnosticProbe -notmatch 'GatewayDiagnosticProbeErrorKind\.InvalidUrl' -or
+    $gatewayDiagnosticProbe -notmatch 'GatewayDiagnosticProbeErrorKind\.Timeout' -or
+    $gatewayDiagnosticProbe -notmatch 'GatewayDiagnosticProbeErrorKind\.Unreachable') {
+    throw 'Gateway diagnostic probing must live in Core, be injectable for tests, use shared A2UI/classifier mapping, and downgrade reachable non-local HTTP to warning.'
+}
+
+if ($heartbeatProbeResolver -notmatch 'public static class HeartbeatProbeResolver' -or
+    $heartbeatProbeResolver -notmatch 'HeartbeatProbeStatus\.Failure when hostedSessionResult\.Status == HeartbeatProbeStatus\.Connecting' -or
+    $heartbeatProbeResolver -notmatch 'HeartbeatProbeStatus\.SessionBlocked' -or
+    $heartbeat -notmatch 'HeartbeatProbeResolver\.Resolve\(hostedSessionResult, transportResult\)') {
+    throw 'Heartbeat hosted-session and transport observations must be merged through the Core resolver with explicit precedence tests.'
 }
 
 $singleInstanceCoordinator = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/SingleInstanceCoordinator.cs') -Raw
@@ -375,9 +589,17 @@ if ($heartbeat -match 'HttpClient|new\(\) \{ Timeout = TimeSpan\.FromSeconds\(10
 }
 
 $gatewayHeartbeatTransport = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/GatewayHeartbeatTransport.cs') -Raw
-if ($gatewayHeartbeatTransport -notmatch 'GatewayHttpStatusClassifier\.Classify' -or
-    $gatewayHeartbeatTransport -match 'statusCode switch') {
-    throw 'Gateway heartbeat transport must classify Cloudflare/proxy 5xx, missing Control UI paths, rejected probes, and unexpected responses as failures.'
+$gatewayHeartbeatProbeMapper = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/GatewayHeartbeatProbeMapper.cs') -Raw
+if ($gatewayHeartbeatTransport -notmatch 'ControlUiProbeUriFactory\.TryCreateConfigUri' -or
+    $gatewayHeartbeatTransport -notmatch 'GatewayHttpStatusClassifier\.ClassifyResponseAsync' -or
+    $gatewayHeartbeatTransport -notmatch 'GatewayHeartbeatProbeMapper\.Map' -or
+    $gatewayHeartbeatTransport -notmatch 'AllowAutoRedirect = false' -or
+    $gatewayHeartbeatTransport -match 'statusCode switch' -or
+    $latencyService -notmatch 'AllowAutoRedirect = false' -or
+    $heartbeat -notmatch 'HeartbeatProbeResolver\.Resolve\(hostedSessionResult, transportResult\)' -or
+    $gatewayHeartbeatProbeMapper -match 'GatewayHttpStatusKind\.Redirected' -or
+    $gatewayHeartbeatProbeMapper -notmatch 'GatewayHttpStatusKind\.AccessRequired or[\s\S]*=> HeartbeatProbeResult\.SessionBlocked') {
+    throw 'Gateway heartbeat and latency transports must preserve raw redirects and classify Cloudflare/proxy, missing path, rejected probe, redirect, and access-required responses consistently.'
 }
 
 $hostedSessionHeartbeatPolicy = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/HostedSessionHeartbeatPolicy.cs') -Raw
@@ -441,7 +663,7 @@ if ($statusInspector -notmatch 'InspectionTimeout' -or
     throw 'WebViewStatusInspector script execution must have a bounded timeout.'
 }
 
-if ($statusInspectorParsing -notmatch 'ParseControlUiSnapshot\(string json\)' -or
+if ($statusInspectorParsing -notmatch 'ParseControlUiSnapshot\(string json(?:, bool allowStringEnvelope = false)?\)' -or
     $statusInspectorParsing -notmatch 'ControlUiStatusMessageKind' -or
     $statusInspectorParsing -notmatch 'ParsePhase\(GetString\(root, "phase"\)\)' -or
     $statusInspectorParsing -notmatch 'ModelSource = currentModelSource') {
@@ -816,7 +1038,9 @@ if ($webViewNavigation -notmatch 'private async void OnNavigationCompleted[\s\S]
     throw 'WebView navigation completion async event handling must be observed, logged, and projected as an error instead of leaving Loading stale.'
 }
 
-if ($webViewSession -notmatch 'await Task\.Run\(\(\) => DeleteUserDataFolderForEnvironment\(environmentName, _logger\)\)') {
+if ($webViewSession -notmatch 'await DeleteUserDataFolderForEnvironmentAsync\(environmentName, gatewayUrl, _logger\)' -or
+    $webViewProfile -notmatch 'await Task\.Run\(\(\) => Directory\.Delete\(folder, recursive: true\)' -or
+    $webViewProfile -notmatch 'await Task\.Delay\(DeleteProfileRetryDelay \* attempt, cancellationToken\)') {
     throw 'Inactive WebView2 profile deletion must run off the UI thread.'
 }
 
@@ -895,7 +1119,7 @@ $mainViewModelLifecycle = Get-Content -LiteralPath (Join-Path $repoRoot 'src/Ope
 if ($mainViewModelLifecycle -notmatch '_lifetimeCts' -or
     $mainViewModelLifecycle -notmatch 'var environmentName = _selectedEnvironment\.Name' -or
     $mainViewModelLifecycle -notmatch 'var gatewayUrl = _selectedEnvironment\.GatewayUrl' -or
-    $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, environmentName, cancellationToken\)' -or
+    $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, environmentName, gatewayUrl, cancellationToken\)' -or
     $mainViewModelLifecycle -notmatch 'InitializeAsync\(webView, cancellationToken\)' -or
     $mainViewModelLifecycle -notmatch 'IsCurrentSelectedEnvironment\(environmentName, gatewayUrl\)' -or
     $mainViewModelLifecycle -notmatch 'private bool IsCurrentSelectedEnvironment\(string environmentName, string gatewayUrl\)') {
@@ -967,6 +1191,8 @@ if ($viewLogsHandler -notmatch 'var mainViewModel = MainViewModel;[\s\S]*this\.C
 
 if ($settingsDialogActions -notmatch 'private async void OnClearEnvironmentSessionClick[\s\S]*try[\s\S]*await ClearEnvironmentSessionAsync' -or
     $settingsDialogActions -notmatch 'private async Task ClearEnvironmentSessionAsync' -or
+    $settingsDialogActions -notmatch 'button\?\.Tag is not EnvironmentConfig environment' -or
+    $settingsDialogActions -notmatch 'MainViewModel\.ClearSessionForEnvironmentAsync\(environment\)' -or
     $settingsDialogActions -notmatch 'button\.IsEnabled = false[\s\S]*finally[\s\S]*button\.IsEnabled = true' -or
     $settingsDialogActions -notmatch 'SettingsSessionResetFailedFormat') {
     throw 'Settings session clear async handler must guard reentry, catch failures, and report localized errors.'
@@ -1142,6 +1368,14 @@ if ($configurationService -notmatch 'public SettingsWriteResult Save\(\)' -or
     throw 'ConfigurationService.Save must return a write result so callers can surface persistence failures.'
 }
 
+if ($configurationService -notmatch 'NormalizeEnvironments' -or
+    $configurationService -notmatch 'uniqueName = \$"\{name\} \(\{suffix\+\+\}\)"' -or
+    $configurationService -notmatch 'settings\.SelectedEnvironmentName = defaultEnvironment\.Name' -or
+    $configurationService -notmatch 'environment\.IsDefault = shouldBeDefault' -or
+    $configurationService -notmatch 'EnvironmentConfig\.PlaceholderGatewayUrl') {
+    throw 'ConfigurationService must normalize environment entries, selected environment, and default ownership before saving settings.'
+}
+
 $settingsDialogShared = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Views/SettingsDialog.Shared.cs') -Raw
 if ($settingsDialogShared -match 'record struct SettingsSaveResult') {
     throw 'SettingsSaveResult must live in OpenClaw.Core models, not SettingsDialog.Shared.cs.'
@@ -1167,6 +1401,15 @@ if ($appSettings -notmatch 'SettingsWindowWidth' -or
     $settingsDialogInitialization -notmatch 'WindowFrameHelper\.TryCenterNativeWindowRectInNearestMonitor' -or
     $settingsDialogInitialization -notmatch 'WindowBoundsUtilities\.CanPersistWindowBounds') {
     throw 'SettingsDialog must persist and restore its own window bounds instead of reopening at the default size and position.'
+}
+
+$windowBoundsUtilities = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Helpers/WindowBoundsUtilities.cs') -Raw
+$minimumSettingsWindowWidthMatch = [regex]::Match(
+    $windowBoundsUtilities,
+    'MinimumPersistedSettingsWindowWidth\s*=\s*(?<width>\d+)')
+if (-not $minimumSettingsWindowWidthMatch.Success -or
+    [int]$minimumSettingsWindowWidthMatch.Groups['width'].Value -lt 428) {
+    throw 'SettingsDialog minimum persisted width must fit the fixed 160px navigation pane, 48px content padding, and 220px controls.'
 }
 
 $compact = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.CompactMode.cs') -Raw
@@ -1419,24 +1662,54 @@ if ($mainViewModelLifecycle -notmatch 'ShouldRunHeartbeatForCurrentState\(\)' -o
 
 $viewModelHeartbeat = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Heartbeat.cs') -Raw
 $viewModelIndicators = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/MainViewModel.Indicators.cs') -Raw
-if ($viewModelIndicators -notmatch 'IsLatencySnapshotForSelectedEnvironment' -or
-    $viewModelIndicators -notmatch 'TryGetEnvironmentHost') {
-    throw 'MainViewModel latency updates must reject stale snapshots from non-selected environment hosts.'
+if ($latencyService -notmatch 'string ProbeKey' -or
+    $latencyService -notmatch 'ControlUiProbeUriFactory\.TryCreateProbeKey' -or
+    $viewModelIndicators -notmatch 'IsLatencySnapshotForSelectedEnvironment' -or
+    $viewModelIndicators -notmatch 'TryGetEnvironmentProbeKey' -or
+    $viewModelIndicators -notmatch 'snapshot\.ProbeKey') {
+    throw 'MainViewModel latency updates must reject stale snapshots from non-selected environment probe keys, including same-host different-port or base-path environments.'
 }
 
 if ($mainViewModelLifecycle -notmatch 'ApplyWebViewHostDetachedState\(\)' -or
     $mainViewModelLifecycle -notmatch '_latencyService\.Stop\(\)[\s\S]*_webViewService\.StopHeartbeat\(\)[\s\S]*ResetResourceProbeProjection\(\)' -or
     $mainViewModelLifecycle -notmatch 'ApplyWebViewHostDetachedState\(\)[\s\S]*ApplyConnectionState\(ConnectionState\.Loading\)[\s\S]*ResetTelemetry\(\)[\s\S]*ApplyRecoveryState\(RecoveryState\.Connecting\)' -or
     $viewModelHeartbeat -notmatch 'ResetHeartbeatProjection\(\)[\s\S]*HeartbeatSummary = StringResources\.HeartbeatWait[\s\S]*ResetHeartbeatIndicatorsToWarning\(\)' -or
-    $viewModelIndicators -notmatch 'ResetLatencyProjection\(\)[\s\S]*LatencySummaryText = DefaultLatencySummary[\s\S]*LatencySummaryBrush = NeutralBrush' -or
+    $viewModelIndicators -notmatch 'ResetLatencyProjection\([^)]*\)[\s\S]*LatencySummaryText = DefaultLatencySummary[\s\S]*LatencySummaryBrush = NeutralBrush' -or
     $viewModelIndicators -notmatch 'snapshot\.State == ControlUiLatencyState\.Unknown') {
     throw 'Stopping probes or detaching WebView must reset visible heartbeat, latency, MODEL, access, work, and shell projections instead of leaving stale healthy status visible.'
 }
 
+$latencyHistory = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/LatencyHistory.cs') -Raw
+if ($latencyHistory -match 'Latency history|Latest:|Avg:|PoP:' -or
+    $latencyHistory -notmatch 'public void Clear\(\)' -or
+    $viewModelIndicators -notmatch 'StringResources\.LatencyHistoryNoSamples' -or
+    $viewModelIndicators -notmatch 'StringResources\.LatencyPoPFormat' -or
+    $viewModelIndicators -notmatch '_latencyHistory\.Clear\(\)' -or
+    $viewModelIndicators -notmatch '_lastKnownPoP = null') {
+    throw 'Latency history tooltip text must be localized in the WinUI layer and environment/host resets must clear stale samples and Cloudflare PoP state.'
+}
+
 $presenter = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels/StatusPresenter.cs') -Raw
 if ($presenter -notmatch 'ControlUiLatencyState\.Failure' -or
-    $presenter -notmatch 'ERR') {
+    $presenter -notmatch 'StringResources\.LatencyError') {
     throw 'Latency presentation must show a distinct failure state instead of leaving ping at the default placeholder after probe failures.'
+}
+
+if ($presenter -notmatch 'ControlUiLatencyState\.Stale' -or
+    $presenter -notmatch 'StringResources\.LatencyStale' -or
+    $presenter -notmatch 'new StatusPresentation\(StringResources\.LatencyStale, brushes\.Warning\)') {
+    throw 'Latency presentation must show stale failed probes as warning text instead of keeping an old healthy-looking ping.'
+}
+
+if ($presenter -cmatch '"AUTH (OK|LOGIN|PAIR|ORIGIN|WAIT)"|"LIVE"|"IDLE"' -or
+    $presenter -notmatch 'StringResources\.AccessStatusOk' -or
+    $presenter -notmatch 'StringResources\.AccessStatusLogin' -or
+    $presenter -notmatch 'StringResources\.AccessStatusPair' -or
+    $presenter -notmatch 'StringResources\.AccessStatusOrigin' -or
+    $presenter -notmatch 'StringResources\.AccessStatusWait' -or
+    $presenter -notmatch 'StringResources\.WorkStatusLive' -or
+    $presenter -notmatch 'StringResources\.WorkStatusIdle') {
+    throw 'StatusPresenter access/work status tokens must come from localized StringResources.'
 }
 
 $mainViewModelFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/ViewModels') -File -Filter 'MainViewModel*.cs'
@@ -1500,6 +1773,39 @@ if ($commands -notmatch 'Task\.Run\(\(\) => DiagnosticBundleService\.ExportBundl
     throw 'Diagnostic bundle export must run log enumeration/compression off the UI thread.'
 }
 
+if ($commands -match 'Diagnostic bundle exported to Desktop' -or
+    $commands -notmatch 'ResolveDiagnosticBundleOutputDirectory' -or
+    $commands -notmatch 'StringResources\.DiagnosticBundleExportedFormat' -or
+    $commands -notmatch 'Environment\.SpecialFolder\.DesktopDirectory' -or
+    $commands -notmatch 'Environment\.SpecialFolder\.MyDocuments' -or
+    $commands -notmatch 'DiagnosticBundleExportFallbackDirectoryName') {
+    throw 'Diagnostic bundle export must use a writable fallback output directory and a localized success summary that reports the real path.'
+}
+
+$diagnosticBundleService = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw.Core/Services/DiagnosticBundleService.cs') -Raw
+if ($diagnosticBundleService -notmatch 'RedactDiagnosticText' -or
+    $diagnosticBundleService -notmatch 'KeyValueSecretPattern' -or
+    $diagnosticBundleService -notmatch 'HeaderSecretPattern' -or
+    $diagnosticBundleService -notmatch 'MaxBundledLogPayloadBytes' -or
+    $diagnosticBundleService -notmatch 'MaxDiagnosticTextEntryBytes' -or
+    $diagnosticBundleService -notmatch 'DiagnosticLogReadResult\(bool Succeeded, string\? Content, string Message, long ByteCount\)' -or
+    $diagnosticBundleService -notmatch 'FileMode\.CreateNew' -or
+    $diagnosticBundleService -notmatch 'Guid\.NewGuid\(\)\.ToString\("N"\)\[\.\.8\]' -or
+    $diagnosticBundleService -match 'CreateEntryFromFile' -or
+    $diagnosticBundleService -match 'FileMode\.Create, FileAccess\.Write') {
+    throw 'Diagnostic bundle export must redact logs/summaries and create unique files without overwriting prior bundles.'
+}
+
+if ($commands -notmatch 'public WebViewService\.DevToolsOpenResult OpenDevTools\(\)' -or
+    $commands -notmatch 'FormatDevToolsOpenResult' -or
+    $commands -notmatch 'SettingsDevToolsUnavailable' -or
+    $commands -notmatch 'SettingsDevToolsDisabled' -or
+    $commands -notmatch 'SettingsDevToolsOpenFailedFormat' -or
+    $settingsDialogActions -notmatch 'OpenDevTools\(\)' -or
+    $settingsDialogActions -notmatch 'DevToolsOpenStatus\.Failed') {
+    throw 'DevTools commands must surface unavailable, disabled, and failed open results to the main shell and Settings dialog.'
+}
+
 if ($commands -match 'private void OnRetry\(\)\s*\{\s*IsErrorVisible = false;\s*_webViewService\.RetryNavigation\(\);') {
     throw 'Manual retry must not hide the visible error before confirming that retry navigation started.'
 }
@@ -1510,6 +1816,10 @@ if ($commands -notmatch 'private void OnRetry\(\)[\s\S]*if \(_webViewService\.Re
 
 if ($commands -notmatch 'private void OnReload\(\)[\s\S]*if \(_webViewService\.Reload\(\)\)[\s\S]*IsErrorVisible = false') {
     throw 'Reload must clear stale visible errors only after WebViewService confirms reload navigation started.'
+}
+
+if ($commands -notmatch 'private void OnAsyncCommandFailed\(Exception ex\)[\s\S]*StringResources\.AsyncCommandFailedFormat[\s\S]*ErrorMessage = [\s\S]*IsErrorVisible = true') {
+    throw 'Async command failures must surface a localized visible error instead of only writing to the log.'
 }
 
 if ($commands -notmatch 'public void ShowWebViewRecreationError\(string message\)[\s\S]*ApplyConnectionState\(ConnectionState\.Error\)[\s\S]*ErrorMessage = message[\s\S]*IsErrorVisible = true[\s\S]*ShowRetryButton = true') {
@@ -1539,6 +1849,22 @@ foreach ($resourceFile in @(
 
     if ($resources -notmatch 'name="StatusConfigureGateway"') {
         throw "Missing localized placeholder-environment status resource: $resourceFile"
+    }
+
+    foreach ($heartbeatResource in @(
+        'HeartbeatInvalidControlUiUrl',
+        'HeartbeatRequestFailedFormat',
+        'HeartbeatHostedSessionActive',
+        'HeartbeatHostedSessionReconnecting',
+        'WebViewInvalidUrlFormat',
+        'WebViewNavigationNotReady',
+        'WebViewReloadNotInitialized',
+        'WebViewReloadNotReady',
+        'WebViewRetryNotReady'
+    )) {
+        if ($resources -notmatch "name=`"$heartbeatResource`"") {
+            throw "Missing localized heartbeat/WebView resource '$heartbeatResource': $resourceFile"
+        }
     }
 
     foreach ($trayResource in @('TrayMenuOpen', 'TrayMenuCompactMode', 'TrayMenuExit')) {
@@ -1580,6 +1906,34 @@ if ($diagnosticService -match 'App\.Logger|App\.Configuration|App\.MainWindow') 
 
 if ($diagnosticService -match 'WebViewService\s+\w+|WebViewService\?\s+\w+') {
     throw 'DiagnosticService must depend on a diagnostic WebView interface instead of the concrete WebViewService.'
+}
+
+if ($diagnosticService -notmatch 'SharedGatewayDiagnosticProbe\.ProbeAsync\(gatewayUrl, cancellationToken\)' -or
+    $diagnosticService -notmatch 'GatewayDiagnosticProbeErrorKind' -or
+    $diagnosticService -notmatch 'CreateNetworkDiagnosticResult' -or
+    $diagnosticService -notmatch 'ProbeNetworkAsync\(\s*string\? gatewayUrl,\s*ControlUiProbeSnapshot\? snapshot = null,\s*CancellationToken cancellationToken = default\)' -or
+    $diagnosticService -notmatch 'ProbeNetworkAsync\(gatewayUrl, snapshot, cancellationToken\)' -or
+    $diagnosticService -notmatch 'AppendHostedControlUiStateDetail' -or
+    $diagnosticService -notmatch 'StringResources\.DiagnosticHostedStateDetailFormat' -or
+    $diagnosticService -match 'GetAsync\(gatewayUrl' -or
+    $diagnosticService -match 'GatewayHttpStatusClassifier\.ClassifyResponseAsync' -or
+    $diagnosticService -match 'ControlUiProbeUriFactory\.TryCreateConfigUri\(gatewayUrl\)' -or
+    $diagnosticService -match 'ProbeNetworkAsync\(string\? gatewayUrl, ControlUiProbeSnapshot' -or
+    $diagnosticService -notmatch 'GatewayHttpStatusKind\.MethodRejected =>[\s\S]*CreateNetworkDiagnosticResult' -or
+    $diagnosticService -notmatch 'GatewayHttpStatusKind\.MissingPath =>[\s\S]*CreateNetworkDiagnosticResult') {
+    throw 'DiagnosticService must consume the Core GatewayDiagnosticProbe and stay responsible only for localized diagnostic presentation.'
+}
+
+if ($diagnosticService -match 'return\s+DiagnosticResult\.Warn\(\s*StringResources\.DiagnosticNonLocalHttp' -or
+    $diagnosticService -notmatch 'var nonLocalHttpDetail = GetNonLocalHttpWarningDetail\(probeResult\.IsNonLocalHttp\);' -or
+    $diagnosticService -notmatch 'CreateNetworkDiagnosticResult\([\s\S]*nonLocalHttpDetail' -or
+    $diagnosticService -notmatch 'AppendDiagnosticDetail') {
+    throw 'Diagnostic network probes must append non-local HTTP warnings to the real A2UI probe result instead of returning before the probe.'
+}
+
+if ($diagnosticService -match 'ResolveNetworkDiagnosticSeverity' -or
+    $diagnosticService -match 'GatewayDiagnosticProbeMapper\.Map') {
+    throw 'Diagnostic network probes with non-local HTTP warnings must not report a PASS result even when the A2UI endpoint is reachable.'
 }
 
 $diagnosticWebViewSession = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Services/DiagnosticWebViewSession.cs') -Raw
@@ -1653,6 +2007,77 @@ if ($settingsXaml -match 'PlaceholderText="https://your-gateway\.example\.com"')
 
 if ($settingsXaml -notmatch 'PlaceholderText="\{x:Bind helpers:StringResources\.SettingsControlUiUrlPlaceholder\}"') {
     throw 'Settings dialog Control UI URL placeholder must bind to the localized StringResources value.'
+}
+
+$settingsSwitches = @(
+    @{ Property = 'MinimizeToTray'; Resource = 'SettingsMinimizeToTray' },
+    @{ Property = 'CloseToTray'; Resource = 'SettingsCloseToTray' },
+    @{ Property = 'AllowMultipleInstances'; Resource = 'SettingsAllowMultipleInstances' },
+    @{ Property = 'AlwaysOnTop'; Resource = 'SettingsAlwaysOnTop' },
+    @{ Property = 'EnableGlobalHotkey'; Resource = 'SettingsEnableGlobalHotkey' },
+    @{ Property = 'EnableDevLog'; Resource = 'SettingsEnableDevLog' },
+    @{ Property = 'EditIsDefault'; Resource = 'SetAsDefault' }
+)
+foreach ($switch in $settingsSwitches) {
+    if ($settingsXaml -notmatch "ToggleSwitch[\s\S]*IsOn=""\{x:Bind ViewModel\.$($switch.Property), Mode=TwoWay\}""[\s\S]*AutomationProperties\.Name=""\{x:Bind helpers:StringResources\.$($switch.Resource)\}""") {
+        throw "Settings toggle switch must expose a localized automation name: $($switch.Property)"
+    }
+}
+
+$mainWindowTheme = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.Theme.cs') -Raw
+$mainWindowAlwaysOnTop = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/MainWindow.AlwaysOnTop.cs') -Raw
+$buttonStyles = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Styles/ButtonStyles.xaml') -Raw
+if ($mainWindowXaml -notmatch '<Button x:Name="LatencyBadge"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.LatencyBadgeAutomationName\}"[\s\S]*AutomationProperties\.HelpText="\{x:Bind ViewModel\.LatencyTooltipText, Mode=OneWay\}"[\s\S]*<Button\.Flyout>[\s\S]*Text="\{x:Bind ViewModel\.LatencyTooltipText, Mode=OneWay\}"') {
+    throw 'Latency badge must be keyboard focusable and expose the latency history through automation help text plus a button flyout.'
+}
+
+if ($mainWindowXaml -notmatch '<ComboBox x:Name="EnvironmentSelector"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.SelectEnvironment\}"' -or
+    $settingsXaml -notmatch '<ListView x:Name="NavList"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.SettingsNavigationAutomationName\}"' -or
+    $settingsXaml -notmatch '<ComboBox x:Name="LanguageComboBox"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.SettingsNavLanguage\}"' -or
+    $settingsXaml -notmatch '<ListView x:Name="EnvironmentList"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.SettingsEnvironmentsTitle\}"' -or
+    $settingsXaml -notmatch '<ListView x:Name="SessionEnvironmentList"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.SettingsSessionsTitle\}"') {
+    throw 'Focusable selector and list controls must expose localized automation names.'
+}
+
+if ($mainWindowXaml -notmatch '<ToggleButton x:Name="PinButton"[\s\S]*Style="\{StaticResource SubtleToggleButtonStyle\}"' -or
+    $mainWindowAlwaysOnTop -notmatch 'PinButton\.IsChecked = _isAlwaysOnTop') {
+    throw 'The always-on-top pin affordance must expose toggle state instead of a stateless button.'
+}
+
+if ($mainWindowXaml -match 'Foreground="\{StaticResource SuccessBrush\}"') {
+    throw 'Top status text must use theme resources instead of fixed success brushes.'
+}
+
+if ($mainWindowXaml -notmatch '<ToggleButton x:Name="SystemThemeButton"' -or
+    $mainWindowXaml -notmatch '<ToggleButton x:Name="LightThemeButton"' -or
+    $mainWindowXaml -notmatch '<ToggleButton x:Name="DarkThemeButton"' -or
+    $mainWindowXaml -notmatch 'x:Name="ThemeSwitcherContainer"[\s\S]*AutomationProperties\.Name="\{x:Bind helpers:StringResources\.ThemeSelectorAutomationName\}"' -or
+    $buttonStyles -notmatch 'x:Key="ThemeSegmentToggleButtonStyle" TargetType="ToggleButton"' -or
+    $mainWindowTheme -notmatch 'IEnumerable<ToggleButton>' -or
+    $mainWindowTheme -notmatch 'button\.IsChecked = isSelected' -or
+    $mainWindowTheme -notmatch 'AccentFillColorDefaultBrush' -or
+    $mainWindowTheme -match 'Windows\.UI\.Color\.FromArgb\(255, 230, 240, 255\)|Windows\.UI\.Color\.FromArgb\(255, 37, 99, 235\)') {
+    throw 'Theme selector must expose checked ToggleButton state and use theme resources instead of fixed selected colors.'
+}
+
+$logViewerXaml = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Views/LogViewerDialog.xaml') -Raw
+foreach ($button in @(
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'PinButton'; Resource = 'SettingsAlwaysOnTop' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'ReloadButton'; Resource = 'Reload' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'StopButton'; Resource = 'Stop' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'SystemThemeButton'; Resource = 'ThemeSystem' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'LightThemeButton'; Resource = 'ThemeLight' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'DarkThemeButton'; Resource = 'ThemeDark' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'SettingsButton'; Resource = 'Settings' },
+    @{ File = 'MainWindow.xaml'; Xaml = $mainWindowXaml; Name = 'AboutButton'; Resource = 'AboutTitle' },
+    @{ File = 'SettingsDialog.xaml'; Xaml = $settingsXaml; Name = 'AddEnvironmentButton'; Resource = 'SettingsAddTooltip' },
+    @{ File = 'SettingsDialog.xaml'; Xaml = $settingsXaml; Name = 'RemoveEnvironmentButton'; Resource = 'SettingsRemoveTooltip' },
+    @{ File = 'LogViewerDialog.xaml'; Xaml = $logViewerXaml; Name = 'RefreshButton'; Resource = 'RefreshLogs' },
+    @{ File = 'LogViewerDialog.xaml'; Xaml = $logViewerXaml; Name = 'OpenFolderButton'; Resource = 'OpenLogFolder' }
+)) {
+    if ($button.Xaml -notmatch "x:Name=""$($button.Name)""[\s\S]*AutomationProperties\.Name=""\{x:Bind helpers:StringResources\.$($button.Resource)\}""") {
+        throw "Icon-only button must expose a localized automation name: $($button.File)#$($button.Name)"
+    }
 }
 
 $commandHelpers = Get-Content -LiteralPath (Join-Path $repoRoot 'src/OpenClaw/Helpers/SimpleCommand.cs') -Raw

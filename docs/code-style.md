@@ -109,7 +109,7 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 - The Core physical source tree (`src/OpenClaw.Core`) owns pure settings, diagnostics formatting, parser, policy, telemetry, and recovery logic.
 - Define "Core" as WinUI-free. Core-compatible files must not reference `Microsoft.UI`, `Microsoft.Web.WebView2`, XAML types, Windows App SDK packages, or `App`.
 - Core-compatible files physically live under `src/OpenClaw.Core`; do not add linked Core source files unless a migration plan explicitly scopes a short-lived transition.
-- `OpenClaw.Core` must remain a platform-independent SDK class library. The solution may expose `x86`, `x64`, and `ARM64` for the WinUI app, but Core mappings must target `Debug|AnyCPU` or `Release|AnyCPU` because VS2026 validates project configurations before build.
+- `OpenClaw.Core` must remain a platform-independent SDK class library. The solution exposes only `x64` for the WinUI app, while Core mappings target `Debug|AnyCPU` or `Release|AnyCPU` because VS2026 validates project configurations before build.
 - There are no current linked Core source exceptions. WinUI adapters should convert platform objects into plain Core types at the app boundary.
 - `WebViewStatusInspector` owns generation-scoped and accepted-page-version-scoped Control UI inspection and must not let stale async script results update current state.
 - `WebViewStatusInspector.cs` owns shared state, public entry points, and snapshot publication. Keep direct inspection/coalescing in `WebViewStatusInspector.Inspection.cs`, post-navigation probing in `WebViewStatusInspector.Probe.cs`, Control UI snapshot parsing in `WebViewStatusInspector.Parsing.cs`, and bounded script execution in `WebViewStatusInspector.ScriptExecution.cs`.
@@ -157,11 +157,11 @@ This guide is the project-specific layer on top of `.editorconfig`, `.gitattribu
 
 ## Tests
 
-- There is no active `.NET tests/` regression harness at this checkpoint; embedded bridge behavior is still covered by the script verifier below.
-- When tests are reintroduced, prefer behavior tests against Core services and fakes.
+- `tests\OpenClaw.Core.Tests` is the active executable Core regression harness. `dotnet run` is the fastest targeted signal for the harness, and `dotnet test` is the supported VSTest workflow invoking the same harness.
+- Keep Core harness coverage limited to pure .NET behavior such as status classifiers, probe URI helpers, parsers, and policies.
 - Use source-text assertions only for contracts a harness cannot execute, such as XAML resource usage, project metadata, and platform integration declarations.
-- `tools\verify-bridge-scripts.ps1` is the active behavior check for embedded JS assets. Future bridge, MODEL, mutation-filter, status-inspection, and command-dispatch changes must update that script rather than restoring `tests/`.
-- Every bug fix or behavior change should have a regression path documented in the PR, manual checklist, or future test harness.
+- `tools\verify-bridge-scripts.ps1` is the active behavior check for embedded JS assets. Future bridge, MODEL, mutation-filter, status-inspection, and command-dispatch changes must update that script.
+- Every bug fix or behavior change should have a regression path documented in the Core harness, bridge verifier, guardrails, PR, or manual checklist.
 
 ## Version And Documentation
 
@@ -176,14 +176,15 @@ Run these commands before handing off code:
 
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
+dotnet run --no-restore --project tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj
+dotnet test OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
-$env:OPENCLAW_NODE='C:\Users\Zen\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
 git diff --check
 ```
 
-`tools\verify-repo-structure.ps1` is the active guardrail for the no-`tests/` checkpoint, solution references, Core boundary rules, embedded bridge assets, and release metadata alignment.
+`tools\verify-repo-structure.ps1` is the active guardrail for solution references, Core boundary rules, embedded bridge assets, release metadata, documentation alignment, and WinUI surface contracts that are not covered by executable harnesses.
 
-`tools\verify-bridge-scripts.ps1` executes focused browser-script behavior checks for embedded JS assets and requires Node.js by default. If the default `node` command is missing or blocked, set `OPENCLAW_NODE` to a specific executable; the path above is the known Codex runtime Node path on this workstation. The script skips only when `OPENCLAW_ALLOW_NODE_SKIP=1` is set explicitly for a local, intentional skip.
+`tools\verify-bridge-scripts.ps1` executes focused browser-script behavior checks for embedded JS assets and requires Node.js by default. If the default `node` command is missing or blocked, set `OPENCLAW_NODE` to a specific executable in your local shell. The script skips only when `OPENCLAW_ALLOW_NODE_SKIP=1` is set explicitly for a local, intentional skip.

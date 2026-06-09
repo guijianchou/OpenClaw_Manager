@@ -7,20 +7,42 @@ namespace OpenClaw.Services;
 internal sealed partial class WebViewStatusInspector
 {
     private const string ControlUiStatusMessageKind = "openclaw-control-ui-status";
+    private const int MaxControlUiStatusPayloadLength = 64 * 1024;
 
-    private static ControlUiProbeSnapshot ParseControlUiSnapshot(string json)
+    private static ControlUiProbeSnapshot ParseControlUiSnapshot(string json, bool allowStringEnvelope = false)
     {
-        using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
-
-        if (root.ValueKind == JsonValueKind.String)
+        if (string.IsNullOrWhiteSpace(json) || json.Length > MaxControlUiStatusPayloadLength)
         {
-            var nested = root.GetString();
-            return string.IsNullOrWhiteSpace(nested)
-                ? ControlUiProbeSnapshot.Unknown
-                : ParseControlUiSnapshot(nested);
+            return ControlUiProbeSnapshot.Unknown;
         }
 
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.String && allowStringEnvelope)
+            {
+                var nested = root.GetString();
+                if (string.IsNullOrWhiteSpace(nested) || nested.Length > MaxControlUiStatusPayloadLength)
+                {
+                    return ControlUiProbeSnapshot.Unknown;
+                }
+
+                using var nestedDocument = JsonDocument.Parse(nested);
+                return ParseControlUiSnapshot(nestedDocument.RootElement);
+            }
+
+            return ParseControlUiSnapshot(root);
+        }
+        catch (JsonException)
+        {
+            return ControlUiProbeSnapshot.Unknown;
+        }
+    }
+
+    private static ControlUiProbeSnapshot ParseControlUiSnapshot(JsonElement root)
+    {
         if (root.ValueKind != JsonValueKind.Object)
         {
             return ControlUiProbeSnapshot.Unknown;

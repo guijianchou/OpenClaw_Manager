@@ -2,6 +2,7 @@
 
 using System.IO.Compression;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace OpenClaw.Services;
@@ -21,6 +22,10 @@ public sealed record DiagnosticRuntimeInfo(
 public static partial class DiagnosticBundleService
 {
     private static readonly TimeSpan DefaultLogRetention = TimeSpan.FromDays(7);
+    private const long MaxBundledLogFileBytes = 5 * 1024 * 1024;
+    private const long MaxBundledLogPayloadBytes = 8 * 1024 * 1024;
+    private const int MaxBundledLogFileCount = 20;
+    private const int MaxDiagnosticTextEntryBytes = 1024 * 1024;
 
     /// <summary>
     /// Redacts sensitive fields from a settings JSON string.
@@ -29,23 +34,38 @@ public static partial class DiagnosticBundleService
     /// </summary>
     public static string RedactSettingsJson(string json)
     {
-        if (string.IsNullOrWhiteSpace(json))
+        return RedactDiagnosticText(json);
+    }
+
+    public static string RedactDiagnosticText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
         {
-            return json;
+            return text;
         }
 
-        // Redact URLs: https://anything.com/path -> https://<host>/<path>
-        var redacted = UrlPattern().Replace(json, match =>
+        var redacted = UrlPattern().Replace(text, match =>
         {
             var scheme = match.Groups[1].Value;
             return $"{scheme}://<host>/<path>";
         });
 
-        // Redact token/key/secret values
         redacted = TokenPattern().Replace(redacted, match =>
         {
             var prefix = match.Groups[1].Value;
             return $"{prefix}\"<redacted>\"";
+        });
+
+        redacted = KeyValueSecretPattern().Replace(redacted, match =>
+        {
+            var prefix = match.Groups[1].Value;
+            return $"{prefix}<redacted>";
+        });
+
+        redacted = HeaderSecretPattern().Replace(redacted, match =>
+        {
+            var prefix = match.Groups[1].Value;
+            return $"{prefix}<redacted>";
         });
 
         return redacted;
@@ -113,18 +133,19 @@ public static partial class DiagnosticBundleService
         string outputDirectory,
         DiagnosticRuntimeInfo runtimeInfo)
     {
-        var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmm");
-        var fileName = $"openclaw-diagnostics-{timestamp}.zip";
-        var outputPath = Path.Combine(outputDirectory, fileName);
-
         Directory.CreateDirectory(outputDirectory);
+        var outputPath = CreateUniqueBundlePath(outputDirectory);
 
-        using var zipStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+        using var zipStream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write);
         using var archive = new ZipArchive(zipStream, ZipArchiveMode.Create);
+        var notes = new List<string>();
 
         // 1. Redacted settings
         var redactedSettings = RedactSettingsJson(settingsJson);
-        await AddTextEntryAsync(archive, "settings-redacted.json", redactedSettings);
+        await AddTextEntryAsync(
+            archive,
+            "settings-redacted.json",
+            TruncateTextEntry(redactedSettings, "settings-redacted.json", notes));
 
         // 2. Runtime info
         await AddTextEntryAsync(archive, "runtime-info.txt", FormatRuntimeInfo(runtimeInfo));
@@ -132,18 +153,87 @@ public static partial class DiagnosticBundleService
         // 3. Diagnostic summary
         if (!string.IsNullOrWhiteSpace(diagnosticSummary))
         {
-            await AddTextEntryAsync(archive, "diagnostic-summary.txt", diagnosticSummary);
+            await AddTextEntryAsync(
+                archive,
+                "diagnostic-summary.txt",
+                TruncateTextEntry(RedactDiagnosticText(diagnosticSummary), "diagnostic-summary.txt", notes));
         }
 
         // 4. Recent log files
         var logFiles = CollectRecentLogFiles(logsDirectory);
+        long bundledLogPayloadBytes = 0;
+        var bundledLogFileCount = 0;
         foreach (var logFile in logFiles)
         {
             var entryName = $"logs/{Path.GetFileName(logFile)}";
-            archive.CreateEntryFromFile(logFile, entryName, CompressionLevel.Optimal);
+            if (bundledLogFileCount >= MaxBundledLogFileCount)
+            {
+                notes.Add($"{Path.GetFileName(logFile)} skipped: log count limit {MaxBundledLogFileCount} reached");
+                continue;
+            }
+
+            var logResult = await TryReadLogFileForBundleAsync(logFile);
+            if (!logResult.Succeeded)
+            {
+                notes.Add($"{Path.GetFileName(logFile)} skipped: {logResult.Message}");
+                continue;
+            }
+
+            if (bundledLogPayloadBytes + logResult.ByteCount > MaxBundledLogPayloadBytes)
+            {
+                notes.Add($"{Path.GetFileName(logFile)} skipped: bundle log payload limit {MaxBundledLogPayloadBytes} bytes reached");
+                continue;
+            }
+
+            await AddTextEntryAsync(archive, entryName, RedactDiagnosticText(logResult.Content ?? string.Empty));
+            bundledLogPayloadBytes += logResult.ByteCount;
+            bundledLogFileCount++;
+        }
+
+        if (notes.Count > 0)
+        {
+            await AddTextEntryAsync(archive, "diagnostic-bundle-notes.txt", string.Join(Environment.NewLine, notes));
         }
 
         return outputPath;
+    }
+
+    private static async Task<DiagnosticLogReadResult> TryReadLogFileForBundleAsync(string logFile)
+    {
+        try
+        {
+            var info = new FileInfo(logFile);
+            if (!info.Exists)
+            {
+                return DiagnosticLogReadResult.Failure("file no longer exists");
+            }
+
+            if (info.Length > MaxBundledLogFileBytes)
+            {
+                return DiagnosticLogReadResult.Failure($"file is {info.Length} bytes, limit is {MaxBundledLogFileBytes} bytes");
+            }
+
+            return DiagnosticLogReadResult.Success(await File.ReadAllTextAsync(logFile), info.Length);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return DiagnosticLogReadResult.Failure(ex.Message);
+        }
+    }
+
+    private readonly record struct DiagnosticLogReadResult(bool Succeeded, string? Content, string Message, long ByteCount)
+    {
+        public static DiagnosticLogReadResult Success(string content, long byteCount) => new(true, content, string.Empty, byteCount);
+
+        public static DiagnosticLogReadResult Failure(string message) => new(false, null, message, 0);
+    }
+
+    private static string CreateUniqueBundlePath(string outputDirectory)
+    {
+        var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss-fff");
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var fileName = $"openclaw-diagnostics-{timestamp}-{suffix}.zip";
+        return Path.Combine(outputDirectory, fileName);
     }
 
     private static async Task AddTextEntryAsync(ZipArchive archive, string entryName, string content)
@@ -153,11 +243,44 @@ public static partial class DiagnosticBundleService
         await writer.WriteAsync(content);
     }
 
+    private static string TruncateTextEntry(string content, string entryName, List<string> notes)
+    {
+        if (Encoding.UTF8.GetByteCount(content) <= MaxDiagnosticTextEntryBytes)
+        {
+            return content;
+        }
+
+        var builder = new StringBuilder(capacity: Math.Min(content.Length, MaxDiagnosticTextEntryBytes));
+        var byteCount = 0;
+        foreach (var rune in content.EnumerateRunes())
+        {
+            var runeLength = rune.Utf8SequenceLength;
+            if (byteCount + runeLength > MaxDiagnosticTextEntryBytes)
+            {
+                break;
+            }
+
+            builder.Append(rune);
+            byteCount += runeLength;
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("<truncated>");
+        notes.Add($"{entryName} truncated: entry exceeded {MaxDiagnosticTextEntryBytes} bytes");
+        return builder.ToString();
+    }
+
     [GeneratedRegex(@"(https?|wss?)://[^""'\s,}\]]+", RegexOptions.IgnoreCase)]
     private static partial Regex UrlPattern();
 
-    [GeneratedRegex(@"(""(?:[^""]*(?:token|key|secret|password|credential)[^""]*)""\s*:\s*)""[^""]+""", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(""(?:[^""]*(?:authorization|cookie|token|key|secret|password|credential)[^""]*)""\s*:\s*)""[^""]+""", RegexOptions.IgnoreCase)]
     private static partial Regex TokenPattern();
+
+    [GeneratedRegex(@"(\b(?:authorization|cookie|token|key|secret|password|credential)\b\s*[=:]\s*)[^\s,;}\]]+", RegexOptions.IgnoreCase)]
+    private static partial Regex KeyValueSecretPattern();
+
+    [GeneratedRegex(@"(?im)^(\s*(?:Authorization|Cookie|Set-Cookie|X-Api-Key|Api-Key)\s*:\s*).+$")]
+    private static partial Regex HeaderSecretPattern();
 
     private static string GetAppVersion()
     {

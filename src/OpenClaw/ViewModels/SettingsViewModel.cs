@@ -470,7 +470,12 @@ public class SettingsViewModel : INotifyPropertyChanged
                 continue;
             }
 
-            WebViewService.TryMoveUserDataFolderToRenamedEnvironment(originalName, env.Name);
+            if (_originalSnapshots.TryGetValue(env, out var original) &&
+                string.Equals(original.GatewayUrl, env.GatewayUrl, StringComparison.Ordinal))
+            {
+                WebViewService.TryMoveUserDataFolderToRenamedEnvironment(originalName, env.Name, env.GatewayUrl);
+            }
+
             _originalNames[env] = env.Name;
             _originalSnapshots[env] = env.Clone();
         }

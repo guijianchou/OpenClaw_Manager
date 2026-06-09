@@ -179,7 +179,7 @@ internal sealed partial class WebViewStatusInspector
                 return GetLatestSnapshotForGenerationOrUnknown(generation, pageVersion);
             }
 
-            var snapshot = ParseControlUiSnapshot(payload);
+            var snapshot = ParseControlUiSnapshot(payload, allowStringEnvelope: true);
             TryPublishInspectionSnapshot(snapshot, generation, pageVersion, inspectionId);
 
             return snapshot;

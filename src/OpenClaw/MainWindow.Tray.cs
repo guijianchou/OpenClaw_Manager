@@ -16,7 +16,10 @@ public sealed partial class MainWindow
             ViewLogsLabel: StringResources.SettingsViewLogs,
             CompactModeLabel: StringResources.TrayMenuCompactMode,
             SettingsLabel: StringResources.Settings,
-            ExitLabel: StringResources.TrayMenuExit);
+            ExitLabel: StringResources.TrayMenuExit,
+            DefaultStatusLabel: StringResources.WorkStatusWait,
+            StatusHeaderFormat: StringResources.TrayStatusFormat,
+            TooltipFormat: StringResources.TrayTooltipFormat);
         _trayIconService = new TrayIconService(iconPath, App.Logger, menuStrings);
         if (!_trayIconService.IsAvailable)
         {

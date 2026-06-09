@@ -72,7 +72,7 @@ public partial class MainViewModel
             return;
         }
 
-        if (_webViewService.IsUsingEnvironmentProfile(environment.Name))
+        if (_webViewService.IsUsingEnvironmentProfile(environment.Name, environment.GatewayUrl))
         {
             _webViewService.Navigate(environment.GatewayUrl);
         }
@@ -97,16 +97,30 @@ public partial class MainViewModel
         ShowRetryButton = false;
     }
 
-    public async Task ClearSessionForEnvironmentAsync(string environmentName)
+    public Task ClearSessionForEnvironmentAsync(EnvironmentConfig environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        return ClearSessionForEnvironmentAsync(environment.Name, environment.GatewayUrl);
+    }
+
+    public Task ClearSessionForEnvironmentAsync(string environmentName) =>
+        ClearSessionForEnvironmentAsync(
+            environmentName,
+            _runtime.Configuration.Settings.Environments
+                .FirstOrDefault(env => string.Equals(env.Name, environmentName, StringComparison.Ordinal))
+                ?.GatewayUrl);
+
+    public async Task ClearSessionForEnvironmentAsync(string environmentName, string? gatewayUrl)
     {
         if (string.IsNullOrWhiteSpace(environmentName))
         {
             return;
         }
 
-        await _webViewService.ClearEnvironmentSessionAsync(environmentName);
+        await _webViewService.ClearEnvironmentSessionAsync(environmentName, gatewayUrl);
 
-        if (string.Equals(_selectedEnvironment?.Name, environmentName, StringComparison.Ordinal))
+        if (string.Equals(_selectedEnvironment?.Name, environmentName, StringComparison.Ordinal) &&
+            string.Equals(_selectedEnvironment?.GatewayUrl, gatewayUrl, StringComparison.Ordinal))
         {
             DismissError();
             DismissDiagnostics();

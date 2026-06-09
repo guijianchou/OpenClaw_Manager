@@ -14,14 +14,17 @@ public partial class MainViewModel
         StopCommand = new AsyncCommand(OnStopAsync, OnAsyncCommandFailed);
         RetryCommand = new SimpleCommand(OnRetry);
         DevToolsCommand = new SimpleCommand(OnDevTools);
-        RunDiagnosticsCommand = new AsyncCommand(OnRunDiagnosticsAsync, OnAsyncCommandFailed);
-        ExportDiagnosticBundleCommand = new AsyncCommand(OnExportDiagnosticBundleAsync, OnAsyncCommandFailed);
+        RunDiagnosticsCommand = new AsyncCommand(RunDiagnosticsAsync, OnAsyncCommandFailed);
+        ExportDiagnosticBundleCommand = new AsyncCommand(ExportDiagnosticBundleAsync, OnAsyncCommandFailed);
         ViewLogsCommand = new SimpleCommand(() => ViewLogsRequested?.Invoke());
     }
 
     private void OnAsyncCommandFailed(Exception ex)
     {
         _runtime.Logger.Error($"Async command failed: {ex}");
+        ErrorMessage = string.Format(StringResources.AsyncCommandFailedFormat, ex.Message);
+        IsErrorVisible = true;
+        ShowRetryButton = false;
     }
 
     private void OnRetry()
@@ -54,7 +57,32 @@ public partial class MainViewModel
 
     private void OnDevTools()
     {
+        var result = OpenDevTools();
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        ErrorMessage = FormatDevToolsOpenResult(result);
+        IsErrorVisible = true;
+        ShowRetryButton = false;
+    }
+
+    public WebViewService.DevToolsOpenResult OpenDevTools() =>
         _webViewService.OpenDevTools();
+
+    public static string FormatDevToolsOpenResult(WebViewService.DevToolsOpenResult result)
+    {
+        return result.Status switch
+        {
+            WebViewService.DevToolsOpenStatus.Opened => StringResources.SettingsDevToolsOpened,
+            WebViewService.DevToolsOpenStatus.Unavailable => StringResources.SettingsDevToolsUnavailable,
+            WebViewService.DevToolsOpenStatus.Disabled => StringResources.SettingsDevToolsDisabled,
+            WebViewService.DevToolsOpenStatus.Failed => string.Format(
+                StringResources.SettingsDevToolsOpenFailedFormat,
+                result.Message ?? StringResources.SettingsValidationSaveFailedUnknown),
+            _ => StringResources.SettingsDevToolsUnavailable,
+        };
     }
 
     /// <summary>
@@ -91,6 +119,13 @@ public partial class MainViewModel
         UpdateStatusPresentation();
     }
 
+    public void ShowGlobalHotkeyRegistrationError(string message)
+    {
+        ErrorMessage = message;
+        IsErrorVisible = true;
+        ShowRetryButton = false;
+    }
+
     public void UpdateShellInstrumentation(
         string lastInstrumentationEvent,
         int? totalWebViewRecreations = null,
@@ -108,7 +143,7 @@ public partial class MainViewModel
             lastInstrumentationEvent: lastInstrumentationEvent);
     }
 
-    private async Task OnRunDiagnosticsAsync()
+    public async Task RunDiagnosticsAsync()
     {
         _runtime.Logger.Info("Running diagnostics...");
 
@@ -123,7 +158,7 @@ public partial class MainViewModel
         _runtime.Logger.Info($"Diagnostics complete. Failures: {report.HasFailures}");
     }
 
-    private async Task OnExportDiagnosticBundleAsync()
+    public async Task ExportDiagnosticBundleAsync()
     {
         _runtime.Logger.Info("Exporting diagnostic bundle...");
 
@@ -133,7 +168,7 @@ public partial class MainViewModel
 
         var diagnosticSummary = DiagnosticSummary;
         var logsDirectory = _runtime.Configuration.LogsDirectory;
-        var outputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var outputDirectory = ResolveDiagnosticBundleOutputDirectory(logsDirectory);
         var runtimeInfo = DiagnosticBundleService.CollectRuntimeInfo(
             DiagnosticService.GetWebView2RuntimeVersion(_runtime.Logger));
 
@@ -145,7 +180,68 @@ public partial class MainViewModel
             runtimeInfo));
 
         _runtime.Logger.Info($"Diagnostic bundle exported to: {outputPath}");
-        DiagnosticSummary = $"Diagnostic bundle exported to Desktop:\n{System.IO.Path.GetFileName(outputPath)}";
+        DiagnosticSummary = string.Format(StringResources.DiagnosticBundleExportedFormat, outputPath);
         IsDiagnosticVisible = true;
+    }
+
+    private static string ResolveDiagnosticBundleOutputDirectory(string logsDirectory)
+    {
+        foreach (var candidate in EnumerateDiagnosticBundleOutputCandidates(logsDirectory))
+        {
+            if (TryEnsureWritableDirectory(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        var fallbackRoot = string.IsNullOrWhiteSpace(logsDirectory)
+            ? AppContext.BaseDirectory
+            : logsDirectory;
+        var fallbackDirectory = System.IO.Path.Combine(
+            fallbackRoot,
+            StringResources.DiagnosticBundleExportFallbackDirectoryName);
+        _ = TryEnsureWritableDirectory(fallbackDirectory);
+        return fallbackDirectory;
+    }
+
+    private static IEnumerable<string> EnumerateDiagnosticBundleOutputCandidates(string logsDirectory)
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var localFallback = string.IsNullOrWhiteSpace(localAppData)
+            ? null
+            : System.IO.Path.Combine(localAppData, "OpenClaw", StringResources.DiagnosticBundleExportFallbackDirectoryName);
+
+        foreach (var candidate in new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            localFallback,
+            string.IsNullOrWhiteSpace(logsDirectory)
+                ? null
+                : System.IO.Path.Combine(System.IO.Path.GetDirectoryName(logsDirectory) ?? logsDirectory, StringResources.DiagnosticBundleExportFallbackDirectoryName),
+        })
+        {
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                yield return candidate;
+            }
+        }
+    }
+
+    private static bool TryEnsureWritableDirectory(string directory)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(directory);
+            var probePath = System.IO.Path.Combine(directory, $".openclaw-write-test-{Guid.NewGuid():N}.tmp");
+            System.IO.File.WriteAllText(probePath, string.Empty);
+            System.IO.File.Delete(probePath);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

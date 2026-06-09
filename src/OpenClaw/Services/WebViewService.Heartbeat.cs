@@ -236,13 +236,7 @@ public partial class WebViewService
             if (hostedSessionResult.Status is HeartbeatProbeStatus.Failure or HeartbeatProbeStatus.Connecting)
             {
                 var transportResult = await ProbeGatewayTransportAsync(url, token);
-                if (transportResult.Status == HeartbeatProbeStatus.Healthy)
-                {
-                    return hostedSessionResult with
-                    {
-                        Message = $"{hostedSessionResult.Message} {transportResult.Message}"
-                    };
-                }
+                return HeartbeatProbeResolver.Resolve(hostedSessionResult, transportResult);
             }
 
             return hostedSessionResult;

@@ -31,7 +31,7 @@ public sealed class ControlUiLatencyService : IDisposable
     }
 
     public ControlUiLatencyService(IAppLogger logger)
-        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(5) }, TimeSpan.FromSeconds(ProbeIntervalSeconds), disposeHttpClient: true, logger)
+        : this(CreateProbeHttpClient(), TimeSpan.FromSeconds(ProbeIntervalSeconds), disposeHttpClient: true, logger)
     {
     }
 
@@ -63,7 +63,8 @@ public sealed class ControlUiLatencyService : IDisposable
     /// </summary>
     public void Start(string? controlUiUrl)
     {
-        var probeUri = TryGetProbeUri(controlUiUrl);
+        var probeUri = ControlUiProbeUriFactory.TryCreateConfigUri(controlUiUrl);
+        var probeKey = ControlUiProbeUriFactory.TryCreateProbeKey(probeUri);
         var host = TryGetProbeHost(probeUri);
         lock (_probeGate)
         {
@@ -102,7 +103,7 @@ public sealed class ControlUiLatencyService : IDisposable
         {
             _probeCts = cancellation;
             _probeTimer = timer;
-            _probeTask = Task.Run(() => RunProbeLoopAsync(probeUri, host, timer, cancellation, runId));
+            _probeTask = Task.Run(() => RunProbeLoopAsync(probeUri, probeKey, host, timer, cancellation, runId));
         }
     }
 
@@ -158,6 +159,7 @@ public sealed class ControlUiLatencyService : IDisposable
 
     private async Task RunProbeLoopAsync(
         Uri probeUri,
+        string? probeKey,
         string host,
         PeriodicTimer timer,
         CancellationTokenSource cancellation,
@@ -166,7 +168,7 @@ public sealed class ControlUiLatencyService : IDisposable
         var cancellationToken = cancellation.Token;
         try
         {
-            await PublishLatencyAsync(probeUri, host, cancellationToken, runId).ConfigureAwait(false);
+            await PublishLatencyAsync(probeUri, probeKey, host, cancellationToken, runId).ConfigureAwait(false);
 
             if (cancellationToken.IsCancellationRequested || !IsCurrentProbeRun(runId))
             {
@@ -175,7 +177,7 @@ public sealed class ControlUiLatencyService : IDisposable
 
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
-                await PublishLatencyAsync(probeUri, host, cancellationToken, runId).ConfigureAwait(false);
+                await PublishLatencyAsync(probeUri, probeKey, host, cancellationToken, runId).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -228,13 +230,25 @@ public sealed class ControlUiLatencyService : IDisposable
         cancellation.Dispose();
     }
 
+    private static HttpClient CreateProbeHttpClient()
+    {
+        return new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(5),
+        };
+    }
+
     private async Task PublishLatencyAsync(
         Uri probeUri,
+        string? probeKey,
         string host,
         CancellationToken cancellationToken,
         int runId)
     {
-        var snapshot = await ProbeAsync(probeUri, host, cancellationToken).ConfigureAwait(false);
+        var snapshot = await ProbeAsync(probeUri, probeKey, host, cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested || !IsCurrentProbeRun(runId))
         {
             return;
@@ -350,7 +364,11 @@ public sealed class ControlUiLatencyService : IDisposable
         return _probeRunId == runId;
     }
 
-    private async Task<ControlUiLatencySnapshot> ProbeAsync(Uri probeUri, string host, CancellationToken cancellationToken)
+    private async Task<ControlUiLatencySnapshot> ProbeAsync(
+        Uri probeUri,
+        string? probeKey,
+        string host,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -368,18 +386,19 @@ public sealed class ControlUiLatencyService : IDisposable
 
             var viaCloudflare = response.Headers.TryGetValues("cf-ray", out var cfRayValues);
             var proxyPoP = cfRayValues is not null ? CloudflareRayParser.ParsePoP(cfRayValues.FirstOrDefault()) : null;
-            var classification = GatewayHttpStatusClassifier.Classify(response.StatusCode, response.ReasonPhrase, viaCloudflare);
+            var classification = await GatewayHttpStatusClassifier.ClassifyResponseAsync(response, cancellationToken).ConfigureAwait(false);
             var detail = $"{classification.Detail} {stopwatch.ElapsedMilliseconds} ms";
-            if (!classification.IsReachable)
+            if (classification.Kind != GatewayHttpStatusKind.Reachable)
             {
-                return ControlUiLatencySnapshot.Failure(host, detail, proxyPoP);
+                return ControlUiLatencySnapshot.Failure(host, detail, proxyPoP, probeKey);
             }
 
             return ControlUiLatencySnapshot.Success(
                 host,
                 stopwatch.ElapsedMilliseconds,
                 detail,
-                proxyPoP);
+                proxyPoP,
+                probeKey);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -387,43 +406,8 @@ public sealed class ControlUiLatencyService : IDisposable
         }
         catch (Exception ex)
         {
-            return ControlUiLatencySnapshot.Failure(host, ex.Message);
+            return ControlUiLatencySnapshot.Failure(host, ex.Message, probeKey: probeKey);
         }
-    }
-
-    private static Uri? TryGetProbeUri(string? controlUiUrl)
-    {
-        if (string.IsNullOrWhiteSpace(controlUiUrl) ||
-            !Uri.TryCreate(controlUiUrl, UriKind.Absolute, out var uri))
-        {
-            return null;
-        }
-
-        return uri.Scheme is "http" or "https"
-            ? CreateControlUiConfigUri(uri)
-            : null;
-    }
-
-    private static Uri CreateControlUiConfigUri(Uri controlUiUri)
-    {
-        var builder = new UriBuilder(controlUiUri)
-        {
-            Query = string.Empty,
-            Fragment = string.Empty,
-        };
-
-        var basePath = builder.Path;
-        if (string.IsNullOrWhiteSpace(basePath) || basePath == "/")
-        {
-            basePath = "/";
-        }
-        else if (!basePath.EndsWith('/'))
-        {
-            basePath += "/";
-        }
-
-        builder.Path = $"{basePath}__openclaw__/a2ui/";
-        return builder.Uri;
     }
 
     private static string? TryGetProbeHost(Uri? uri)
@@ -459,15 +443,25 @@ public readonly record struct ControlUiLatencySnapshot(
     string Host,
     long? RoundtripTimeMs,
     string? Detail = null,
-    string? ProxyPoP = null)
+    string? ProxyPoP = null,
+    string ProbeKey = "")
 {
     public static ControlUiLatencySnapshot Unknown => new(ControlUiLatencyState.Unknown, string.Empty, null);
 
-    public static ControlUiLatencySnapshot Success(string host, long roundtripTimeMs, string? detail = null, string? proxyPoP = null) =>
-        new(ControlUiLatencyState.Success, host, roundtripTimeMs, detail, proxyPoP);
+    public static ControlUiLatencySnapshot Success(
+        string host,
+        long roundtripTimeMs,
+        string? detail = null,
+        string? proxyPoP = null,
+        string? probeKey = null) =>
+        new(ControlUiLatencyState.Success, host, roundtripTimeMs, detail, proxyPoP, probeKey ?? string.Empty);
 
-    public static ControlUiLatencySnapshot Failure(string host, string? detail = null, string? proxyPoP = null) =>
-        new(ControlUiLatencyState.Failure, host, null, detail, proxyPoP);
+    public static ControlUiLatencySnapshot Failure(
+        string host,
+        string? detail = null,
+        string? proxyPoP = null,
+        string? probeKey = null) =>
+        new(ControlUiLatencyState.Failure, host, null, detail, proxyPoP, probeKey ?? string.Empty);
 
     public bool IsSuccess => State == ControlUiLatencyState.Success && RoundtripTimeMs is not null;
 }

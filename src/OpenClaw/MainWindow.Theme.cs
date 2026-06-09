@@ -3,6 +3,7 @@
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using OpenClaw.Helpers;
 
@@ -12,7 +13,7 @@ public sealed partial class MainWindow
 {
     private void OnThemeSelectionClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || button.Tag is not string selectedTheme)
+        if (sender is not ToggleButton button || button.Tag is not string selectedTheme)
         {
             return;
         }
@@ -31,23 +32,35 @@ public sealed partial class MainWindow
         }
     }
 
-    private IEnumerable<Button> EnumerateThemeButtons()
+    private IEnumerable<ToggleButton> EnumerateThemeButtons()
     {
         yield return SystemThemeButton;
         yield return LightThemeButton;
         yield return DarkThemeButton;
     }
 
-    private static void UpdateThemeButtonState(Button button, string selectedThemeMode)
+    private static void UpdateThemeButtonState(ToggleButton button, string selectedThemeMode)
     {
         var isSelected = string.Equals(button.Tag as string, selectedThemeMode, StringComparison.Ordinal);
+        button.IsChecked = isSelected;
         button.Background = isSelected
-            ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 230, 240, 255))
-            : new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            ? GetBrushResource("AccentFillColorDefaultBrush")
+            : GetBrushResource("SubtleFillColorTransparentBrush");
 
         button.Foreground = isSelected
-            ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 99, 235))
-            : (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            ? GetBrushResource("TextOnAccentFillColorPrimaryBrush")
+            : GetBrushResource("TextFillColorSecondaryBrush");
+    }
+
+    private static Brush GetBrushResource(string resourceKey)
+    {
+        if (Application.Current.Resources.TryGetValue(resourceKey, out var resource) &&
+            resource is Brush brush)
+        {
+            return brush;
+        }
+
+        return new SolidColorBrush(Colors.Transparent);
     }
 
     private void ApplyTheme(string themeMode)

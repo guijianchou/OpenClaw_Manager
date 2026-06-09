@@ -1,35 +1,31 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
+using OpenClaw.Helpers;
+
 namespace OpenClaw.Services;
 
 internal sealed class GatewayHeartbeatTransport
 {
-    private static readonly HttpClient HeartbeatHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static readonly HttpClient HeartbeatHttpClient = CreateHeartbeatHttpClient();
 
     public async Task<HeartbeatProbeResult> ProbeAsync(string url, CancellationToken token)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var probeUri = ControlUiProbeUriFactory.TryCreateConfigUri(url);
+            if (probeUri is null)
+            {
+                return HeartbeatProbeResult.Failure(StringResources.HeartbeatInvalidControlUiUrl);
+            }
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, probeUri);
             request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache, no-store, max-age=0");
             request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
-            request.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml");
+            request.Headers.TryAddWithoutValidation("Accept", "application/json,text/plain,*/*");
 
             using var response = await HeartbeatHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-            var classification = GatewayHttpStatusClassifier.Classify(
-                response.StatusCode,
-                response.ReasonPhrase,
-                response.Headers.TryGetValues("cf-ray", out _));
-
-            return classification.Kind switch
-            {
-                GatewayHttpStatusKind.Reachable or
-                GatewayHttpStatusKind.Redirected or
-                GatewayHttpStatusKind.AccessRequired => HeartbeatProbeResult.Healthy(classification.Detail),
-                GatewayHttpStatusKind.GatewayWaitingApproval or
-                GatewayHttpStatusKind.AuthRateLimited => HeartbeatProbeResult.SessionBlocked(classification.Detail),
-                _ => HeartbeatProbeResult.Failure(classification.Detail),
-            };
+            var classification = await GatewayHttpStatusClassifier.ClassifyResponseAsync(response, token);
+            return GatewayHeartbeatProbeMapper.Map(classification);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -37,7 +33,19 @@ internal sealed class GatewayHeartbeatTransport
         }
         catch (Exception ex)
         {
-            return HeartbeatProbeResult.Failure($"Gateway heartbeat request failed: {ex.Message}");
+            return HeartbeatProbeResult.Failure(
+                string.Format(StringResources.HeartbeatRequestFailedFormat, ex.Message));
         }
+    }
+
+    private static HttpClient CreateHeartbeatHttpClient()
+    {
+        return new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(10),
+        };
     }
 }

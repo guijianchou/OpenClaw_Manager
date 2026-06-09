@@ -12,7 +12,10 @@ public sealed record TrayMenuStrings(
     string ViewLogsLabel,
     string CompactModeLabel,
     string SettingsLabel,
-    string ExitLabel)
+    string ExitLabel,
+    string DefaultStatusLabel,
+    string StatusHeaderFormat,
+    string TooltipFormat)
 {
     /// <summary>
     /// English fallback strings used when no localized strings are provided.
@@ -23,5 +26,8 @@ public sealed record TrayMenuStrings(
         ViewLogsLabel: "View Logs",
         CompactModeLabel: "Compact Mode",
         SettingsLabel: "Settings",
-        ExitLabel: "Exit");
+        ExitLabel: "Exit",
+        DefaultStatusLabel: "WAIT",
+        StatusHeaderFormat: "Status: {0}",
+        TooltipFormat: "OpenClaw - {0}");
 }

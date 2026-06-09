@@ -402,6 +402,8 @@ public class ConfigurationService
             changed = true;
         }
 
+        changed |= NormalizeEnvironments(settings);
+
         if (settings.RecoveryPolicy is null)
         {
             settings.RecoveryPolicy = new RecoveryPolicyOptions();
@@ -422,6 +424,7 @@ public class ConfigurationService
 
         changed |= NormalizeWindowBounds(settings);
         changed |= NormalizeSettingsWindowBounds(settings);
+        changed |= NormalizeRecoveryPolicy(settings.RecoveryPolicy);
 
         var normalizedHeartbeatInterval = Math.Max(0, settings.Heartbeat.IntervalSeconds);
         changed |= normalizedHeartbeatInterval != settings.Heartbeat.IntervalSeconds;
@@ -479,6 +482,173 @@ public class ConfigurationService
         settings.HeartbeatIntervalSeconds = synchronizedHeartbeatInterval;
 
         return changed;
+    }
+
+    private static bool NormalizeEnvironments(AppSettings settings)
+    {
+        var changed = false;
+        var source = settings.Environments;
+        var normalized = new List<EnvironmentConfig>();
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var environment in source)
+        {
+            if (environment is null)
+            {
+                changed = true;
+                continue;
+            }
+
+            var name = environment.Name?.Trim() ?? string.Empty;
+            var gatewayUrl = environment.GatewayUrl?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(gatewayUrl))
+            {
+                changed = true;
+                continue;
+            }
+
+            var uniqueName = name;
+            if (!usedNames.Add(uniqueName))
+            {
+                var suffix = 2;
+                do
+                {
+                    uniqueName = $"{name} ({suffix++})";
+                }
+                while (!usedNames.Add(uniqueName));
+
+                changed = true;
+            }
+
+            if (!string.Equals(environment.Name, uniqueName, StringComparison.Ordinal))
+            {
+                environment.Name = uniqueName;
+                changed = true;
+            }
+
+            if (!string.Equals(environment.GatewayUrl, gatewayUrl, StringComparison.Ordinal))
+            {
+                environment.GatewayUrl = gatewayUrl;
+                changed = true;
+            }
+
+            normalized.Add(environment);
+        }
+
+        if (normalized.Count == 0)
+        {
+            normalized.Add(new EnvironmentConfig
+            {
+                Name = "Default",
+                GatewayUrl = EnvironmentConfig.PlaceholderGatewayUrl,
+                IsDefault = true,
+            });
+            changed = true;
+        }
+
+        var selectedEnvironmentName = settings.SelectedEnvironmentName?.Trim();
+        if (!string.Equals(settings.SelectedEnvironmentName, selectedEnvironmentName, StringComparison.Ordinal))
+        {
+            settings.SelectedEnvironmentName = selectedEnvironmentName;
+            changed = true;
+        }
+
+        var selectedEnvironment = !string.IsNullOrWhiteSpace(selectedEnvironmentName)
+            ? normalized.FirstOrDefault(env => string.Equals(env.Name, selectedEnvironmentName, StringComparison.Ordinal))
+            : null;
+
+        var defaultEnvironment = normalized.FirstOrDefault(env => env.IsDefault)
+            ?? selectedEnvironment
+            ?? normalized[0];
+
+        var defaultAssigned = false;
+        foreach (var environment in normalized)
+        {
+            var shouldBeDefault = ReferenceEquals(environment, defaultEnvironment) && !defaultAssigned;
+            if (environment.IsDefault != shouldBeDefault)
+            {
+                environment.IsDefault = shouldBeDefault;
+                changed = true;
+            }
+
+            defaultAssigned |= shouldBeDefault;
+        }
+
+        if (selectedEnvironment is null)
+        {
+            settings.SelectedEnvironmentName = defaultEnvironment.Name;
+            changed = true;
+        }
+
+        if (source.Count != normalized.Count || !source.SequenceEqual(normalized))
+        {
+            changed = true;
+        }
+
+        settings.Environments = normalized;
+        return changed;
+    }
+
+    private static bool NormalizeRecoveryPolicy(RecoveryPolicyOptions recovery)
+    {
+        var changed = false;
+
+        changed |= SetIfChanged(
+            value => recovery.BackgroundResumeThresholdSeconds = value,
+            recovery.BackgroundResumeThresholdSeconds,
+            Math.Max(0, recovery.BackgroundResumeThresholdSeconds));
+        changed |= SetIfChanged(
+            value => recovery.MaxReconnectAttempts = value,
+            recovery.MaxReconnectAttempts,
+            Math.Max(1, recovery.MaxReconnectAttempts));
+        changed |= SetIfChanged(
+            value => recovery.MaxSoftResyncAttempts = value,
+            recovery.MaxSoftResyncAttempts,
+            Math.Max(1, recovery.MaxSoftResyncAttempts));
+        changed |= SetIfChanged(
+            value => recovery.EventIdleSuspicionSeconds = value,
+            recovery.EventIdleSuspicionSeconds,
+            Math.Max(0, recovery.EventIdleSuspicionSeconds));
+        changed |= SetIfChanged(
+            value => recovery.TransportIdleSuspicionSeconds = value,
+            recovery.TransportIdleSuspicionSeconds,
+            Math.Max(0, recovery.TransportIdleSuspicionSeconds));
+        changed |= SetIfChanged(
+            value => recovery.ReconnectDelayMs = value,
+            recovery.ReconnectDelayMs,
+            Math.Max(0, recovery.ReconnectDelayMs));
+
+        var normalizedBackoff = double.IsFinite(recovery.ReconnectBackoffMultiplier) &&
+            recovery.ReconnectBackoffMultiplier >= 1d
+            ? recovery.ReconnectBackoffMultiplier
+            : 1d;
+        if (!recovery.ReconnectBackoffMultiplier.Equals(normalizedBackoff))
+        {
+            recovery.ReconnectBackoffMultiplier = normalizedBackoff;
+            changed = true;
+        }
+
+        changed |= SetIfChanged(
+            value => recovery.MaxReconnectDelayMs = value,
+            recovery.MaxReconnectDelayMs,
+            Math.Max(recovery.ReconnectDelayMs, recovery.MaxReconnectDelayMs));
+        changed |= SetIfChanged(
+            value => recovery.HardRefreshCooldownSeconds = value,
+            recovery.HardRefreshCooldownSeconds,
+            Math.Max(0, recovery.HardRefreshCooldownSeconds));
+
+        return changed;
+    }
+
+    private static bool SetIfChanged(Action<int> setValue, int current, int normalized)
+    {
+        if (current == normalized)
+        {
+            return false;
+        }
+
+        setValue(normalized);
+        return true;
     }
 
     private static bool NormalizeWindowBounds(AppSettings settings)

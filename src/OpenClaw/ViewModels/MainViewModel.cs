@@ -17,7 +17,11 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         _dispatchToUi = dispatchToUi ?? throw new ArgumentNullException(nameof(dispatchToUi));
         _latencyService = new ControlUiLatencyService(runtime.Logger);
-        _webViewService = new WebViewService(runtime.Logger, _messageOwnership, _dispatchToUi);
+        _webViewService = new WebViewService(
+            runtime.Logger,
+            _messageOwnership,
+            _dispatchToUi,
+            () => runtime.Configuration.Settings.Diagnostics.EnableVerboseRecoveryLogging);
         _hostedUiBridge = new HostedUiBridge(runtime.Logger, _messageOwnership);
         InitializeCommands();
         SubscribeToServiceEvents();

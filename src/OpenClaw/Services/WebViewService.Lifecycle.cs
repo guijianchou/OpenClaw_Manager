@@ -11,7 +11,11 @@ public partial class WebViewService
     /// <summary>
     /// Initializes the WebView2 control with a custom user data folder.
     /// </summary>
-    public async Task InitializeAsync(WebView2 webView, string environmentName, CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(
+        WebView2 webView,
+        string environmentName,
+        string gatewayUrl,
+        CancellationToken cancellationToken = default)
     {
         if (_isDisposed)
         {
@@ -24,18 +28,20 @@ public partial class WebViewService
         var initializationGeneration = _generations.Next();
         _messageOwnership.ResetForNewWebView();
         CurrentEnvironmentName = environmentName;
+        CurrentEnvironmentGatewayUrl = gatewayUrl;
         _isInitialized = false;
 
         try
         {
-            var userDataFolder = GetUserDataFolderForEnvironment(environmentName);
+            await MigrateLegacyUserDataFolderIfNeededAsync(environmentName, gatewayUrl, _logger, cancellationToken);
+            var userDataFolder = GetUserDataFolderForEnvironment(environmentName, gatewayUrl);
             Directory.CreateDirectory(userDataFolder);
+            await WriteProfileIdentityMarkerAsync(userDataFolder, gatewayUrl, _logger, cancellationToken);
 
-            // In WinUI 3, set user data folder via environment variable before initialization.
-            // This avoids API signature differences between WinUI 3 and Win32 WebView2.
-            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", userDataFolder);
+            var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null, userDataFolder, null);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            await webView.EnsureCoreWebView2Async();
+            await webView.EnsureCoreWebView2Async(environment);
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!IsCurrentInitialization(webView, initializationGeneration))
@@ -76,7 +82,7 @@ public partial class WebViewService
             // Allow file input dialog
             coreWebView.Settings.AreDefaultContextMenusEnabled = true;
             coreWebView.Settings.IsStatusBarEnabled = false;
-            coreWebView.Settings.AreDevToolsEnabled = true;
+            coreWebView.Settings.AreDevToolsEnabled = ShouldEnableDevTools();
 
             coreWebView.Settings.IsGeneralAutofillEnabled = true;
 
@@ -147,6 +153,7 @@ public partial class WebViewService
         _webMessageReceivedHandler = null;
         _webView = null;
         _coreWebView = null;
+        CurrentEnvironmentGatewayUrl = null;
         _isInitialized = false;
         _statusInspector.SetUnknownSnapshot();
         _lastPublishedControlUiSnapshot = ControlUiProbeSnapshot.Unknown;
@@ -179,6 +186,15 @@ public partial class WebViewService
         {
             return null;
         }
+    }
+
+    private bool ShouldEnableDevTools()
+    {
+#if DEBUG
+        return true;
+#else
+        return _shouldEnableDevTools();
+#endif
     }
 
     private CoreWebView2? GetCoreWebView()

@@ -25,27 +25,55 @@ public sealed partial class ShellSessionCoordinator
 
     private void HandleSessionReady(SessionReadyEventArgs args)
     {
+        if (!IsSessionReadyForCurrentEnvironment(args))
+        {
+            _logger.Warning("session.ready.ignored", new
+            {
+                args.Uri,
+                currentGatewayUrl = _currentGatewayUrl
+            });
+            return;
+        }
+
         _sessionHealth = HealthStatus.Healthy;
         _hostedUiHealth = HealthStatus.Healthy;
         _streamHealth = HealthStatus.Healthy;
         ResetEscalationCounters();
 
-        if (_recoveryState is RecoveryState.Connecting or RecoveryState.Reconnecting)
+        MarkRecoveryReady();
+        _logger.Info("session.ready", new
         {
-            MarkRecoveryReady();
-            _logger.Info("session.ready", new
-            {
-                args.Model,
-                args.Uri,
-                modelSource = string.IsNullOrWhiteSpace(args.ModelSource) ? null : args.ModelSource
-            });
-        }
-        else
-        {
-            MarkRecoveryHealthy();
-        }
+            args.Model,
+            args.Uri,
+            modelSource = string.IsNullOrWhiteSpace(args.ModelSource) ? null : args.ModelSource
+        });
 
         PublishTelemetry();
+    }
+
+    private bool IsSessionReadyForCurrentEnvironment(SessionReadyEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(_currentGatewayUrl))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(args.Uri))
+        {
+            return false;
+        }
+
+        var currentKey = ControlUiProbeUriFactory.TryCreateProbeKey(_currentGatewayUrl);
+        var readyKey = ControlUiProbeUriFactory.TryCreateProbeKey(args.Uri);
+        if (currentKey is not null && readyKey is not null)
+        {
+            return string.Equals(currentKey, readyKey, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(
+            _currentGatewayUrl.Trim().TrimEnd('/'),
+            args.Uri.Trim().TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task HandleEventGapDetectedAsync(EventGapEventArgs args, CancellationToken cancellationToken)

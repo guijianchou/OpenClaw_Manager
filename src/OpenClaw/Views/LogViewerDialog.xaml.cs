@@ -104,18 +104,33 @@ public sealed partial class LogViewerDialog : ContentDialog
     {
         try
         {
-            if (Directory.Exists(_logDirectory))
+            if (!Directory.Exists(_logDirectory))
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_logDirectory)
-                {
-                    UseShellExecute = true,
-                });
+                ShowLogMessage(
+                    InfoBarSeverity.Warning,
+                    string.Format(StringResources.LogFolderMissingFormat, _logDirectory));
+                return;
             }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_logDirectory)
+            {
+                UseShellExecute = true,
+            });
         }
         catch (Exception ex)
         {
             App.Logger.Error($"Failed to open log folder: {ex.Message}");
+            ShowLogMessage(
+                InfoBarSeverity.Error,
+                string.Format(StringResources.LogFolderOpenFailedFormat, ex.Message));
         }
+    }
+
+    private void ShowLogMessage(InfoBarSeverity severity, string message)
+    {
+        LogInfoBar.Severity = severity;
+        LogInfoBar.Message = message;
+        LogInfoBar.IsOpen = true;
     }
 
     private void OnClosed(ContentDialog sender, ContentDialogClosedEventArgs args)

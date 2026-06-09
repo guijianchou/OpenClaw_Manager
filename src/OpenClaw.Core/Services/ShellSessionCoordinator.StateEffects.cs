@@ -40,7 +40,7 @@ public sealed partial class ShellSessionCoordinator
 
         switch (snapshot.Phase)
         {
-            case ControlUiPhase.Connected when _recoveryState is RecoveryState.Connecting or RecoveryState.Reconnecting or RecoveryState.Resyncing:
+            case ControlUiPhase.Connected when _recoveryState is not RecoveryState.Ready and not RecoveryState.Healthy:
                 MarkRecoveryReady();
                 ResetEscalationCounters();
                 break;
