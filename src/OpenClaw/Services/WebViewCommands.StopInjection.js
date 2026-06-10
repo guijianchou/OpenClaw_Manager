@@ -1,20 +1,6 @@
 (() => {
   const stopCommand = '/stop';
 
-  const chatTargets = [
-    window.chat,
-    window.__openclaw?.chat,
-    window.__OPENCLAW__?.chat,
-    window.__APP__?.chat,
-    window.app?.chat
-  ].filter(Boolean);
-
-  const chatCalls = chatTargets.flatMap((chat) => [
-    () => typeof chat.inject === 'function' ? chat.inject(stopCommand) : false,
-    () => typeof chat.send === 'function' ? chat.send(stopCommand) : false,
-    () => typeof chat.sendMessage === 'function' ? chat.sendMessage(stopCommand) : false
-  ]);
-
   const isVisible = (el) => {
     if (!el) return false;
     const style = window.getComputedStyle(el);
@@ -23,21 +9,17 @@
     return rect.width > 0 && rect.height > 0;
   };
 
-  const setNativeValue = (el, value) => {
-    const prototype = Object.getPrototypeOf(el);
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-    if (descriptor && typeof descriptor.set === 'function') {
-      descriptor.set.call(el, value);
-    } else {
-      el.value = value;
-    }
-  };
-
   const clearElement = (el) => {
     if (!el) return;
 
     if ('value' in el) {
-      setNativeValue(el, '');
+      const prototype = Object.getPrototypeOf(el);
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+      if (descriptor && typeof descriptor.set === 'function') {
+        descriptor.set.call(el, '');
+      } else {
+        el.value = '';
+      }
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return;
@@ -47,72 +29,19 @@
     el.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteContentBackward' }));
   };
 
-  const findChatSurface = () => {
-    const selectors = [
-      '[data-openclaw-chat]',
-      '[data-openclaw-chat-surface]',
-      '[data-testid="chat"]',
-      '[data-testid*="chat"]',
-      '[data-testid*="conversation"]',
-      '[aria-label*="chat" i]'
-    ];
-
-    return selectors
-      .flatMap((selector) => Array.from(document.querySelectorAll(selector)))
-      .find(isVisible) || null;
-  };
-
-  const findChatComposer = () => {
-    const surface = findChatSurface();
-    if (!surface) return null;
-
-    const selectors = [
-      '[data-openclaw-chat-composer]',
-      '[data-testid*="composer"]',
-      '[data-testid*="prompt"]',
-      '[aria-label*="message" i]',
-      '[aria-label*="prompt" i]',
-      'form'
-    ];
-    const scopes = selectors
-      .flatMap((selector) => Array.from(surface.querySelectorAll(selector)))
-      .filter(isVisible);
-    scopes.unshift(surface);
-
-    const inputSelectors = [
-      'textarea',
-      'input[type="text"]',
-      'input:not([type])',
-      '[contenteditable="true"]',
-      '[role="textbox"]'
-    ];
-
-    for (const scope of scopes) {
-      const input = inputSelectors
-        .flatMap((selector) => Array.from(scope.querySelectorAll(selector)))
-        .find((el) =>
-          !el.disabled &&
-          !el.readOnly &&
-          !el.hasAttribute('disabled') &&
-          isVisible(el));
-      if (input) return input;
-    }
-
-    return null;
-  };
-
   const submitElement = (el) => {
     if (!el) return false;
     const form = el.closest('form');
-    if (form && typeof form.requestSubmit === 'function') {
-      try {
-        const submitter = Array.from(form.querySelectorAll('button:not([type]), button[type="submit"], input[type="submit"]'))
-          .find((button) => !button.disabled && !button.hasAttribute('disabled') && isVisible(button));
-        form.requestSubmit(submitter || undefined);
-        window.setTimeout(() => clearElement(el), 0);
-        return true;
-      } catch {
+    if (form) {
+      const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+      form.dispatchEvent(submitEvent);
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else if (typeof form.submit === 'function') {
+        form.submit();
       }
+      window.setTimeout(() => clearElement(el), 0);
+      return true;
     }
 
     const keyboardEventInit = {
@@ -131,46 +60,36 @@
     return true;
   };
 
-  const submitStopCommand = () => {
-    const composer = findChatComposer();
-    if (!composer) return false;
-
-    composer.focus();
-    if ('value' in composer) {
-      setNativeValue(composer, stopCommand);
-      composer.dispatchEvent(new Event('input', { bubbles: true }));
-      composer.dispatchEvent(new Event('change', { bubbles: true }));
+  const setNativeValue = (el, value) => {
+    const prototype = Object.getPrototypeOf(el);
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    if (descriptor && typeof descriptor.set === 'function') {
+      descriptor.set.call(el, value);
     } else {
-      composer.textContent = stopCommand;
-      composer.dispatchEvent(new InputEvent('input', { bubbles: true, data: stopCommand, inputType: 'insertText' }));
+      el.value = value;
     }
-
-    return submitElement(composer);
   };
 
-  const tryChatCall = (index) => {
-    if (index >= chatCalls.length) {
-      return submitStopCommand();
-    }
+  const textInput = Array.from(document.querySelectorAll('textarea, input[type="text"], input:not([type])'))
+    .find((el) => !el.disabled && !el.readOnly && isVisible(el));
 
-    let result;
-    try {
-      result = chatCalls[index]();
-    } catch {
-      return tryChatCall(index + 1);
-    }
+  if (textInput) {
+    textInput.focus();
+    setNativeValue(textInput, stopCommand);
+    textInput.dispatchEvent(new Event('input', { bubbles: true }));
+    textInput.dispatchEvent(new Event('change', { bubbles: true }));
+    return submitElement(textInput);
+  }
 
-    if (result && typeof result.then === 'function') {
-      result.then(
-        (resolved) => {
-          if (resolved === false) tryChatCall(index + 1);
-        },
-        () => tryChatCall(index + 1));
-      return true;
-    }
+  const editor = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'))
+    .find((el) => !el.hasAttribute('disabled') && isVisible(el));
 
-    return result !== false || tryChatCall(index + 1);
-  };
+  if (editor) {
+    editor.focus();
+    editor.textContent = stopCommand;
+    editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: stopCommand, inputType: 'insertText' }));
+    return submitElement(editor);
+  }
 
-  return tryChatCall(0);
+  return false;
 })()

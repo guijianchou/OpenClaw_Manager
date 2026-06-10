@@ -1,24 +1,5 @@
 # OpenClaw Development Notes
 
-## v5.1.1 Stability Review Notes
-
-- `5.1.1` keeps the current x64-only application architecture and tightens production behavior around environment identity, recovery ownership, diagnostics, and developer-tool feedback.
-- Hosted `session-ready` events must be scoped to the current environment probe identity before they clear recovery state; stale events from a previous endpoint are ignored and logged.
-- Hard-refresh cooldowns start only after WebView2 accepts a reload. A failed or unavailable reload must not consume the cooldown window or advance recovery as if a hard refresh started.
-- Control UI latency success is reserved for `GatewayHttpStatusKind.Reachable`. Auth-required, pairing, rate-limit, redirects, Cloudflare/proxy failures, and other user-action/error states must publish failure or stale snapshots, not healthy latency.
-- Environment configuration normalization trims persisted names and URLs, drops unusable blank entries, de-duplicates display names, guarantees exactly one default, and repairs invalid selected-environment references.
-- WebView2 profile identity and session clearing use both environment name and Gateway URL. Legacy profile migration is intentionally marker-gated; unmarked pre-5.1.1 legacy folders are left in place rather than auto-migrated across possible endpoint boundaries.
-- Diagnostic bundles must keep total copied log payload bounded, cap diagnostic text entries, redact authorization/cookie/API-key headers, and write notes for skipped or truncated content.
-- Release DevTools enablement is injected from diagnostics settings. `WebViewService` must not read `App.Configuration`; the Settings and command surfaces should show localized unavailable, disabled, or failure feedback when DevTools cannot open.
-
-## v5.0.2 Stability Review Notes
-
-- Gateway/Cloudflare HTTP classification must stay strict: header-based Cloudflare 1033 detection accepts exact `1033`, body-based detection requires explicit `Error 1033`, `error code 1033`, or nearby `cf-error-code` evidence, and body snippet reads have a local timeout so diagnostics, heartbeat, and latency probes cannot hang after headers arrive.
-- Healthy Gateway network diagnostics must remain `Pass`, while access-required, approval, rate-limit, redirect, and unexpected states remain warnings and path/proxy/tunnel/server failures remain failures.
-- When the hosted Control UI reports `Connecting` or failure and the HTTP transport probe also returns a non-healthy result, heartbeat recovery should keep the transport failure detail instead of hiding it behind hosted-session state.
-- Latency tooltip text is user-visible and automation-visible, so formatting belongs in the WinUI layer with localized resources; environment changes, placeholder selection, and WebView host detach must clear stale latency samples and Cloudflare PoP state.
-- Follow-up review items left intentionally outside this narrow release: theme toggle visuals should be owned by XAML checked-state styling, invalid persisted `AppTheme` values should normalize to `System`, and the approved single-instance shutdown synchronous waits should eventually become a nonblocking bounded drain.
-
 ## Project Code Standards
 
 Canonical checklist: [docs/code-style.md](docs/code-style.md).
@@ -82,8 +63,8 @@ This project uses C# and WinUI conventions, but follows the Linux engineering bi
 - Hosted bridge document-created script ids must be removed during WebView detach so observers and poll timers do not accumulate across repeated initialization.
 - Hosted bridge JavaScript belongs behind dedicated script-builder and asset seams; keep native WebView orchestration in `HostedUiBridge`, script assembly in `HostedUiBridge.Script.cs`, and executable pure JS logic in focused assets with behavior tests.
 - Pure settings, diagnostics, parser, policy, telemetry, recovery, and window-bounds code should live physically under `src/OpenClaw.Core`; there are no current linked Core source exceptions.
-- `OpenClaw.Core` is a pure SDK class library and must stay platform-independent. The solution exposes only x64 for the WinUI app, while Core and Core tests map that x64 solution platform to their `Any CPU` project configurations.
-- Repository guardrails must fail if `OpenClaw.Core` declares architecture-specific platforms, if the solution reintroduces non-x64 platforms, or if Core/test solution mappings target anything other than `Any CPU`.
+- `OpenClaw.Core` is a pure SDK class library and must stay platform-independent. Solution-level x64/x86/ARM64 mappings must point to the Core project's `AnyCPU` configuration so VS2026 can load the solution without Configuration Manager repair.
+- Repository guardrails must fail if `OpenClaw.Core` declares architecture-specific platforms or if solution mappings target anything other than Core `AnyCPU`.
 - Runtime and UI code should not introduce new synchronous waits. The current approved exceptions are shutdown drains that preserve settings/log durability and single-instance ownership release; `tools\verify-repo-structure.ps1` must fail any new `.Wait()`, `.GetAwaiter().GetResult()`, `Task.Result`, or `Thread.Sleep()` outside those approved lines.
 - Unpackaged WinUI 3 language override belongs to Windows App SDK's `Microsoft.Windows.Globalization.ApplicationLanguages`; using the system `Windows.Globalization.ApplicationLanguages` API logs `Language override failed` at startup on this app.
 - Diagnostics should depend on narrow session interfaces such as `IDiagnosticWebViewSession`, not concrete navigation/lifecycle services. This keeps diagnostic reporting from becoming another consumer of `WebViewService` internals.
@@ -105,29 +86,27 @@ Canonical local verification:
 
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
-dotnet run --no-restore --project tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj
-dotnet test OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
+$env:OPENCLAW_NODE='C:\Users\Zen\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
 git diff --check
 ```
 
-The Core regression harness is part of the active solution. `dotnet run` is the targeted executable harness path, and `dotnet test` is the supported VSTest workflow that invokes the same harness. The harness covers pure Core status/probe helpers plus heartbeat, latency, diagnostics, configuration normalization, recovery ownership, and diagnostic-bundle semantics. Validate with locked restore, Core harness, VSTest, x64 build, format, repository guardrails, bridge script checks, whitespace checks, and VS2026 manual debug for real WebView2/Gateway behavior. `tools\verify-repo-structure.ps1` is the active architecture and release-metadata guardrail, and `tools\verify-bridge-scripts.ps1` is the active behavior check for embedded bridge scripts. The bridge verifier requires Node.js by default, honors `OPENCLAW_NODE` when a specific Node executable is required, and skips only when `OPENCLAW_ALLOW_NODE_SKIP=1` is set explicitly.
+The local regression harness is not part of the active solution at this checkpoint; validate with restore, x64 build, format, repository guardrails, bridge script checks, whitespace checks, and VS2026 manual debug for real WebView2/Gateway behavior. `tools\verify-repo-structure.ps1` is the active architecture and release-metadata guardrail, and `tools\verify-bridge-scripts.ps1` is the active behavior check for embedded bridge scripts. The bridge verifier requires Node.js by default, honors `OPENCLAW_NODE` when a specific Node executable is required, and skips only when `OPENCLAW_ALLOW_NODE_SKIP=1` is set explicitly; on this workstation the Codex runtime Node path above avoids the blocked default `node`.
 
-## Active Verification Scope
+## Active Verification After Test Harness Removal
 
 Older notes mention regression tests that existed in previous checkpoints. Current active verification is:
 
-- Core regression harness through `dotnet run --no-restore --project tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj`
 - solution restore/build/format
 - repository structure guardrails through `tools\verify-repo-structure.ps1`
 - bridge script behavior checks through `tools\verify-bridge-scripts.ps1`
 - whitespace diff checks
 - VS2026 manual debug on real WebView2/Gateway behavior
 
-When a note says "Regression coverage now checks", read it as Core-harness coverage only if the behavior is pure .NET and listed in the current harness; otherwise treat it as historical context or manual-debug coverage.
+When a note says "Regression coverage now checks", read it as historical context unless the current verification section lists an active command for it.
 
 Manual VS2026 debug must cover the runtime edges that local scripts cannot prove:
 
@@ -218,7 +197,7 @@ The right-click failure had two separate causes:
 - Use a hidden normal owner window for `TrackPopupMenu`; do not pass `HWND_MESSAGE` as the menu owner.
 - Keep right-click tray commands intentional and bounded: Open OpenClaw, Reload, View Logs, Compact Mode, Settings, and Exit. Left-click can remain the quick show/hide toggle.
 
-Historical harness coverage checked the Unicode imports, `LOWORD(lParam)` callback parsing, the bounded tray command set, and the hidden normal owner-window requirement. The current Core harness does not cover tray behavior, so keep these behaviors in the VS2026 manual debug checklist or add guardrails before changing tray code.
+Historical harness coverage checked the Unicode imports, `LOWORD(lParam)` callback parsing, the bounded tray command set, and the hidden normal owner-window requirement. In the current no-`tests/` checkpoint, keep these behaviors in the VS2026 manual debug checklist or add guardrails before changing tray code.
 
 ## Single Instance Launch Coordination
 
@@ -259,13 +238,7 @@ Those coordinates are Windows minimized-window sentinel values, not a user-visib
 - Before moving to saved coordinates, verify that the restored rectangle intersects one of the current `DisplayArea` work areas.
 - If saved coordinates no longer intersect any display, center the window on the current display instead of trusting stale topology.
 
-Historical harness coverage checked both sides of the fix: settings load sanitizes minimized sentinel bounds, and `SaveWindowBounds()` skips hidden/minimized windows. The current Core harness does not run WinUI windowing behavior, so preserve this through review, guardrails, or manual debug when window-bounds code changes.
-
-### Settings Dialog Width Floor
-
-The Settings dialog uses a fixed 160px sidebar plus 24px content padding on each side. Several right-pane controls have a 220px minimum width, so the persisted Settings-window width floor must stay at or above 428px. This protects reopened Settings windows from restoring into a layout narrower than the sidebar plus the minimum usable form surface.
-
-Keep `WindowBoundsUtilities.MinimumPersistedSettingsWindowWidth` aligned with the repository guardrail in `tools/verify-repo-structure.ps1` before changing Settings navigation width, content padding, or right-pane control minimums.
+Historical harness coverage checked both sides of the fix: settings load sanitizes minimized sentinel bounds, and `SaveWindowBounds()` skips hidden/minimized windows. In the current no-`tests/` checkpoint, preserve this through review, guardrails, or manual debug when window-bounds code changes.
 
 ## Always-On-Top And Pin State
 

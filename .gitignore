@@ -6,6 +6,8 @@
 [Dd]ebug/
 [Rr]elease/
 x64/
+x86/
+ARM64/
 
 # Visual Studio / MSBuild user state
 .vs/

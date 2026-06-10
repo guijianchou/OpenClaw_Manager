@@ -61,7 +61,7 @@ public partial class MainViewModel
         var gatewayUrl = _selectedEnvironment.GatewayUrl;
         _runtime.Logger.Info("Initializing WebView2 host.", new { environment = environmentName });
 
-        await _webViewService.InitializeAsync(webView, environmentName, gatewayUrl, cancellationToken);
+        await _webViewService.InitializeAsync(webView, environmentName, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsCurrentSelectedEnvironment(environmentName, gatewayUrl) ||
             _isDisposed ||

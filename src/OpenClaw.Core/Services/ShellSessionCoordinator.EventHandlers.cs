@@ -25,46 +25,27 @@ public sealed partial class ShellSessionCoordinator
 
     private void HandleSessionReady(SessionReadyEventArgs args)
     {
-        if (!IsSessionReadyForCurrentEnvironment(args))
-        {
-            _logger.Warning("session.ready.ignored", new
-            {
-                args.Uri,
-                currentGatewayUrl = _currentGatewayUrl
-            });
-            return;
-        }
-
         _sessionHealth = HealthStatus.Healthy;
         _hostedUiHealth = HealthStatus.Healthy;
         _streamHealth = HealthStatus.Healthy;
         ResetEscalationCounters();
 
-        AbortRecoveryOperation();
-        MarkRecoveryReady();
-        _logger.Info("session.ready", new
+        if (_recoveryState is RecoveryState.Connecting or RecoveryState.Reconnecting)
         {
-            args.Model,
-            args.Uri,
-            modelSource = string.IsNullOrWhiteSpace(args.ModelSource) ? null : args.ModelSource
-        });
+            MarkRecoveryReady();
+            _logger.Info("session.ready", new
+            {
+                args.Model,
+                args.Uri,
+                modelSource = string.IsNullOrWhiteSpace(args.ModelSource) ? null : args.ModelSource
+            });
+        }
+        else
+        {
+            MarkRecoveryHealthy();
+        }
 
         PublishTelemetry();
-    }
-
-    private bool IsSessionReadyForCurrentEnvironment(SessionReadyEventArgs args)
-    {
-        if (string.IsNullOrWhiteSpace(_currentGatewayUrl))
-        {
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(args.Uri))
-        {
-            return false;
-        }
-
-        return GatewayUrlIdentity.IsSameGatewayRoute(_currentGatewayUrl, args.Uri);
     }
 
     private async Task HandleEventGapDetectedAsync(EventGapEventArgs args, CancellationToken cancellationToken)
@@ -141,10 +122,8 @@ public sealed partial class ShellSessionCoordinator
 
     private void HandleHeartbeatObserved(HeartbeatProbeResult result)
     {
-        var observedAt = DateTimeOffset.Now;
-        _lastHeartbeatAt = observedAt;
+        _lastHeartbeatAt = DateTimeOffset.Now;
         ApplyHeartbeatHealth(result);
-        ApplyIdleSuspicion(observedAt);
     }
 
     private async Task HandleHeartbeatFailedAsync(string message, CancellationToken cancellationToken)
@@ -156,10 +135,8 @@ public sealed partial class ShellSessionCoordinator
             return;
         }
 
-        var observedAt = DateTimeOffset.Now;
-        var recoveryReason = ResolveTransportIdleRecoveryReason(observedAt, message);
-        _logger.Warning("heartbeat.recovery.requested", new { message, recoveryReason });
+        _logger.Warning("heartbeat.recovery.requested", new { message });
         cancellationToken.ThrowIfCancellationRequested();
-        await RequestReconnectAsync(recoveryReason, cancellationToken);
+        await RequestReconnectAsync($"Heartbeat recovery requested: {message}", cancellationToken);
     }
 }

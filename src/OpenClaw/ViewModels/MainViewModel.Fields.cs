@@ -14,12 +14,12 @@ public partial class MainViewModel
     private const int HeartbeatIndicatorCount = 12;
     private const int RunIndicatorCount = 12;
     private const int LatencyHistoryCapacity = 60;
+    private const string DefaultHeartbeatSummary = "HB --";
     private const string DefaultModelSummary = "--";
+    private const string DefaultAccessSummary = "AUTH --";
+    private const string DefaultLatencySummary = "-- ms";
+    private const string DefaultWorkStatus = "WAIT";
 
-    private static string DefaultHeartbeatSummary => StringResources.StatusDefaultHeartbeat;
-    private static string DefaultAccessSummary => StringResources.StatusDefaultAccess;
-    private static string DefaultLatencySummary => StringResources.StatusDefaultLatency;
-    private static string DefaultWorkStatus => StringResources.WorkStatusWait;
     private static Brush NeutralBrush => GetStatusBrush("StatusOfflineBrush");
     private static Brush SuccessBrush => GetStatusBrush("SuccessBrush");
     private static Brush WarningBrush => GetStatusBrush("StatusReconnectingBrush");
@@ -54,7 +54,7 @@ public partial class MainViewModel
     private Brush _accessSummaryBrush = NeutralBrush;
     private string _latencySummaryText = DefaultLatencySummary;
     private Brush _latencySummaryBrush = NeutralBrush;
-    private string _latencyTooltipText = string.Empty;
+    private string _latencyTooltipText = LatencyTooltipFormatter.Format(LatencyHistorySummary.Empty);
     private string _workStatusText = DefaultWorkStatus;
     private Brush _workStatusBrush = NeutralBrush;
     private RunIndicatorMode _runIndicatorMode = RunIndicatorMode.Wait;

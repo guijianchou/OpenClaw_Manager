@@ -31,11 +31,6 @@ public sealed class LatencyHistory
         }
     }
 
-    public void Clear()
-    {
-        _samples.Clear();
-    }
-
     public LatencyHistorySummary CreateSummary()
     {
         if (_samples.Count == 0)
@@ -69,4 +64,37 @@ public readonly record struct LatencyHistorySummary(
     long? MaxMs)
 {
     public static LatencyHistorySummary Empty => new(0, null, null, null, null, null);
+}
+
+public static class LatencyTooltipFormatter
+{
+    public static string Format(LatencyHistorySummary summary, string? proxyPoP = null)
+    {
+        if (summary.SampleCount <= 0 ||
+            summary.LatestMs is not long latest ||
+            summary.MinMs is not long min ||
+            summary.AverageMs is not long average ||
+            summary.P95Ms is not long p95 ||
+            summary.MaxMs is not long max)
+        {
+            return "Latency history: no samples yet";
+        }
+
+        var lines = new List<string>(8)
+        {
+            $"Latency history ({summary.SampleCount} samples)",
+            $"Latest: {latest} ms",
+            $"Min: {min} ms",
+            $"Avg: {average} ms",
+            $"P95: {p95} ms",
+            $"Max: {max} ms",
+        };
+
+        if (!string.IsNullOrWhiteSpace(proxyPoP))
+        {
+            lines.Add($"PoP: {proxyPoP}");
+        }
+
+        return string.Join('\n', lines);
+    }
 }

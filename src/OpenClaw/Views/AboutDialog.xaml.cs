@@ -13,6 +13,6 @@ public sealed partial class AboutDialog : ContentDialog
     public AboutDialog()
     {
         this.InitializeComponent();
-        VersionText.Text = string.Format(StringResources.AboutVersionFormat, AppMetadata.GetDisplayVersion());
+        VersionText.Text = $"Version {AppMetadata.GetDisplayVersion()}";
     }
 }

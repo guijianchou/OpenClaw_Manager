@@ -2,8 +2,6 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Historical note (2026-06-07):** This file is implementation history, not the current verification source of truth. The active solution now includes the executable `tests\OpenClaw.Core.Tests` Core harness, and current commands live in `README.md`, `readme_zh.md`, `DEVELOPMENT_NOTES.md`, and `docs/code-style.md`. Later `OPENCLAW_NODE='C:\Users\Zen\...'` snippets are historical local verification evidence only; current docs should describe `OPENCLAW_NODE` as an optional local override. Sections that say `tests/` is absent describe an older checkpoint.
-
 **Goal:** Make the v3.3.x architecture cleanup real instead of patch-stacked: stable WebView/bridge ownership, live settings application, predictable compact layout, explicit verification without the removed `tests/` harness, and documentation that matches the active codebase and development notes.
 
 **Architecture:** Keep `src/OpenClaw.Core` as the pure .NET shared source tree and keep the active solution free of `tests/` for now. Move volatile behavior behind small services and contracts inside the existing app/Core split: WinUI owns windows/WebView2/tray/hotkey, Core owns policy/parsing/state decisions, and script behavior is verified by lightweight repo scripts instead of an active C# test project. This file is the authoritative combined plan; `2026-05-23-deep-refactor-hardening_opus.md` remains a review input.

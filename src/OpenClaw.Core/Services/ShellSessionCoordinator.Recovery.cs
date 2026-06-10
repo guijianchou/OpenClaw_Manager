@@ -133,7 +133,6 @@ public sealed partial class ShellSessionCoordinator
             if (_streamHealth == HealthStatus.Healthy)
             {
                 _logger.Info("recovery.soft_resync.ok", new { attempt = operation.Attempt });
-                ResetEscalationCounters();
                 MarkRecoveryReady();
             }
             else
@@ -190,7 +189,6 @@ public sealed partial class ShellSessionCoordinator
                 return;
             }
 
-            MarkHardRefreshExecuted();
             await Task.Delay(1000, operation.CancellationToken);
             MarkRecoveryConnecting();
         }

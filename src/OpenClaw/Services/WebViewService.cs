@@ -2,7 +2,6 @@
 
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
-using OpenClaw.Helpers;
 using Windows.Foundation;
 
 namespace OpenClaw.Services;
@@ -34,7 +33,6 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
     private readonly WebViewGenerationTracker _generations;
     private readonly WebViewStatusInspector _statusInspector;
     private readonly WebViewMessageOwnership _messageOwnership;
-    private readonly Func<bool> _shouldEnableDevTools;
     private readonly object _navigationStartWatchdogGate = new();
     private readonly object _navigationCompletionWatchdogGate = new();
     private TypedEventHandler<CoreWebView2, CoreWebView2NavigationStartingEventArgs>? _navigationStartingHandler;
@@ -53,12 +51,10 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
     internal WebViewService(
         IAppLogger logger,
         WebViewMessageOwnership messageOwnership,
-        Func<Action, bool> dispatchToUi,
-        Func<bool>? shouldEnableDevTools = null)
+        Func<Action, bool> dispatchToUi)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _messageOwnership = messageOwnership ?? throw new ArgumentNullException(nameof(messageOwnership));
-        _shouldEnableDevTools = shouldEnableDevTools ?? (() => false);
         _uiDispatcher = new UiTaskDispatcher(dispatchToUi);
         _generations = new WebViewGenerationTracker();
         _statusInspector = new WebViewStatusInspector(GetCoreWebView, _uiDispatcher, _generations, _messageOwnership, _logger);
@@ -114,11 +110,6 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
     public string? CurrentEnvironmentName { get; private set; }
 
     /// <summary>
-    /// Gets the Gateway URL identity currently backing the active WebView2 profile.
-    /// </summary>
-    public string? CurrentEnvironmentGatewayUrl { get; private set; }
-
-    /// <summary>
     /// Navigates the WebView2 to the specified URL.
     /// </summary>
     public void Navigate(string url)
@@ -133,7 +124,7 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
         if (!Uri.TryCreate(url, UriKind.Absolute, out _))
         {
             _logger.Warning($"Invalid URL: {url}");
-            NavigationErrorOccurred?.Invoke(string.Format(StringResources.WebViewInvalidUrlFormat, url));
+            NavigationErrorOccurred?.Invoke($"Invalid URL: {url}");
             return;
         }
 
@@ -150,7 +141,7 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
             CancelNavigationStartWatchdog();
             CancelNavigationCancellation();
             SetState(ConnectionState.Error);
-            NavigationErrorOccurred?.Invoke(StringResources.WebViewNavigationNotReady);
+            NavigationErrorOccurred?.Invoke("Navigation failed before WebView2 was ready.");
             return;
         }
     }
@@ -165,7 +156,7 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
         {
             _logger.Warning("Cannot reload: WebView2 not initialized.");
             SetState(ConnectionState.Error);
-            NavigationErrorOccurred?.Invoke(StringResources.WebViewReloadNotInitialized);
+            NavigationErrorOccurred?.Invoke("Cannot reload: WebView2 not initialized.");
             return false;
         }
 
@@ -182,7 +173,7 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
         CancelNavigationStartWatchdog();
         CancelNavigationCancellation();
         SetState(ConnectionState.Error);
-        NavigationErrorOccurred?.Invoke(StringResources.WebViewReloadNotReady);
+        NavigationErrorOccurred?.Invoke("Reload failed before WebView2 was ready.");
         return false;
     }
 
@@ -212,7 +203,7 @@ public partial class WebViewService : IDiagnosticWebViewSession, IDisposable
         CancelNavigationStartWatchdog();
         CancelNavigationCancellation();
         SetState(ConnectionState.Error);
-        NavigationErrorOccurred?.Invoke(StringResources.WebViewRetryNotReady);
+        NavigationErrorOccurred?.Invoke("Retry failed before WebView2 was ready.");
         return false;
     }
 

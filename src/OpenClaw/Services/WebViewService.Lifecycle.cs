@@ -11,11 +11,7 @@ public partial class WebViewService
     /// <summary>
     /// Initializes the WebView2 control with a custom user data folder.
     /// </summary>
-    public async Task InitializeAsync(
-        WebView2 webView,
-        string environmentName,
-        string gatewayUrl,
-        CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(WebView2 webView, string environmentName, CancellationToken cancellationToken = default)
     {
         if (_isDisposed)
         {
@@ -28,20 +24,18 @@ public partial class WebViewService
         var initializationGeneration = _generations.Next();
         _messageOwnership.ResetForNewWebView();
         CurrentEnvironmentName = environmentName;
-        CurrentEnvironmentGatewayUrl = gatewayUrl;
         _isInitialized = false;
 
         try
         {
-            await MigrateLegacyUserDataFolderIfNeededAsync(environmentName, gatewayUrl, _logger, cancellationToken);
-            var userDataFolder = GetUserDataFolderForEnvironment(environmentName, gatewayUrl);
+            var userDataFolder = GetUserDataFolderForEnvironment(environmentName);
             Directory.CreateDirectory(userDataFolder);
-            await WriteProfileIdentityMarkerAsync(userDataFolder, gatewayUrl, _logger, cancellationToken);
 
-            var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null, userDataFolder, null);
-            cancellationToken.ThrowIfCancellationRequested();
+            // In WinUI 3, set user data folder via environment variable before initialization.
+            // This avoids API signature differences between WinUI 3 and Win32 WebView2.
+            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", userDataFolder);
 
-            await webView.EnsureCoreWebView2Async(environment);
+            await webView.EnsureCoreWebView2Async();
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!IsCurrentInitialization(webView, initializationGeneration))
@@ -62,13 +56,11 @@ public partial class WebViewService
 
             _coreWebView = coreWebView;
 
-            TryApplyNonCriticalWebViewSetting(
-                "PreferredColorScheme",
-                () => coreWebView.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto);
+            // Make WebView2 follow system Light/Dark theme preferred scheme
+            coreWebView.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Auto;
 
-            TryApplyNonCriticalWebViewSetting(
-                "DefaultBackgroundColor",
-                () => webView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent);
+            // Set default background to transparent (blends with Mica)
+            webView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
 
             var hostGeneration = _hostGeneration;
             _navigationStartingHandler = CreateNavigationStartingHandler(hostGeneration);
@@ -81,18 +73,12 @@ public partial class WebViewService
             coreWebView.ProcessFailed += _processFailedHandler;
             coreWebView.WebMessageReceived += _webMessageReceivedHandler;
 
-            TryApplyNonCriticalWebViewSetting(
-                "AreDefaultContextMenusEnabled",
-                () => coreWebView.Settings.AreDefaultContextMenusEnabled = true);
-            TryApplyNonCriticalWebViewSetting(
-                "IsStatusBarEnabled",
-                () => coreWebView.Settings.IsStatusBarEnabled = false);
-            TryApplyNonCriticalWebViewSetting(
-                "AreDevToolsEnabled",
-                () => coreWebView.Settings.AreDevToolsEnabled = ShouldEnableDevTools());
-            TryApplyNonCriticalWebViewSetting(
-                "IsGeneralAutofillEnabled",
-                () => coreWebView.Settings.IsGeneralAutofillEnabled = true);
+            // Allow file input dialog
+            coreWebView.Settings.AreDefaultContextMenusEnabled = true;
+            coreWebView.Settings.IsStatusBarEnabled = false;
+            coreWebView.Settings.AreDevToolsEnabled = true;
+
+            coreWebView.Settings.IsGeneralAutofillEnabled = true;
 
             _isInitialized = true;
             _logger.Info("WebView2 initialized successfully.");
@@ -161,7 +147,6 @@ public partial class WebViewService
         _webMessageReceivedHandler = null;
         _webView = null;
         _coreWebView = null;
-        CurrentEnvironmentGatewayUrl = null;
         _isInitialized = false;
         _statusInspector.SetUnknownSnapshot();
         _lastPublishedControlUiSnapshot = ControlUiProbeSnapshot.Unknown;
@@ -193,31 +178,6 @@ public partial class WebViewService
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
             return null;
-        }
-    }
-
-    private bool ShouldEnableDevTools()
-    {
-#if DEBUG
-        return true;
-#else
-        return _shouldEnableDevTools();
-#endif
-    }
-
-    private void TryApplyNonCriticalWebViewSetting(string settingName, Action apply)
-    {
-        try
-        {
-            apply();
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException or NotImplementedException)
-        {
-            _logger.Warning("webview2.setting.skipped", new
-            {
-                settingName,
-                ex.Message
-            });
         }
     }
 

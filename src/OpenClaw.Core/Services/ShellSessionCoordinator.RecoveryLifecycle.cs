@@ -112,12 +112,8 @@ public sealed partial class ShellSessionCoordinator
     {
         _hardRefreshAttempts++;
         _totalHardRefreshAttempts++;
+        _lastHardRefreshAt = startedAt;
         return _hardRefreshAttempts;
-    }
-
-    private void MarkHardRefreshExecuted()
-    {
-        _lastHardRefreshAt = DateTimeOffset.Now;
     }
 
     private static RecoveryState GetRecoveryOperationState(RecoveryOperationKind operation)

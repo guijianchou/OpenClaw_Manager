@@ -54,32 +54,15 @@ public static class StringResources
     public static string Retry => Get("Retry");
     public static string RetryUnavailable => Get("RetryUnavailable");
     public static string WebViewRecreationFailedFormat => Get("WebViewRecreationFailedFormat");
-    public static string AsyncCommandFailedFormat => Get("AsyncCommandFailedFormat");
-    public static string GlobalHotkeyRegistrationFailedFormat => Get("GlobalHotkeyRegistrationFailedFormat");
     public static string DevTools => Get("DevTools");
     public static string ConnectionIssue => Get("ConnectionIssue");
     public static string DiagnosticsTitle => Get("DiagnosticsTitle");
     public static string SelectEnvironment => Get("SelectEnvironment");
     public static string MainModelLabel => Get("MainModelLabel");
     public static string MainStatusLabel => Get("MainStatusLabel");
-    public static string StatusDefaultHeartbeat => Get("StatusDefaultHeartbeat");
-    public static string StatusDefaultAccess => Get("StatusDefaultAccess");
-    public static string StatusDefaultLatency => Get("StatusDefaultLatency");
-    public static string LatencyBadgeAutomationName => Get("LatencyBadgeAutomationName");
-    public static string LatencyError => Get("LatencyError");
-    public static string LatencyStale => Get("LatencyStale");
-    public static string LatencyHistoryNoSamples => Get("LatencyHistoryNoSamples");
-    public static string LatencyHistoryHeaderFormat => Get("LatencyHistoryHeaderFormat");
-    public static string LatencyLatestFormat => Get("LatencyLatestFormat");
-    public static string LatencyMinFormat => Get("LatencyMinFormat");
-    public static string LatencyAverageFormat => Get("LatencyAverageFormat");
-    public static string LatencyP95Format => Get("LatencyP95Format");
-    public static string LatencyMaxFormat => Get("LatencyMaxFormat");
-    public static string LatencyPoPFormat => Get("LatencyPoPFormat");
     public static string ThemeSystem => Get("ThemeSystem");
     public static string ThemeLight => Get("ThemeLight");
     public static string ThemeDark => Get("ThemeDark");
-    public static string ThemeSelectorAutomationName => Get("ThemeSelectorAutomationName");
 
     // --- Top Bar ---
     public static string Reload => Get("Reload");
@@ -91,8 +74,6 @@ public static class StringResources
     public static string TrayMenuOpen => Get("TrayMenuOpen");
     public static string TrayMenuCompactMode => Get("TrayMenuCompactMode");
     public static string TrayMenuExit => Get("TrayMenuExit");
-    public static string TrayStatusFormat => Get("TrayStatusFormat");
-    public static string TrayTooltipFormat => Get("TrayTooltipFormat");
 
     // --- Status Bar ---
     public static string StatusConnected => Get("StatusConnected");
@@ -108,23 +89,6 @@ public static class StringResources
     public static string HeartbeatWait => Get("HeartbeatWait");
     public static string HeartbeatBlocked => Get("HeartbeatBlocked");
     public static string HeartbeatFailed => Get("HeartbeatFailed");
-    public static string HeartbeatInvalidControlUiUrl => Get("HeartbeatInvalidControlUiUrl");
-    public static string HeartbeatRequestFailedFormat => Get("HeartbeatRequestFailedFormat");
-    public static string HeartbeatHostedSessionActive => Get("HeartbeatHostedSessionActive");
-    public static string HeartbeatHostedSessionReconnecting => Get("HeartbeatHostedSessionReconnecting");
-    public static string WebViewInvalidUrlFormat => Get("WebViewInvalidUrlFormat");
-    public static string WebViewNavigationNotReady => Get("WebViewNavigationNotReady");
-    public static string WebViewReloadNotInitialized => Get("WebViewReloadNotInitialized");
-    public static string WebViewReloadNotReady => Get("WebViewReloadNotReady");
-    public static string WebViewRetryNotReady => Get("WebViewRetryNotReady");
-    public static string AccessStatusOk => Get("AccessStatusOk");
-    public static string AccessStatusLogin => Get("AccessStatusLogin");
-    public static string AccessStatusPair => Get("AccessStatusPair");
-    public static string AccessStatusOrigin => Get("AccessStatusOrigin");
-    public static string AccessStatusWait => Get("AccessStatusWait");
-    public static string WorkStatusLive => Get("WorkStatusLive");
-    public static string WorkStatusIdle => Get("WorkStatusIdle");
-    public static string WorkStatusWait => Get("WorkStatusWait");
     public static string CircuitBreakerRecreationSuppressed => Get("CircuitBreakerRecreationSuppressed");
 
     // --- Recovery States ---
@@ -137,7 +101,6 @@ public static class StringResources
 
     // --- Settings Dialog ---
     public static string SettingsTitle => Get("SettingsTitle");
-    public static string SettingsNavigationAutomationName => Get("SettingsNavigationAutomationName");
     public static string SettingsNavLanguage => Get("SettingsNavLanguage");
     public static string SettingsNavShell => Get("SettingsNavShell");
     public static string SettingsNavEnvironments => Get("SettingsNavEnvironments");
@@ -188,20 +151,10 @@ public static class StringResources
     public static string SettingsDevToolsDescription => Get("SettingsDevToolsDescription");
     public static string SettingsEnableDevLog => Get("SettingsEnableDevLog");
     public static string SettingsEnableDevLogDescription => Get("SettingsEnableDevLogDescription");
-    public static string SettingsEnableDevTools => Get("SettingsEnableDevTools");
-    public static string SettingsEnableDevToolsDescription => Get("SettingsEnableDevToolsDescription");
     public static string SettingsRunDiagnostics => Get("SettingsRunDiagnostics");
     public static string SettingsViewLogs => Get("SettingsViewLogs");
     public static string SettingsOpenDevTools => Get("SettingsOpenDevTools");
     public static string SettingsExportDiagnosticBundle => Get("SettingsExportDiagnosticBundle");
-    public static string SettingsDiagnosticsRunning => Get("SettingsDiagnosticsRunning");
-    public static string SettingsDiagnosticBundleExporting => Get("SettingsDiagnosticBundleExporting");
-    public static string SettingsDevToolsOpened => Get("SettingsDevToolsOpened");
-    public static string SettingsDevToolsUnavailable => Get("SettingsDevToolsUnavailable");
-    public static string SettingsDevToolsDisabled => Get("SettingsDevToolsDisabled");
-    public static string SettingsDevToolsOpenFailedFormat => Get("SettingsDevToolsOpenFailedFormat");
-    public static string DiagnosticBundleExportedFormat => Get("DiagnosticBundleExportedFormat");
-    public static string DiagnosticBundleExportFallbackDirectoryName => Get("DiagnosticBundleExportFallbackDirectoryName");
     public static string AddEnvironment => Get("AddEnvironment");
     public static string RemoveEnvironment => Get("RemoveEnvironment");
     public static string Save => Get("Save");
@@ -227,7 +180,6 @@ public static class StringResources
     // --- About Dialog ---
     public static string AboutTitle => Get("AboutTitle");
     public static string AboutDescription => Get("AboutDescription");
-    public static string AboutVersionFormat => Get("AboutVersionFormat");
     public static string AboutGitHubProfile => Get("AboutGitHubProfile");
     public static string AboutDevelopedBy => Get("AboutDevelopedBy");
     public static string AboutCopyright => Get("AboutCopyright");
@@ -240,17 +192,11 @@ public static class StringResources
     public static string LogShowingLastLinesFormat => Get("LogShowingLastLinesFormat");
     public static string LogNotFoundToday => Get("LogNotFoundToday");
     public static string LogReadFailedFormat => Get("LogReadFailedFormat");
-    public static string LogFolderMissingFormat => Get("LogFolderMissingFormat");
-    public static string LogFolderOpenFailedFormat => Get("LogFolderOpenFailedFormat");
 
     // --- Diagnostics ---
     public static string DiagnosticWebView2RuntimeLabel => Get("DiagnosticWebView2RuntimeLabel");
     public static string DiagnosticNetworkConnectivityLabel => Get("DiagnosticNetworkConnectivityLabel");
     public static string DiagnosticSessionStatusLabel => Get("DiagnosticSessionStatusLabel");
-    public static string DiagnosticStatusPass => Get("DiagnosticStatusPass");
-    public static string DiagnosticStatusWarning => Get("DiagnosticStatusWarning");
-    public static string DiagnosticStatusFail => Get("DiagnosticStatusFail");
-    public static string DiagnosticStatusSkipped => Get("DiagnosticStatusSkipped");
     public static string DiagnosticWebViewRuntimeNotFound => Get("DiagnosticWebViewRuntimeNotFound");
     public static string DiagnosticWebViewRuntimeNotFoundDetail => Get("DiagnosticWebViewRuntimeNotFoundDetail");
     public static string DiagnosticWebViewRuntimeCheckFailed => Get("DiagnosticWebViewRuntimeCheckFailed");
@@ -292,11 +238,9 @@ public static class StringResources
     public static string DiagnosticGatewayTimeoutDetail => Get("DiagnosticGatewayTimeoutDetail");
     public static string DiagnosticGatewayUnreachable => Get("DiagnosticGatewayUnreachable");
     public static string DiagnosticNetworkProbeFailed => Get("DiagnosticNetworkProbeFailed");
-    public static string DiagnosticInvalidControlUiUrlDetail => Get("DiagnosticInvalidControlUiUrlDetail");
     public static string DiagnosticWebViewNotInitialized => Get("DiagnosticWebViewNotInitialized");
     public static string DiagnosticGatewaySessionAppearsActive => Get("DiagnosticGatewaySessionAppearsActive");
     public static string DiagnosticPageLoadedButEstablishing => Get("DiagnosticPageLoadedButEstablishing");
-    public static string DiagnosticHostedStateDetailFormat => Get("DiagnosticHostedStateDetailFormat");
     public static string DiagnosticCurrentDeviceApprovalDetailFormat => Get("DiagnosticCurrentDeviceApprovalDetailFormat");
     public static string DiagnosticOriginRejectedFailDetailFormat => Get("DiagnosticOriginRejectedFailDetailFormat");
     public static string DiagnosticNoPageLoaded => Get("DiagnosticNoPageLoaded");

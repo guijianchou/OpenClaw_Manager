@@ -12,14 +12,6 @@
         <Setter Property="MinHeight" Value="32" />
     </Style>
 
-    <Style x:Key="SubtleToggleButtonStyle" TargetType="ToggleButton">
-        <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="8,4" />
-        <Setter Property="MinWidth" Value="32" />
-        <Setter Property="MinHeight" Value="32" />
-    </Style>
-
     <!-- Subtle style for DropDownButton (not a subclass of Button) -->
     <Style x:Key="SubtleDropDownButtonStyle" TargetType="DropDownButton">
         <Setter Property="Background" Value="Transparent" />
@@ -30,16 +22,6 @@
     </Style>
 
     <Style x:Key="ThemeSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
-        <Setter Property="Padding" Value="6,4" />
-        <Setter Property="MinWidth" Value="28" />
-        <Setter Property="MinHeight" Value="28" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-    </Style>
-
-    <Style x:Key="ThemeSegmentToggleButtonStyle" TargetType="ToggleButton">
-        <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
-        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="6,4" />
         <Setter Property="MinWidth" Value="28" />
         <Setter Property="MinHeight" Value="28" />

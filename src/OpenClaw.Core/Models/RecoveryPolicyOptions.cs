@@ -120,12 +120,6 @@ public class DiagnosticsOptions
     public bool EnableVerboseRecoveryLogging { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets whether the embedded WebView is allowed to open DevTools in release builds.
-    /// Default is false because DevTools exposes page storage such as cookies and local/session storage.
-    /// </summary>
-    public bool EnableDevTools { get; set; } = false;
-
-    /// <summary>
     /// Gets or sets whether to collect telemetry snapshots periodically.
     /// Default is true.
     /// </summary>

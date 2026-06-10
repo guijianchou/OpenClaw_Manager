@@ -10,7 +10,7 @@ public static class WindowBoundsUtilities
     public const int MinimumPersistedWindowHeight = 480;
     public const int DefaultSettingsWindowWidth = 720;
     public const int DefaultSettingsWindowHeight = 520;
-    public const int MinimumPersistedSettingsWindowWidth = 600;
+    public const int MinimumPersistedSettingsWindowWidth = 360;
     public const int MinimumPersistedSettingsWindowHeight = 240;
 
     private const int HiddenWindowCoordinateThreshold = -30000;

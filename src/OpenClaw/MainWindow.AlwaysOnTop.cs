@@ -62,7 +62,6 @@ public sealed partial class MainWindow
         }
 
         PinButton.Foreground = foreground;
-        PinButton.IsChecked = _isAlwaysOnTop;
         PinButton.Content = new FontIcon
         {
             Glyph = _isAlwaysOnTop ? "" : "",

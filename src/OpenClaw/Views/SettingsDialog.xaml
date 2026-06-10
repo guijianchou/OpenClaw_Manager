@@ -35,7 +35,6 @@
                 <ListView x:Name="NavList"
                           SelectionMode="Single"
                           SelectionChanged="OnNavSelectionChanged"
-                          AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsNavigationAutomationName}"
                           Padding="4,12">
                     <ListViewItem x:Name="NavLanguage" Tag="Language">
                         <StackPanel Orientation="Horizontal" Spacing="10">
@@ -87,7 +86,6 @@
                         <ComboBox x:Name="LanguageComboBox"
                                   SelectionChanged="OnLanguageSelectionChanged"
                                   MinWidth="220"
-                                  AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsNavLanguage}"
                                   Margin="0,8,0,0" />
                         <TextBlock Text="{x:Bind helpers:StringResources.SettingsLanguageRestartHint}"
                                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
@@ -108,7 +106,6 @@
                             <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsMinimizeToTray}"
                                                    Description="{x:Bind helpers:StringResources.SettingsMinimizeToTrayDescription}">
                                 <ToggleSwitch IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsMinimizeToTray}"
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
@@ -116,7 +113,6 @@
                             <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsCloseToTray}"
                                                    Description="{x:Bind helpers:StringResources.SettingsCloseToTrayDescription}">
                                 <ToggleSwitch IsOn="{x:Bind ViewModel.CloseToTray, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsCloseToTray}"
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
@@ -124,7 +120,6 @@
                             <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsAllowMultipleInstances}"
                                                    Description="{x:Bind helpers:StringResources.SettingsAllowMultipleInstancesDescription}">
                                 <ToggleSwitch IsOn="{x:Bind ViewModel.AllowMultipleInstances, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsAllowMultipleInstances}"
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
@@ -132,7 +127,6 @@
                             <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsAlwaysOnTop}"
                                                    Description="{x:Bind helpers:StringResources.SettingsAlwaysOnTopDescription}">
                                 <ToggleSwitch IsOn="{x:Bind ViewModel.AlwaysOnTop, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsAlwaysOnTop}"
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
@@ -140,7 +134,6 @@
                             <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkey}"
                                                    Description="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkeyDescription}">
                                 <ToggleSwitch IsOn="{x:Bind ViewModel.EnableGlobalHotkey, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsEnableGlobalHotkey}"
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
@@ -185,7 +178,6 @@
                                           MinHeight="48"
                                           MaxHeight="150"
                                           SelectionMode="Single"
-                                          AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsEnvironmentsTitle}"
                                           SelectionChanged="OnEnvironmentSelectionChanged">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
@@ -197,18 +189,12 @@
                                 <StackPanel Grid.Column="1" Orientation="Vertical"
                                             Spacing="2" Padding="4"
                                             VerticalAlignment="Top">
-                                    <Button x:Name="AddEnvironmentButton"
-                                            Click="OnAddClick"
-                                            ToolTipService.ToolTip="{x:Bind helpers:StringResources.SettingsAddTooltip}"
-                                            AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsAddTooltip}"
-                                            Padding="6">
+                                    <Button Click="OnAddClick"
+                                            ToolTipService.ToolTip="{x:Bind helpers:StringResources.SettingsAddTooltip}" Padding="6">
                                         <FontIcon Glyph="&#xE710;" FontSize="11" />
                                     </Button>
-                                    <Button x:Name="RemoveEnvironmentButton"
-                                            Click="OnRemoveClick"
-                                            ToolTipService.ToolTip="{x:Bind helpers:StringResources.SettingsRemoveTooltip}"
-                                            AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsRemoveTooltip}"
-                                            Padding="6">
+                                    <Button Click="OnRemoveClick"
+                                            ToolTipService.ToolTip="{x:Bind helpers:StringResources.SettingsRemoveTooltip}" Padding="6">
                                         <FontIcon Glyph="&#xE738;" FontSize="11" />
                                     </Button>
                                 </StackPanel>
@@ -310,7 +296,6 @@
 
                         <ListView x:Name="SessionEnvironmentList"
                                   ItemsSource="{x:Bind ViewModel.Environments}"
-                                  AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsSessionsTitle}"
                                   SelectionMode="None">
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:EnvironmentConfig">
@@ -332,7 +317,7 @@
 
                                         <Button Grid.Column="1"
                                                 Content="{x:Bind helpers:StringResources.SettingsClearSessionAction}"
-                                                Tag="{Binding}"
+                                                Tag="{x:Bind Name}"
                                                 Click="OnClearEnvironmentSessionClick"
                                                 Margin="12,0,0,0" />
                                     </Grid>
@@ -353,23 +338,10 @@
                             <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsEnableDevLog}"
                                                    Description="{x:Bind helpers:StringResources.SettingsEnableDevLogDescription}">
                                 <ToggleSwitch IsOn="{x:Bind ViewModel.EnableDevLog, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsEnableDevLog}"
-                                              OnContent=""
-                                              OffContent="" />
-                            </controls:SettingsCard>
-                            <controls:SettingsCard Header="{x:Bind helpers:StringResources.SettingsEnableDevTools}"
-                                                   Description="{x:Bind helpers:StringResources.SettingsEnableDevToolsDescription}">
-                                <ToggleSwitch IsOn="{x:Bind ViewModel.EnableDevTools, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Bind helpers:StringResources.SettingsEnableDevTools}"
                                               OnContent=""
                                               OffContent="" />
                             </controls:SettingsCard>
                         </StackPanel>
-
-                        <InfoBar x:Name="DevToolsInfoBar"
-                                  IsOpen="False"
-                                  Severity="Informational"
-                                  Title="{x:Bind helpers:StringResources.DiagnosticsTitle}" />
 
                         <StackPanel Spacing="8" Margin="0,8,0,0">
                             <Button HorizontalAlignment="Stretch" Click="OnRunDiagnosticsClick">

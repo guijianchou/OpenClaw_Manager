@@ -1,6 +1,5 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
-using System.Globalization;
 using OpenClaw.Helpers;
 using OpenClaw.Services;
 
@@ -25,8 +24,7 @@ public sealed partial class MainWindow
         }
 
         _globalHotkeyService = new GlobalHotkeyService(App.Logger);
-        var result = _globalHotkeyService.Register(binding);
-        if (result.Succeeded)
+        if (_globalHotkeyService.TryRegister(binding))
         {
             _globalHotkeyService.HotkeyPressed += OnGlobalHotkeyPressed;
         }
@@ -34,7 +32,6 @@ public sealed partial class MainWindow
         {
             _globalHotkeyService.Dispose();
             _globalHotkeyService = null;
-            ShowGlobalHotkeyRegistrationFailure(result);
         }
     }
 
@@ -54,14 +51,6 @@ public sealed partial class MainWindow
     {
         DisposeGlobalHotkey();
         InitializeGlobalHotkey();
-    }
-
-    private void ShowGlobalHotkeyRegistrationFailure(GlobalHotkeyRegistrationResult result)
-    {
-        var binding = result.Binding?.ToString() ?? App.Configuration.Settings.GlobalHotkey;
-        var errorCode = result.ErrorCode?.ToString(CultureInfo.InvariantCulture) ?? "n/a";
-        ViewModel.ShowGlobalHotkeyRegistrationError(
-            string.Format(StringResources.GlobalHotkeyRegistrationFailedFormat, binding, errorCode));
     }
 
     private void OnGlobalHotkeyPressed()

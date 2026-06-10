@@ -16,7 +16,7 @@ public partial class MainViewModel
         ModelSummaryText = DefaultModelSummary;
         AccessSummaryText = DefaultAccessSummary;
         AccessSummaryBrush = WarningBrush;
-        ResetLatencyProjection(clearHistory: true);
+        ResetLatencyProjection();
         WorkStatusText = DefaultWorkStatus;
         WorkStatusBrush = WarningBrush;
         SetRunIndicatorMode(RunIndicatorMode.Wait);
@@ -38,7 +38,7 @@ public partial class MainViewModel
                 DefaultLatencySummary);
             LatencySummaryText = latencySummary.Text;
             LatencySummaryBrush = latencySummary.Brush;
-            LatencyTooltipText = FormatLatencyTooltip(
+            LatencyTooltipText = LatencyTooltipFormatter.Format(
                 _latencyHistory.CreateSummary(),
                 snapshot.ProxyPoP ?? _lastKnownPoP);
             if (!string.IsNullOrWhiteSpace(snapshot.ProxyPoP))
@@ -55,12 +55,6 @@ public partial class MainViewModel
             return true;
         }
 
-        var selectedProbeKey = TryGetEnvironmentProbeKey(_selectedEnvironment?.GatewayUrl);
-        if (!string.IsNullOrWhiteSpace(snapshot.ProbeKey))
-        {
-            return string.Equals(snapshot.ProbeKey, selectedProbeKey, StringComparison.OrdinalIgnoreCase);
-        }
-
         var selectedHost = TryGetEnvironmentHost(_selectedEnvironment?.GatewayUrl);
         if (string.IsNullOrWhiteSpace(snapshot.Host))
         {
@@ -68,11 +62,6 @@ public partial class MainViewModel
         }
 
         return string.Equals(snapshot.Host, selectedHost, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string? TryGetEnvironmentProbeKey(string? gatewayUrl)
-    {
-        return ControlUiProbeUriFactory.TryCreateProbeKey(gatewayUrl);
     }
 
     private static string? TryGetEnvironmentHost(string? gatewayUrl)
@@ -92,46 +81,10 @@ public partial class MainViewModel
             : host.Trim('[', ']');
     }
 
-    private void ResetLatencyProjection(bool clearHistory = false)
+    private void ResetLatencyProjection()
     {
-        if (clearHistory)
-        {
-            _latencyHistory.Clear();
-            _lastKnownPoP = null;
-        }
-
         LatencySummaryText = DefaultLatencySummary;
         LatencySummaryBrush = NeutralBrush;
-        LatencyTooltipText = FormatLatencyTooltip(_latencyHistory.CreateSummary(), _lastKnownPoP);
-    }
-
-    private static string FormatLatencyTooltip(LatencyHistorySummary summary, string? proxyPoP = null)
-    {
-        if (summary.SampleCount <= 0 ||
-            summary.LatestMs is not long latest ||
-            summary.MinMs is not long min ||
-            summary.AverageMs is not long average ||
-            summary.P95Ms is not long p95 ||
-            summary.MaxMs is not long max)
-        {
-            return StringResources.LatencyHistoryNoSamples;
-        }
-
-        var lines = new List<string>(8)
-        {
-            string.Format(StringResources.LatencyHistoryHeaderFormat, summary.SampleCount),
-            string.Format(StringResources.LatencyLatestFormat, latest),
-            string.Format(StringResources.LatencyMinFormat, min),
-            string.Format(StringResources.LatencyAverageFormat, average),
-            string.Format(StringResources.LatencyP95Format, p95),
-            string.Format(StringResources.LatencyMaxFormat, max),
-        };
-
-        if (!string.IsNullOrWhiteSpace(proxyPoP))
-        {
-            lines.Add(string.Format(StringResources.LatencyPoPFormat, proxyPoP));
-        }
-
-        return string.Join('\n', lines);
+        LatencyTooltipText = LatencyTooltipFormatter.Format(_latencyHistory.CreateSummary());
     }
 }

@@ -8,53 +8,11 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
-### v5.1.2 (2026-06-09)
-
-- Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.1.2`.
-- Added stable Gateway URL identity handling for WebView2 profiles, including query/userinfo-sensitive profile hashing, hashed marker files, display-name-independent profile folders, and migration from legacy name-scoped or previous URL-scoped folders.
-- Hardened settings persistence so corrupt JSON is backed up before defaults are written, read/permission failures do not overwrite existing settings, invalid non-http(s) Gateway URLs are removed during normalization, and deferred saves remain queued after a failed write.
-- Fixed hosted `session-ready` recovery ordering by cancelling in-flight recovery operations after a current ready event and accepting deep page routes under the configured Gateway base path.
-- Aligned hosted Gateway behavior with the Gateway docs: base-path route identity is case-sensitive, transitional hosted UI states trigger reload because event gaps are not replayed, and Stop/Abort prefer documented chat APIs before scoped DOM fallbacks.
-- Further hardened 5.1.2 follow-ups: legacy WebView2 profile migration now requires a positive URL-identity marker match, Stop/Abort command scripts keep the WebView2 synchronous handled-result contract while avoiding whole-app DOM actions, diagnostic bundles redact scheme-independent Authorization values and complex parameter lists, log enumeration is best-effort, and CI actions/global SDK pinning were tightened.
-- Extended diagnostic bundle redaction to inline `Authorization` credentials inside JSON log messages and diagnostic summaries, and kept diagnostic bundle notes from exposing local file paths when log files cannot be enumerated or read.
-- Split release DevTools enablement from verbose recovery logging with a dedicated diagnostics setting, Settings UI toggle, localized security-aware copy, and explicit disabled feedback.
-- Pinned CI to `windows-2025-vs2026` and .NET SDK `10.0.300`, added `global.json`, pinned analyzer level to `10.0`, and strengthened repository guardrails for active workflow structure.
-- Added Core regression coverage for the 5.1.2 settings, diagnostics, recovery, Gateway URL identity, and deferred-save contracts.
-
-### v5.1.1 (2026-06-08)
-
-- Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.1.1`.
-- Scoped hosted `session-ready` recovery cleanup to the active environment probe key so stale ready events from a previous endpoint cannot clear the current environment's degraded state.
-- Started hard-refresh cooldown only after WebView2 accepts reload, and stopped latency probes from publishing auth, pairing, rate-limit, redirect, or proxy/error classifications as success.
-- Normalized environment configuration by trimming names and URLs, dropping blank entries, de-duplicating names, enforcing one default, and repairing invalid selected-environment values.
-- Tightened WebView2 session isolation and cleanup: inactive session clearing now carries both environment name and Gateway URL, active-session recreation checks both fields, and legacy profile migration requires a matching URL identity marker.
-- Added explicit DevTools open results with localized unavailable, disabled, and failure feedback; release DevTools enablement now flows through an injected diagnostics setting instead of a `WebViewService` global configuration read.
-- Bounded diagnostic bundle log payload, diagnostic text entries, and copied log count; added header redaction for authorization, cookie, set-cookie, and API-key style headers.
-- Updated repository guardrails and Core regression coverage for the 5.1.1 contracts, including current x64-only architecture and the supported `dotnet run` plus `dotnet test` harness workflow.
-
-### v5.0.2 (2026-06-07)
-
-- Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.0.2`.
-- Tightened Cloudflare error 1033 detection so generic Cloudflare-branded 5xx bodies with unrelated `1033` text stay classified as server/proxy failures.
-- Added a bounded Cloudflare error-body snippet read timeout so diagnostics, heartbeat, and latency probes cannot hang after response headers arrive.
-- Mapped healthy Gateway network diagnostics to pass instead of warning, and kept transport failures from being hidden behind a hosted Control UI `Connecting` state.
-- Localized latency history tooltip/flyout text and cleared stale latency samples plus Cloudflare PoP state when environments or WebView hosts reset.
-- Raised the Settings window persisted-width floor so a saved narrow Settings window cannot restore below the fixed sidebar, padding, and form-control layout width.
-- Added localized automation names for icon-only shell, Settings, and Log Viewer buttons.
-- Added localized automation names for Settings toggle switches and focusable selector/list controls, made the latency badge keyboard-focusable with accessible history text, and changed the theme switcher to checked ToggleButton semantics backed by theme resources.
-- Added a Core C# regression harness for Cloudflare error 1033 detection, idempotent/root/invalid `__openclaw__/a2ui/` probe URL generation, HTTP status classification, heartbeat access-required/rate-limit/failure mapping, latency success/failure publication, and diagnostics severity mapping.
-- Aligned heartbeat, diagnostics, and latency HTTP probes on the hosted Control UI `__openclaw__/a2ui/` endpoint, including bounded Cloudflare 1033 body/header/code-header detection under normal HTTP 5xx/530 responses.
-- Preserved raw HTTP 30x responses during heartbeat and latency probes, mapped redirects to heartbeat failures so recovery can run, and stopped treating redirects as healthy transport or healthy latency.
-- Updated Gateway/Cloudflare docs and Settings hints to distinguish the full hosted Control UI page URL from the `gateway.controlUi.allowedOrigins` origin-only value.
-- Surfaced guarded async command failures as localized visible errors instead of only writing them to the log.
-- Condensed README current-version notes so release/debug details stay in changelog and development notes.
-- Added repository guardrails for the Settings width floor, icon-only button automation names, Settings toggle and selector/list automation names, shared Gateway probe classification, and visible async-command failures.
-
 ### v5.0.1 (2026-06-01)
 
 - Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.0.1`.
-- Unified Gateway HTTP status classification across heartbeat, diagnostics, and latency probes for Cloudflare Tunnel / reverse-proxy deployments. Proxy, path, server, and Cloudflare error 1033 failures now report as failures instead of healthy transport or latency samples.
-- Moved Control UI latency probing to the documented `__openclaw__/a2ui/` hosted Control UI path and stopped recording 404/405/5xx or Cloudflare error 1033 responses in latency history.
+- Unified Gateway HTTP status classification across heartbeat, diagnostics, and latency probes for Cloudflare Tunnel / reverse-proxy deployments. Proxy, path, server, and Cloudflare Tunnel 1033 failures now report as failures instead of healthy transport or latency samples.
+- Moved Control UI latency probing to the documented `__openclaw__/a2ui/` hosted Control UI path and stopped recording 404/405/5xx/1033 responses in latency history.
 - Surfaced Settings persistence failures back to the Settings dialog so file-lock, permission, disk, or atomic-write failures no longer close the dialog as if settings were saved.
 - Added repository guardrails that prevent reverting latency probes to the stale `control-ui-config.json` path, prevent unclassified HTTP success publishing, and require Settings write failures to flow through the persistence adapter.
 
@@ -337,53 +295,11 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## 简体中文
 
-### v5.1.2 (2026-06-09)
-
-- 将 app、assembly、file、package manifest、application manifest、README、中文 README 和 changelog metadata 同步到 `5.1.2`。
-- 新增稳定 Gateway URL identity 处理：WebView2 profile hash 会区分 query/userinfo，marker 文件改为 hash，profile folder 不再依赖显示名，并支持从 legacy name-scoped 或旧 URL-scoped folder 迁移。
-- 加固 settings 持久化：损坏 JSON 会先备份再写默认值，读取或权限失败不会覆盖现有 settings，normalization 会移除非 http(s) Gateway URL，deferred save 写失败后仍保留待保存状态。
-- 修复托管端 `session-ready` 的 recovery 顺序：当前环境 ready 后会取消仍在执行的 recovery operation，并接受配置 Gateway base path 下的深层页面路由。
-- 对齐 Gateway 文档中的托管行为：base-path route identity 严格区分大小写；由于 event gap 不会重放，过渡态 hosted UI 会触发 reload；Stop/Abort 优先使用文档化 chat API，再退回到受限 DOM fallback。
-- 继续加固 5.1.2 follow-up：legacy WebView2 profile migration 必须有 URL-identity marker 正向匹配；Stop/Abort command script 保持 WebView2 同步 handled-result 契约并避免 whole-app DOM action；diagnostic bundle 会脱敏不限定 scheme 和复杂参数列表的 Authorization 值；日志枚举改为 best-effort；CI actions 和全局 SDK pinning 进一步收紧。
-- Diagnostic bundle 现在会脱敏 JSON log message 和 diagnostic summary 中内联的 `Authorization` 凭据，并在日志文件无法枚举或读取时避免把本地文件路径写入 diagnostic bundle notes。
-- 将 release DevTools enablement 从 verbose recovery logging 中拆出，新增独立 diagnostics setting、Settings UI toggle、本地化安全文案和明确的 disabled 反馈。
-- CI 固定到 `windows-2025-vs2026` 和 .NET SDK `10.0.300`，新增 `global.json`，将 analyzer level 固定为 `10.0`，并强化 repository guardrails 对 active workflow 结构的检查。
-- 新增 Core 回归覆盖，验证 5.1.2 的 settings、diagnostics、recovery、Gateway URL identity 和 deferred-save 契约。
-
-### v5.1.1 (2026-06-08)
-
-- 将 app、assembly、file、package manifest、application manifest、README、中文 README 和 changelog metadata 同步到 `5.1.1`。
-- 将托管端 `session-ready` recovery cleanup 绑定到当前环境 probe key，避免旧端点的滞后 ready 事件清理当前环境的 degraded state。
-- hard-refresh cooldown 只在 WebView2 接受 reload 后开始计时；latency probe 不再把 auth、pairing、rate-limit、redirect 或 proxy/error classification 发布为 success。
-- 加固 environment configuration normalization：裁剪名称和 URL、丢弃空条目、去重同名环境、保证单一 default，并修复无效 selected environment。
-- 收紧 WebView2 session isolation 和 cleanup：非活动 session 清理同时携带 environment name 和 Gateway URL，活动 session 重建同时校验两者，legacy profile migration 需要匹配 URL identity marker。
-- 为 DevTools 打开动作加入明确结果，并提供本地化的 unavailable、disabled 和 failure 反馈；Release DevTools enablement 改为由 diagnostics setting 注入，不再让 `WebViewService` 读取全局配置。
-- 为 diagnostic bundle 增加总日志 payload、单个诊断文本条目和复制日志数量限制，并脱敏 authorization、cookie、set-cookie 和 API-key 类 headers。
-- 更新 repository guardrails 和 Core regression coverage，覆盖 5.1.1 契约、当前 x64-only 架构，以及 `dotnet run` + `dotnet test` 都受支持的 harness workflow。
-
-### v5.0.2 (2026-06-07)
-
-- 将 app、assembly、file、package manifest、application manifest、README、中文 README 和 changelog 元数据同步到 `5.0.2`。
-- 收紧 Cloudflare error 1033 识别逻辑，带 Cloudflare 品牌但只包含无关 `1033` 文本的普通 5xx 正文会继续归类为服务端或代理故障。
-- 为 Cloudflare error 正文片段读取增加有界超时，避免 diagnostics、heartbeat 和 latency probe 在收到响应头后被卡住。
-- 健康的 Gateway network diagnostics 现在显示为 pass 而不是 warning，并避免 transport failure 被托管 Control UI 的 `Connecting` 状态遮蔽。
-- 延迟历史 tooltip/flyout 文案已本地化，并在环境或 WebView host 重置时清空旧延迟样本和 Cloudflare PoP 状态。
-- 提高 Settings 窗口的持久化最小宽度，避免已保存的窄 Settings 窗口恢复后小于固定侧栏、内容 padding 和表单控件所需宽度。
-- 为 Shell、Settings 和 Log Viewer 中只显示图标的按钮补齐本地化 automation name。
-- 为 Settings toggle switch 和可聚焦 selector/list 控件补齐本地化 automation name，让延迟徽标可用键盘聚焦并暴露历史详情，并把主题切换器改为基于主题资源的 checked ToggleButton 语义。
-- 新增 Core C# 回归 harness，覆盖 Cloudflare error 1033 识别、`__openclaw__/a2ui/` 探测 URL 的幂等/root/非法 URL 处理、HTTP 状态分类、heartbeat 对 access-required/rate-limit/failure 状态的映射、latency 成功/失败发布和 diagnostics severity 映射。
-- heartbeat、diagnostics 和 latency HTTP 探测统一到托管 Control UI 的 `__openclaw__/a2ui/` 端点，并支持在普通 HTTP 5xx/530 响应下从 Cloudflare 正文、头部或 code header 有限识别 1033。
-- heartbeat 和 latency probe 现在保留原始 HTTP 30x 响应，并把 redirect 映射为 heartbeat failure 以触发 recovery，不再把 redirect 当成健康 transport 或健康延迟。
-- 更新 Gateway/Cloudflare 文档和 Settings 提示，区分完整托管 Control UI 页面 URL 与 `gateway.controlUi.allowedOrigins` 只接受 origin 的配置值。
-- 受保护的异步命令失败现在会显示本地化可见错误，而不是只写入日志。
-- 精简 README 当前版本说明，把发布和调试细节保留在 changelog 和 development notes 中。
-- 新增仓库 guardrail，覆盖 Settings 最小宽度、图标按钮 automation name、Settings toggle 与 selector/list automation name、共享 Gateway 探测分类和异步命令失败可见性。
-
 ### v5.0.1 (2026-06-01)
 
 - 将 app、assembly、file、package manifest、application manifest、README、中文 README 和 changelog 元数据同步到 `5.0.1`。
-- 为 Cloudflare Tunnel / 反向代理部署统一 Gateway HTTP 状态分类，heartbeat、diagnostics 和 latency probe 共用同一套语义；代理、路径、服务端和 Cloudflare error 1033 故障现在会报告为失败，而不是健康 transport 或健康延迟样本。
-- 将 Control UI latency probe 改到文档中的 `__openclaw__/a2ui/` 托管 Control UI 路径，并停止把 404/405/5xx 或 Cloudflare error 1033 响应写入 latency history。
+- 为 Cloudflare Tunnel / 反向代理部署统一 Gateway HTTP 状态分类，heartbeat、diagnostics 和 latency probe 共用同一套语义；代理、路径、服务端和 Cloudflare Tunnel 1033 故障现在会报告为失败，而不是健康 transport 或健康延迟样本。
+- 将 Control UI latency probe 改到文档中的 `__openclaw__/a2ui/` 托管 Control UI 路径，并停止把 404/405/5xx/1033 响应写入 latency history。
 - Settings 持久化失败现在会回传到 Settings 对话框；文件锁定、权限、磁盘或原子写入失败不会再让对话框像保存成功一样关闭。
 - 新增仓库 guardrail，防止 latency probe 回退到旧 `control-ui-config.json` 路径、防止未分类 HTTP 状态被发布为成功，并要求 Settings 写入失败经由 persistence adapter 传回 UI。
 

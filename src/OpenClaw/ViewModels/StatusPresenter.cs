@@ -44,14 +44,14 @@ internal sealed class StatusPresenter
             return new StatusPresentation($"{roundtripTimeMs} ms", FormatLatencyBrush(roundtripTimeMs, brushes));
         }
 
-        if (snapshot.State == ControlUiLatencyState.Stale)
+        if (snapshot.State == ControlUiLatencyState.Stale && snapshot.RoundtripTimeMs is long staleRoundtripTimeMs)
         {
-            return new StatusPresentation(StringResources.LatencyStale, brushes.Warning);
+            return new StatusPresentation($"{staleRoundtripTimeMs} ms", FormatLatencyBrush(staleRoundtripTimeMs, brushes));
         }
 
         if (snapshot.State == ControlUiLatencyState.Failure)
         {
-            return new StatusPresentation(StringResources.LatencyError, brushes.Error);
+            return new StatusPresentation("ERR", brushes.Error);
         }
 
         return new StatusPresentation(defaultLatencySummary, brushes.Neutral);
@@ -71,12 +71,12 @@ internal sealed class StatusPresenter
     {
         return snapshot.Phase switch
         {
-            ControlUiPhase.Connected => new StatusPresentation(StringResources.AccessStatusOk, brushes.Success),
-            ControlUiPhase.AuthRequired => new StatusPresentation(StringResources.AccessStatusLogin, brushes.Warning),
-            ControlUiPhase.PairingRequired => new StatusPresentation(StringResources.AccessStatusPair, brushes.Warning),
-            ControlUiPhase.OriginRejected => new StatusPresentation(StringResources.AccessStatusOrigin, brushes.Warning),
+            ControlUiPhase.Connected => new StatusPresentation("AUTH OK", brushes.Success),
+            ControlUiPhase.AuthRequired => new StatusPresentation("AUTH LOGIN", brushes.Warning),
+            ControlUiPhase.PairingRequired => new StatusPresentation("AUTH PAIR", brushes.Warning),
+            ControlUiPhase.OriginRejected => new StatusPresentation("AUTH ORIGIN", brushes.Warning),
             ControlUiPhase.GatewayConnecting or ControlUiPhase.PageLoaded or ControlUiPhase.Loading =>
-                new StatusPresentation(StringResources.AccessStatusWait, brushes.Warning),
+                new StatusPresentation("AUTH WAIT", brushes.Warning),
             _ => new StatusPresentation(defaultAccessSummary, brushes.Warning),
         };
     }
@@ -88,13 +88,13 @@ internal sealed class StatusPresenter
     {
         if (snapshot.IsBusy || string.Equals(snapshot.WorkState, "busy", StringComparison.OrdinalIgnoreCase))
         {
-            return new WorkStatusPresentation(StringResources.WorkStatusLive, brushes.Success, RunIndicatorMode.Live);
+            return new WorkStatusPresentation("LIVE", brushes.Success, RunIndicatorMode.Live);
         }
 
         if (string.Equals(snapshot.WorkState, "idle", StringComparison.OrdinalIgnoreCase) ||
             snapshot.Phase == ControlUiPhase.Connected)
         {
-            return new WorkStatusPresentation(StringResources.WorkStatusIdle, brushes.Warning, RunIndicatorMode.Idle);
+            return new WorkStatusPresentation("IDLE", brushes.Warning, RunIndicatorMode.Idle);
         }
 
         return new WorkStatusPresentation(defaultWorkStatus, brushes.Warning, RunIndicatorMode.Wait);

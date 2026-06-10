@@ -48,28 +48,21 @@ internal sealed class GlobalHotkeyService : IDisposable
     /// Attempts to register the specified hotkey binding.
     /// Returns true if registration succeeded, false otherwise.
     /// </summary>
-    public bool TryRegister(HotkeyBinding? binding) => Register(binding).Succeeded;
-
-    /// <summary>
-    /// Attempts to register the specified hotkey binding and returns a failure reason for UI feedback.
-    /// </summary>
-    public GlobalHotkeyRegistrationResult Register(HotkeyBinding? binding)
+    public bool TryRegister(HotkeyBinding? binding)
     {
         Unregister();
 
         if (binding is null || binding.GetVirtualKeyCode() == 0)
         {
-            const string message = "No valid hotkey binding was provided.";
-            _logger.Warning($"hotkey.register.skipped: {message}");
-            return GlobalHotkeyRegistrationResult.Failed(binding, null, message);
+            _logger.Warning("hotkey.register.skipped: no valid binding provided.");
+            return false;
         }
 
         EnsureMessageWindow();
         if (_messageWindowHandle == IntPtr.Zero)
         {
-            const string message = "The hotkey message window could not be created.";
-            _logger.Warning($"hotkey.register.failed: {message}");
-            return GlobalHotkeyRegistrationResult.Failed(binding, Marshal.GetLastWin32Error(), message);
+            _logger.Warning("hotkey.register.failed: message window not available.");
+            return false;
         }
 
         var modifiers = binding.GetWin32Modifiers();
@@ -78,15 +71,14 @@ internal sealed class GlobalHotkeyService : IDisposable
         if (!RegisterHotKey(_messageWindowHandle, HotkeyId, modifiers, vk))
         {
             var error = Marshal.GetLastWin32Error();
-            var message = $"RegisterHotKey returned false for '{binding}'.";
-            _logger.Warning($"hotkey.register.failed: {message} error={error}");
-            return GlobalHotkeyRegistrationResult.Failed(binding, error, message);
+            _logger.Warning($"hotkey.register.failed: RegisterHotKey returned false, error={error}, binding={binding}");
+            return false;
         }
 
         _isRegistered = true;
         _currentBinding = binding;
         _logger.Info("hotkey.register.ok", new { binding = binding.ToString() });
-        return GlobalHotkeyRegistrationResult.Success(binding);
+        return true;
     }
 
     /// <summary>
@@ -232,17 +224,4 @@ internal sealed class GlobalHotkeyService : IDisposable
         public string lpszClassName;
         public IntPtr hIconSm;
     }
-}
-
-internal readonly record struct GlobalHotkeyRegistrationResult(
-    bool Succeeded,
-    HotkeyBinding? Binding,
-    int? ErrorCode,
-    string? Message)
-{
-    public static GlobalHotkeyRegistrationResult Success(HotkeyBinding binding) =>
-        new(true, binding, null, null);
-
-    public static GlobalHotkeyRegistrationResult Failed(HotkeyBinding? binding, int? errorCode, string message) =>
-        new(false, binding, errorCode, message);
 }
