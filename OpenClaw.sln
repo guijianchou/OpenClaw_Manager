@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.0.0
@@ -6,6 +6,10 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw", "src\OpenClaw\OpenClaw.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Core", "src\OpenClaw.Core\OpenClaw.Core.csproj", "{BC4C7184-C8DD-4748-AC82-D26123568BD1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Core.Tests", "tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj", "{6DB246C9-EA2B-474A-8365-26ACD317C0CD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,8 +51,23 @@ Global
 		{BC4C7184-C8DD-4748-AC82-D26123568BD1}.Release|x86.Build.0 = Release|Any CPU
 		{BC4C7184-C8DD-4748-AC82-D26123568BD1}.Release|ARM64.ActiveCfg = Release|Any CPU
 		{BC4C7184-C8DD-4748-AC82-D26123568BD1}.Release|ARM64.Build.0 = Release|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Debug|x64.Build.0 = Debug|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Debug|x86.Build.0 = Debug|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Release|x64.ActiveCfg = Release|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Release|x64.Build.0 = Release|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Release|x86.ActiveCfg = Release|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Release|x86.Build.0 = Release|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD}.Release|ARM64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6DB246C9-EA2B-474A-8365-26ACD317C0CD} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
