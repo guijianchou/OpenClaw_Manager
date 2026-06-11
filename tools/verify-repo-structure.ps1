@@ -3,14 +3,14 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 
-$testsPath = Join-Path $repoRoot 'tests'
-if (Test-Path -LiteralPath $testsPath) {
-    throw 'Active tests/ directory exists, but this checkpoint intentionally keeps tests out of the solution.'
+$testsProjectPath = Join-Path $repoRoot 'tests/OpenClaw.Core.Tests/OpenClaw.Core.Tests.csproj'
+if (-not (Test-Path -LiteralPath $testsProjectPath)) {
+    throw 'tests/OpenClaw.Core.Tests is missing. The Core regression test project must stay in the repository.'
 }
 
 $solution = Get-Content -LiteralPath (Join-Path $repoRoot 'OpenClaw.sln') -Raw
-if ($solution -match 'OpenClaw\.Tests|tests\\OpenClaw\.Tests') {
-    throw 'OpenClaw.sln still references the removed test harness.'
+if ($solution -notmatch [regex]::Escape('tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj')) {
+    throw 'OpenClaw.sln must reference tests/OpenClaw.Core.Tests so the regression suite builds with the solution.'
 }
 
 $coreProjectId = '{BC4C7184-C8DD-4748-AC82-D26123568BD1}'
