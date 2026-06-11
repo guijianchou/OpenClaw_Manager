@@ -8,6 +8,18 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 
 ## English
 
+### v5.2.0 (2026-06-11)
+
+- Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.2.0`.
+- Hardened settings persistence: a corrupt `settings.json` is backed up to `settings.json.corrupt-<timestamp>` before defaults are written, and a transient read failure (file lock, permissions) falls back to in-memory defaults without overwriting the user's settings file.
+- Fixed per-environment WebView2 session isolation: profiles are now created through an explicit `CoreWebView2Environment` with the environment's user data folder. The previous `WEBVIEW2_USER_DATA_FOLDER` environment-variable approach only affected the process-wide default environment, which is created once and cached, so switching gateway environments at runtime silently shared cookies/session state.
+- Fixed Cloudflare Tunnel outage classification: tunnel outages are detected from HTTP `530` behind Cloudflare (`cf-ray` present). The previous `1033` status-code branch was unreachable because Cloudflare reports error 1033 in the response body of a 530, never as an HTTP status code.
+- Guarded the recovery cancellation source against a concurrent cancel/dispose race that could throw `ObjectDisposedException` out of `ShellSessionCoordinator.DetachServices`/`Dispose`.
+- Log retention now re-runs when the UTC date rolls over instead of only at writer startup, so tray-resident instances stop accumulating expired logs.
+- Removed dead configuration options that were persisted but never read (`eventIdleSuspicionSeconds`, `transportIdleSuspicionSeconds`, `enableTelemetryCollection`, `telemetryIntervalSeconds`) and the unused `RecoveryOptionsJsonContext`.
+- Global hotkey parse or registration failures now show a localized diagnostic InfoBar message instead of only logging a warning.
+- Restored the Core regression test project (`tests/OpenClaw.Core.Tests`, 24 tests covering configuration load/corruption/locked-file paths, legacy heartbeat migration, gateway HTTP classification, atomic writes, the WebView circuit breaker, hotkey parsing, and ShellSessionCoordinator recovery throttling/reload-fallback/auth-issue/dispose paths) and the Windows CI workflow; the repository guardrail now requires the test project instead of forbidding it.
+
 ### v5.0.1 (2026-06-01)
 
 - Updated app, assembly, file, package manifest, application manifest, README, Chinese README, and changelog metadata to `5.0.1`.
@@ -294,6 +306,18 @@ Full release notes for OpenClaw Manager. See [README.md](README.md) / [readme_zh
 ---
 
 ## 简体中文
+
+### v5.2.0 (2026-06-11)
+
+- 将 app、assembly、file、package manifest、application manifest、README、中文 README 和 changelog 元数据同步到 `5.2.0`。
+- 加固设置持久化：`settings.json` 损坏时先备份为 `settings.json.corrupt-<时间戳>` 再写默认值；文件被锁、权限不足等暂时性读失败只使用内存默认值，不再覆盖用户的设置文件。
+- 修复按环境隔离的 WebView2 会话：profile 现在通过显式 `CoreWebView2Environment`（指定该环境的 user data folder）创建。原先的 `WEBVIEW2_USER_DATA_FOLDER` 环境变量只影响进程级默认 environment（创建一次后缓存），运行期切换 Gateway 环境会静默共享 cookie/会话状态。
+- 修复 Cloudflare Tunnel 故障分类：改为按 Cloudflare 后的 HTTP `530`（带 `cf-ray`）识别。原先的 `1033` 状态码分支不可达——Cloudflare 的 1033 错误出现在 530 响应体中，永远不会是 HTTP 状态码。
+- 修复恢复操作 CancellationTokenSource 的并发 Cancel/Dispose 竞争，避免 `ObjectDisposedException` 从 `ShellSessionCoordinator.DetachServices`/`Dispose` 抛出。
+- 日志过期清理改为 UTC 日期翻转时重跑，不再只在启动时执行一次，常驻托盘实例不会无限堆积过期日志。
+- 删除写入配置但从未被读取的死配置项（`eventIdleSuspicionSeconds`、`transportIdleSuspicionSeconds`、`enableTelemetryCollection`、`telemetryIntervalSeconds`）和未使用的 `RecoveryOptionsJsonContext`。
+- 全局热键解析或注册失败时显示本地化诊断 InfoBar 提示，不再只写警告日志。
+- 恢复 Core 回归测试项目（`tests/OpenClaw.Core.Tests`，24 个测试，覆盖配置加载/损坏/锁定路径、legacy 心跳迁移、Gateway HTTP 分类、原子写入、WebView 熔断器、热键解析，以及 ShellSessionCoordinator 的恢复节流/reload 回退/AuthIssue/Dispose 路径）和 Windows CI workflow；仓库守护脚本从"禁止 tests/ 存在"反转为"要求测试项目存在"。
 
 ### v5.0.1 (2026-06-01)
 

@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-**当前版本：** 5.0.1
+**当前版本：** 5.2.0
 
 OpenClaw Manager 是一个轻量的 Windows 原生 OpenClaw 远程管理外壳，基于 WinUI 3 和 WebView2 构建。
 
@@ -26,9 +26,15 @@ OpenClaw Manager 是托管版 OpenClaw Control UI 的薄桌面外壳。它面向
 - 通过 Cloudflare Tunnel 或反向代理访问它
 - 想用轻量 Windows 原生客户端，而不是一直开着浏览器标签页
 
-## 当前 5.0.1 注意事项
+## 当前 5.2.0 注意事项
 
-- `5.0.1` 针对 VPS + Cloudflare Tunnel 部署更新 Gateway/Cloudflare 状态模型：heartbeat、diagnostics 和 latency probe 现在共用同一套 HTTP 状态分类，latency probe 改为探测文档中的 `__openclaw__/a2ui/` Control UI 路径，404、405、5xx、Cloudflare Tunnel 1033 等代理或路径故障不会再显示成健康延迟。
+- `5.2.0` 按工程审查结论加固持久化与恢复：`settings.json` 损坏时先备份为 `settings.json.corrupt-<时间戳>` 再写默认值；文件被锁等暂时性读失败只使用内存默认值，不再覆盖用户的设置文件。
+- 按环境隔离的 WebView2 会话现在通过显式 `CoreWebView2Environment`（指定该环境的 user data folder）创建。原先的 `WEBVIEW2_USER_DATA_FOLDER` 环境变量只影响进程级默认 environment，运行期切换环境时会静默共享 cookie/会话状态。
+- Cloudflare Tunnel 故障改为按 Cloudflare 后的 HTTP `530`（带 `cf-ray`）分类；删除了永不可达的 `1033` 状态码分支。
+- 日志过期清理改为 UTC 日期翻转时重跑，常驻托盘不再无限堆积过期日志；全局热键解析或注册失败时显示本地化 InfoBar 提示，不再只写日志。
+- 删除了写入 `settings.json` 但从未被读取的死配置项（`eventIdleSuspicionSeconds`、`transportIdleSuspicionSeconds`、`enableTelemetryCollection`、`telemetryIntervalSeconds`）。
+- 恢复了 Core 回归测试项目（`tests/OpenClaw.Core.Tests`，24 个测试）和 Windows CI workflow；仓库守护脚本从"禁止 tests/"反转为"要求测试项目存在"。
+- `5.0.1` 针对 VPS + Cloudflare Tunnel 部署更新 Gateway/Cloudflare 状态模型：heartbeat、diagnostics 和 latency probe 现在共用同一套 HTTP 状态分类，latency probe 改为探测文档中的 `__openclaw__/a2ui/` Control UI 路径，404、405、5xx 等代理或路径故障不会再显示成健康延迟。
 - Settings 持久化失败现在会回传到 Settings 对话框，不再只写日志却让对话框像保存成功一样关闭。
 - 本轮收尾继续加固 timeout / `Unavailable` 恢复路径：terminal `Unavailable` 会在 `Reconnecting` 时显示可见 InfoBar，`GatewayError` / `Unavailable` 不会让 ShellSessionCoordinator 停留在旧的 Ready/Healthy 投影，completion timeout 后迟到但仍属当前导航的成功 completion 会重新建立 navigation cancellation ownership 并继续正常 page-token/probe 路径。
 - 动态 WebView 重建如果抛出异常，会显示本地化的可操作错误和 Retry，而不是在 timeout recovery 先隐藏 InfoBar 后只写日志。
@@ -216,21 +222,21 @@ dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 
 ### 当前验证方式
 
-当前 checkpoint 有意不保留本地 `tests/` harness。现行自动验证由 restore、x64 build、format、仓库结构 guardrail、bridge 脚本检查和空白差异检查组成：
+现行自动验证由 restore、Core 回归测试、x64 build、format、仓库结构 guardrail、bridge 脚本检查和空白差异检查组成，与 CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）一致：
 
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
+dotnet test tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj -c Debug --no-restore
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
-$env:OPENCLAW_NODE='C:\Users\Zen\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
 git diff --check
 ```
 
 `tools\verify-bridge-scripts.ps1` 默认要求 Node.js，因为它是当前 embedded bridge assets 的行为验证入口。默认 `PATH` 上的 `node` 被阻止或不可用时，可以用 `OPENCLAW_NODE` 指定 Node 可执行文件；只有明确设置 `OPENCLAW_ALLOW_NODE_SKIP=1` 时才会跳过。
 
-Bridge 脚本验证是当前用于拆分后的 hosted bridge JS assets 的行为检查。当前 checkpoint 有意不保留 C# 回归测试 harness。
+Bridge 脚本验证是当前用于拆分后的 hosted bridge JS assets 的行为检查。
 
 真实 WebView2、Gateway、Cloudflare Tunnel、tray、hotkey 和 compact mode 行为仍需要 VS2026 manual debug。
 
@@ -248,10 +254,10 @@ Manual debug 需要明确覆盖：
 
 ### 当前限制
 
-- 仓库内没有 active C# test harness；当前验证依赖 restore/build/format、guardrail scripts、bridge script checks 和 VS2026 manual debug。
-- Bridge 脚本行为由 `tools\verify-bridge-scripts.ps1` 覆盖，但浏览器运行时行为仍需要 WebView2/VS2026 debug；当前 checkpoint 有意不保留 C# harness。
+- 仓库内的 C# 回归测试覆盖 Core 逻辑（配置、分类、恢复状态机、helpers）；WinUI 外壳行为仍依赖 guardrail scripts、bridge script checks 和 VS2026 manual debug。
+- Bridge 脚本行为由 `tools\verify-bridge-scripts.ps1` 覆盖，但浏览器运行时行为仍需要 WebView2/VS2026 debug。
 - `WebViewService` 已拆成聚焦 partial；新的 lifecycle、navigation、inspection、heartbeat、command 和 profile/session 行为应放到对应 partial，而不是继续塞进 root 文件。
-- 真实 Gateway、Cloudflare Tunnel、反代错误页、tray、hotkey、single-instance、DWM title-bar 和 compact mode 行为仍需要 VS2026 manual debug；当前 checkpoint 有意不保留本地 C# harness。
+- 真实 Gateway、Cloudflare Tunnel、反代错误页、tray、hotkey、single-instance、DWM title-bar 和 compact mode 行为仍需要 VS2026 manual debug。
 
 ### 开发日志
 

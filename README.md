@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](readme_zh.md)
 
-**Current version:** 5.0.1
+**Current version:** 5.2.0
 
 Lightweight Windows-native OpenClaw remote management shell built with WinUI 3 and WebView2.
 
@@ -26,9 +26,15 @@ It is best suited for users who:
 - access it through Cloudflare Tunnel or a reverse proxy
 - want a lightweight Windows-native client instead of keeping a browser tab open
 
-## Current 5.0.1 Notes
+## Current 5.2.0 Notes
 
-- `5.0.1` updates the Gateway/Cloudflare status model for VPS deployments behind Cloudflare Tunnel: heartbeat, diagnostics, and latency probes now share one HTTP status classifier, the latency probe targets the documented `__openclaw__/a2ui/` Control UI path, and proxy/path failures such as 404, 405, 5xx, and Cloudflare Tunnel 1033 no longer publish as healthy latency.
+- `5.2.0` hardens persistence and recovery after an engineering review: a corrupt `settings.json` is backed up to `settings.json.corrupt-<timestamp>` before defaults are written, and a transient read failure (file lock, permissions) no longer overwrites the user's settings file.
+- Per-environment WebView2 session isolation now uses an explicit `CoreWebView2Environment` created with the environment's user data folder. The previous `WEBVIEW2_USER_DATA_FOLDER` environment-variable approach only affected the process-wide default environment and could silently share cookies/session state across gateway environments after a runtime switch.
+- Cloudflare Tunnel outages are classified from HTTP `530` behind Cloudflare (`cf-ray` present); the unreachable `1033` status-code branch was removed.
+- Log retention now re-runs when the UTC date rolls over, so a tray-resident instance no longer accumulates expired logs; a global hotkey that fails to parse or register shows a localized InfoBar warning instead of only logging.
+- Dead configuration options (`eventIdleSuspicionSeconds`, `transportIdleSuspicionSeconds`, `enableTelemetryCollection`, `telemetryIntervalSeconds`) were removed from `settings.json`; they were persisted but never read.
+- The Core regression test project (`tests/OpenClaw.Core.Tests`, 24 tests) and the Windows CI workflow are restored; the repository guardrail now requires the test project instead of forbidding it.
+- `5.0.1` updates the Gateway/Cloudflare status model for VPS deployments behind Cloudflare Tunnel: heartbeat, diagnostics, and latency probes now share one HTTP status classifier, the latency probe targets the documented `__openclaw__/a2ui/` Control UI path, and proxy/path failures such as 404, 405, and 5xx no longer publish as healthy latency.
 - Settings persistence failures now flow back to the Settings dialog instead of being logged while the dialog closes as if the save succeeded.
 - `5.0.0` remains the previous refactor-validation baseline. The v3.3.6 cleanup remains the reviewed baseline; this is not intended to rewrite the historical `v3.0.5` / `v3.0.1` / `v3.0.0` release entries in [changelog.md](changelog.md).
 - [docs/code-style.md](docs/code-style.md) is the canonical code-style and architecture guide for this branch.
@@ -211,21 +217,21 @@ dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 
 ### Active Verification
 
-The local `tests/` harness is intentionally absent at this checkpoint. Current automated verification is restore, x64 build, format, repository guardrails, bridge script checks, and whitespace checks:
+Automated verification is restore, the Core regression test suite, x64 build, format, repository guardrails, bridge script checks, and whitespace checks. The same steps run in CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)):
 
 ```powershell
 dotnet restore OpenClaw.sln --locked-mode
+dotnet test tests\OpenClaw.Core.Tests\OpenClaw.Core.Tests.csproj -c Debug --no-restore
 dotnet build OpenClaw.sln -c Debug -p:Platform=x64 --no-restore
 $env:Platform='x64'; dotnet format OpenClaw.sln --verify-no-changes --no-restore
 powershell -ExecutionPolicy Bypass -File tools\verify-repo-structure.ps1
-$env:OPENCLAW_NODE='C:\Users\Zen\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 powershell -ExecutionPolicy Bypass -File tools\verify-bridge-scripts.ps1
 git diff --check
 ```
 
 `tools\verify-bridge-scripts.ps1` requires Node.js by default because it is the active behavior check for embedded bridge assets. Set `OPENCLAW_NODE` to a specific Node executable when the default `node` on `PATH` is blocked or unavailable; set `OPENCLAW_ALLOW_NODE_SKIP=1` only for an explicit local skip.
 
-Bridge script verification is the active behavior check for the split hosted bridge JS assets. The C# regression-test harness is intentionally not present in this checkpoint.
+Bridge script verification is the active behavior check for the split hosted bridge JS assets. It requires Node.js by default; set `OPENCLAW_NODE` to a specific Node executable when the default `node` on `PATH` is blocked or unavailable, or `OPENCLAW_ALLOW_NODE_SKIP=1` only for an explicit local skip.
 
 VS2026 manual debug remains required for real WebView2, Gateway, Cloudflare Tunnel, tray, hotkey, and compact-mode behavior.
 
@@ -243,10 +249,10 @@ Manual debug should explicitly cover:
 
 ### Current Limitations
 
-- There is no active in-repo C# test harness; verification depends on restore/build/format, guardrail scripts, bridge script checks, and VS2026 manual debug.
-- Bridge script behavior is covered by `tools\verify-bridge-scripts.ps1`, but browser-runtime behavior still needs WebView2/VS2026 debug because the C# harness is intentionally absent.
+- The in-repo C# regression suite covers Core logic (configuration, classification, recovery state machine, helpers); WinUI shell behavior is still verified by guardrail scripts, bridge script checks, and VS2026 manual debug.
+- Bridge script behavior is covered by `tools\verify-bridge-scripts.ps1`, but browser-runtime behavior still needs WebView2/VS2026 debug.
 - `WebViewService` is split into focused partials; new lifecycle, navigation, inspection, heartbeat, command, and profile/session behavior should stay in the matching partial instead of the root file.
-- Real Gateway, Cloudflare Tunnel, reverse-proxy error pages, tray, hotkey, single-instance, DWM title-bar, and compact-mode behavior still need VS2026 manual debug because the local C# harness is intentionally absent.
+- Real Gateway, Cloudflare Tunnel, reverse-proxy error pages, tray, hotkey, single-instance, DWM title-bar, and compact-mode behavior still need VS2026 manual debug.
 
 ### Development Notes
 
