@@ -221,6 +221,13 @@ public sealed partial class ShellSessionCoordinator
         }
 
         // The running operation owns disposal in CompleteRecoveryOperation().
-        cancellationSource?.Cancel();
+        try
+        {
+            cancellationSource?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The operation completed and disposed its source concurrently.
+        }
     }
 }
