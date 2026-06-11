@@ -1,7 +1,5 @@
 // Copyright (c) Lanstack @openclaw. All rights reserved.
 
-using System.Text.Json.Serialization;
-
 namespace OpenClaw.Models;
 
 /// <summary>
@@ -34,20 +32,6 @@ public class RecoveryPolicyOptions
     /// Default is 2.
     /// </summary>
     public int MaxSoftResyncAttempts { get; set; } = 2;
-
-    /// <summary>
-    /// Gets or sets the idle suspicion timeout (seconds).
-    /// If no event observed for this duration, connection is considered degraded.
-    /// Default is 120 seconds.
-    /// </summary>
-    public int EventIdleSuspicionSeconds { get; set; } = 120;
-
-    /// <summary>
-    /// Gets or sets the transport idle suspicion timeout (seconds).
-    /// If transport shows no activity for this duration, reconnect is recommended.
-    /// Default is 60 seconds.
-    /// </summary>
-    public int TransportIdleSuspicionSeconds { get; set; } = 60;
 
     /// <summary>
     /// Gets or sets the delay before first reconnect attempt (milliseconds).
@@ -118,29 +102,4 @@ public class DiagnosticsOptions
     /// Default is false (summary only).
     /// </summary>
     public bool EnableVerboseRecoveryLogging { get; set; } = false;
-
-    /// <summary>
-    /// Gets or sets whether to collect telemetry snapshots periodically.
-    /// Default is true.
-    /// </summary>
-    public bool EnableTelemetryCollection { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets the telemetry collection interval in seconds.
-    /// Default is 60 seconds.
-    /// </summary>
-    public int TelemetryIntervalSeconds { get; set; } = 60;
-}
-
-/// <summary>
-/// Source generation context for recovery options serialization.
-/// </summary>
-[JsonSerializable(typeof(RecoveryPolicyOptions))]
-[JsonSerializable(typeof(HeartbeatOptions))]
-[JsonSerializable(typeof(DiagnosticsOptions))]
-[JsonSourceGenerationOptions(
-    WriteIndented = true,
-    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-public partial class RecoveryOptionsJsonContext : JsonSerializerContext
-{
 }
