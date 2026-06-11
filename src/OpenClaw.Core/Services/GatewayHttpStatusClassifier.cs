@@ -74,7 +74,9 @@ public static class GatewayHttpStatusClassifier
                 numericStatusCode,
                 $"Gateway rejected the HTTP probe{proxyHint} ({numericStatusCode}{reason}).",
                 false),
-            1033 => new(
+            // Cloudflare reports a disconnected tunnel as HTTP 530 (body error 1033);
+            // 1033 itself is never an HTTP status code.
+            530 when viaCloudflare => new(
                 GatewayHttpStatusKind.CloudflareTunnelUnavailable,
                 numericStatusCode,
                 $"Cloudflare Tunnel is not connected to the Gateway origin ({numericStatusCode}{reason}).",
