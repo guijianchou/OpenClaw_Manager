@@ -127,10 +127,21 @@ public class LoggingService : IAppLogger
         try
         {
             DeleteExpiredLogs();
+            var lastRetentionSweepDate = DateTime.UtcNow.Date;
 
             while (true)
             {
                 await _queueSignal.WaitAsync(_writerCts.Token).ConfigureAwait(false);
+
+                // The app can stay resident for weeks (tray); re-run retention
+                // whenever the UTC date rolls over instead of only at startup.
+                var utcDate = DateTime.UtcNow.Date;
+                if (utcDate != lastRetentionSweepDate)
+                {
+                    lastRetentionSweepDate = utcDate;
+                    DeleteExpiredLogs();
+                }
+
                 FlushPendingLines();
             }
         }
