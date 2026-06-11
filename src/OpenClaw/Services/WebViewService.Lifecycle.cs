@@ -31,11 +31,17 @@ public partial class WebViewService
             var userDataFolder = GetUserDataFolderForEnvironment(environmentName);
             Directory.CreateDirectory(userDataFolder);
 
-            // In WinUI 3, set user data folder via environment variable before initialization.
-            // This avoids API signature differences between WinUI 3 and Win32 WebView2.
-            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", userDataFolder);
+            // Create an explicit environment per user data folder. The
+            // WEBVIEW2_USER_DATA_FOLDER variable only influences the process-wide
+            // default environment, which is created once and cached, so it cannot
+            // switch profiles when the user changes environments at runtime.
+            var webView2Environment = await CoreWebView2Environment.CreateWithOptionsAsync(
+                browserExecutableFolder: null,
+                userDataFolder: userDataFolder,
+                options: null);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            await webView.EnsureCoreWebView2Async();
+            await webView.EnsureCoreWebView2Async(webView2Environment);
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!IsCurrentInitialization(webView, initializationGeneration))
