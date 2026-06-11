@@ -71,6 +71,16 @@ public partial class MainViewModel
     }
 
     /// <summary>
+    /// Shows a non-blocking shell warning (e.g. hotkey registration failure)
+    /// in the diagnostic InfoBar without touching connection state.
+    /// </summary>
+    public void ShowShellWarning(string message)
+    {
+        DiagnosticSummary = message;
+        IsDiagnosticVisible = true;
+    }
+
+    /// <summary>
     /// Shows an error indicating the WebView recreation circuit breaker has tripped.
     /// </summary>
     public void ShowCircuitBreakerError()

@@ -676,6 +676,9 @@
   <data name="SettingsGlobalHotkeyHint" xml:space="preserve">
     <value>示例：Ctrl+Alt+Space、Shift+F12、Win+Alt+O。如果快捷键已被其他应用占用，OpenClaw 会继续运行并记录警告。</value>
   </data>
+  <data name="GlobalHotkeyRegistrationFailedFormat" xml:space="preserve">
+    <value>全局热键“{0}”注册失败，可能格式无效或已被其他应用占用，请在设置中更换。</value>
+  </data>
   <data name="SettingsValidationGlobalHotkeyRequired" xml:space="preserve">
     <value>请输入热键，或关闭全局热键选项。</value>
   </data>

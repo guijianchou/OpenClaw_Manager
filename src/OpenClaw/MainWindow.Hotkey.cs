@@ -20,6 +20,7 @@ public sealed partial class MainWindow
         if (binding is null)
         {
             App.Logger.Warning($"Global hotkey binding could not be parsed: '{settings.GlobalHotkey}'");
+            NotifyGlobalHotkeyFailed(settings.GlobalHotkey);
             return;
         }
 
@@ -32,7 +33,14 @@ public sealed partial class MainWindow
         {
             _globalHotkeyService.Dispose();
             _globalHotkeyService = null;
+            NotifyGlobalHotkeyFailed(settings.GlobalHotkey);
         }
+    }
+
+    private void NotifyGlobalHotkeyFailed(string hotkey)
+    {
+        ViewModel.ShowShellWarning(
+            string.Format(StringResources.GlobalHotkeyRegistrationFailedFormat, hotkey));
     }
 
     private void DisposeGlobalHotkey()

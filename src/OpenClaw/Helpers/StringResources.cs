@@ -123,6 +123,7 @@ public static class StringResources
     public static string SettingsGlobalHotkeyPlaceholder => Get("SettingsGlobalHotkeyPlaceholder");
     public static string SettingsGlobalHotkeyReset => Get("SettingsGlobalHotkeyReset");
     public static string SettingsGlobalHotkeyHint => Get("SettingsGlobalHotkeyHint");
+    public static string GlobalHotkeyRegistrationFailedFormat => Get("GlobalHotkeyRegistrationFailedFormat");
     public static string SettingsLanguageSystem => Get("SettingsLanguageSystem");
     public static string SettingsLanguageEnglish => Get("SettingsLanguageEnglish");
     public static string SettingsLanguageChineseSimplified => Get("SettingsLanguageChineseSimplified");

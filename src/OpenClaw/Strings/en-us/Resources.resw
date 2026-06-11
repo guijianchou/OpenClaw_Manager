@@ -676,6 +676,9 @@
   <data name="SettingsGlobalHotkeyHint" xml:space="preserve">
     <value>Examples: Ctrl+Alt+Space, Shift+F12, Win+Alt+O. If another app already owns the shortcut, OpenClaw will keep running and log a warning.</value>
   </data>
+  <data name="GlobalHotkeyRegistrationFailedFormat" xml:space="preserve">
+    <value>The global hotkey '{0}' could not be registered. It may be invalid or already in use by another application — change it in Settings.</value>
+  </data>
   <data name="SettingsValidationGlobalHotkeyRequired" xml:space="preserve">
     <value>Enter a hotkey or disable the global hotkey option.</value>
   </data>
