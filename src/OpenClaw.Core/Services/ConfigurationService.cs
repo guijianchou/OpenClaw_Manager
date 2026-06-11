@@ -75,17 +75,38 @@ public class ConfigurationService
 
     /// <summary>
     /// Loads settings from disk. Creates defaults if the file doesn't exist.
+    /// A corrupt file is backed up and replaced with defaults; a transient read
+    /// failure (lock, permissions) falls back to in-memory defaults without
+    /// overwriting the file on disk.
     /// </summary>
     public void Load()
     {
         lock (_lock)
         {
+            string? json = null;
+            var fileExists = false;
+
             try
             {
                 if (File.Exists(_settingsFilePath))
                 {
-                    var json = File.ReadAllText(_settingsFilePath);
-                    var settings = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+                    fileExists = true;
+                    json = File.ReadAllText(_settingsFilePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to read settings file; using in-memory defaults without overwriting it: {ex.Message}");
+                Settings = CreateDefaultSettings();
+                NormalizeSettings(Settings);
+                return;
+            }
+
+            if (fileExists)
+            {
+                try
+                {
+                    var settings = JsonSerializer.Deserialize(json!, AppSettingsJsonContext.Default.AppSettings);
                     if (settings is not null)
                     {
                         var settingsChanged = NormalizeSettings(settings, json);
@@ -97,29 +118,52 @@ public class ConfigurationService
 
                         return;
                     }
+
+                    _logger.Error("Settings file deserialized to null; treating it as corrupt.");
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Failed to load settings: {ex.Message}");
+                catch (Exception ex)
+                {
+                    _logger.Error($"Settings file is corrupt: {ex.Message}");
+                }
+
+                BackUpCorruptSettingsFile();
             }
 
-            // Create default settings with a sample environment
-            Settings = new AppSettings
-            {
-                Environments =
-                [
-                    new EnvironmentConfig
-                    {
-                        Name = "Default",
-                        GatewayUrl = "https://example.com",
-                        IsDefault = true,
-                    }
-                ],
-                SelectedEnvironmentName = "Default",
-            };
+            Settings = CreateDefaultSettings();
             NormalizeSettings(Settings);
             Save();
+        }
+    }
+
+    private static AppSettings CreateDefaultSettings()
+    {
+        // Default settings with a sample environment
+        return new AppSettings
+        {
+            Environments =
+            [
+                new EnvironmentConfig
+                {
+                    Name = "Default",
+                    GatewayUrl = EnvironmentConfig.PlaceholderGatewayUrl,
+                    IsDefault = true,
+                }
+            ],
+            SelectedEnvironmentName = "Default",
+        };
+    }
+
+    private void BackUpCorruptSettingsFile()
+    {
+        try
+        {
+            var backupPath = $"{_settingsFilePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}";
+            File.Copy(_settingsFilePath, backupPath, overwrite: true);
+            _logger.Warning($"Backed up corrupt settings file to '{backupPath}'.");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Failed to back up corrupt settings file: {ex.Message}");
         }
     }
 
